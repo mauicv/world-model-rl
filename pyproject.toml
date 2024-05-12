@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "world-model-rl"
+authors = [
+    {name = "Alex Athorne", email = "alexander.athorne@gmail.com"},
+]
+description = "World model and RL experiments written in pytorch"
+readme = "README.md"
+requires-python = ">=3.7"
+keywords = ["world-models", "RL", "experiments", "pytorch"]
+license = {text = "BSD-3-Clause"}
+classifiers = [
+    "Programming Language :: Python :: 3",
+]
+dependencies = [
+    "torch",
+    'importlib-metadata; python_version<"3.8"',
+    "pyyaml",
+    "numpy"
+]
+dynamic = ["version"]
