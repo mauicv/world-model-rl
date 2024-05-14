@@ -57,6 +57,19 @@ class WorldModel(torch.nn.Module):
             grad_clip=100
         )
 
+    def forward(self, x):
+        z_dist = self.obs_model.encode(x)
+        z = z_dist.rsample()
+        y = self.observation_model.decoder(z)
+        y_hat = self.dynamic_model(y)
+        return y_hat, z, z_dist
+
+    def encode(self, image):
+        b, t, c, h, w = image.shape
+        image = image.reshape(b * t, c, h, w)
+        z = self.observation_model.encode(image)
+        return z.reshape(b, t, -1)
+
     def step(
             self,
             z: torch.Tensor,
