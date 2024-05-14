@@ -69,3 +69,22 @@ def test_world_model(timesteps):
                 'consistency_loss', 'dynamic_loss',
                 'reward_loss', 'done_loss']:
         assert key in results
+
+
+def test_save_load(tmp_path):
+    om = ObservationalModel()
+
+    dm = DynamicsModel(
+        hdn_dim=256,
+        num_heads=8,
+        a_size=8,
+    )
+
+    wm = WorldModel(
+        observation_model=om,
+        dynamic_model=dm,
+        num_ts=16,
+    )    
+
+    wm.save(tmp_path)
+    wm.load(tmp_path)

@@ -134,8 +134,26 @@ class WorldModel(torch.nn.Module):
             'done_loss': done_loss.cpu().item(),
         }
 
-    def load(self):
-        pass
+    def load(self, path):
+        checkpoint = torch.load(f'{path}/world-model-checkpoint.pth')
+        self.observation_model.load_state_dict(
+            checkpoint['observation_model']
+        )
+        self.dynamic_model.load_state_dict(
+            checkpoint['dynamic_model']
+        )
+        self.observation_model_opt.optimizer.load_state_dict(
+            checkpoint['observation_model_opt']
+        )
+        self.dynamic_model_opt.optimizer.load_state_dict(
+            checkpoint['dynamic_model_opt']
+        )
 
-    def save(self):
-        pass
+    def save(self, path):
+        checkpoint = {
+            'observation_model': self.observation_model.state_dict(),
+            'dynamic_model': self.dynamic_model.state_dict(),
+            'observation_model_opt': self.observation_model_opt.optimizer.state_dict(),
+            'dynamic_model_opt': self.dynamic_model_opt.optimizer.state_dict(),
+        }
+        torch.save(checkpoint, f'{path}/world-model-checkpoint.pth')
