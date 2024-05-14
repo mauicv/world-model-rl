@@ -4,6 +4,30 @@ from reflect.models.world_model.observation_model import ObservationalModel
 from reflect.models.world_model.dynamic_model import DynamicsModel
 import torch
 from reflect.models.td3_policy import EPS
+from reflect.utils import (
+    recon_loss_fn,
+    reg_loss_fn,
+    cross_entropy_loss_fn,
+    reward_loss_fn,
+    AdamOptim
+)
+import torch.distributions as D
+from torchvision.transforms import Resize, Compose
+torch.autograd.set_detect_anomaly(True)
+
+done_loss_fn = torch.nn.BCELoss()
+
+
+def create_z_dist(logits, temperature=1):
+    assert temperature > 0
+    dist = D.OneHotCategoricalStraightThrough(logits=logits / temperature)
+    return D.Independent(dist, 1)
+
+
+def get_causal_mask(l):
+    mask = torch.tril(torch.ones(l, l))
+    masked_indices = mask[None, None, :l, :l] == 0
+    return masked_indices
 
 
 class WorldModel(torch.nn.Module):
@@ -14,22 +38,24 @@ class WorldModel(torch.nn.Module):
             num_ts: int,
         ):
         super().__init__()
-        self.observation_model, = observation_model,
+        self.observation_model = observation_model
         self.dynamic_model = dynamic_model
         self.num_ts = num_ts
-
-    def forward(self, x):
-        z_dist = self.obs_model.encode(x)
-        z = z_dist.rsample()
-        y = self.observation_model.decoder(z)
-        y_hat = self.dynamic_model(y)
-        return y_hat, z, z_dist
-
-    def encode(self, image):
-        b, t, c, h, w = image.shape
-        image = image.reshape(b * t, c, h, w)
-        z = self.observation_model.encode(image)
-        return z.reshape(b, t, -1)
+        self.mask = get_causal_mask(self.num_ts)
+        self.observation_model_opt = AdamOptim(
+            self.observation_model.parameters(),
+            lr=0.0001,
+            eps=1e-5,
+            weight_decay=1e-6,
+            grad_clip=100
+        )
+        self.dynamic_model_opt = AdamOptim(
+            self.dynamic_model.parameters(),
+            lr=0.0001,
+            eps=1e-5,
+            weight_decay=1e-6,
+            grad_clip=100
+        )
 
     def step(
             self,
@@ -55,68 +81,61 @@ class WorldModel(torch.nn.Module):
 
         return z, r, d
 
-
-class Environment():
-    def __init__(
+    def update(
             self,
-            world_model: WorldModel,
-            data_loader: EnvDataLoader,
-            batch_size: int
-        ) -> None:
-        self.world_model = world_model
-        self.data_loader = data_loader
-        self.batch_size = batch_size
-        self.states = None
-        self.actions = None
-        self.rewards = None
-        self.dones = None
+            o: torch.Tensor,
+            a: torch.Tensor,
+            r: torch.Tensor,
+            d: torch.Tensor
+        ):
+        self.mask.to(o.device)
+        b, t, *_  = o.shape
+        o = o.flatten(0, 1)
 
-    def reset(self, batch_size=None):
-        if batch_size is None:
-            batch_size = self.batch_size
-        o, a, r, d = self.data_loader.sample(
-            batch_size=batch_size,
-            num_time_steps=1
+        # Observational Model
+        r_o, z, z_dist = self.observation_model(o)
+        recon_loss = recon_loss_fn(o, r_o)
+        reg_loss = 2 * reg_loss_fn(z_dist)
+
+        # Dynamic Models
+        z = z.detach()
+        _, num_z, num_c = z_dist.base_dist.logits.shape
+        z_logits = z_dist.base_dist.logits
+        z_logits = z_logits.reshape(b, t, num_z, num_c)
+        z_logits = z_logits[:, 1:]
+        next_z_dist = create_z_dist(z_logits.detach())
+
+        z = z.reshape(b, t, -1)
+        r_targets = r[:, 1:]
+        d_targets = d[:, 1:]
+        z_inputs, r_inputs, a_inputs = z[:, :-1], r[:, :-1], a[:, :-1]
+        z_pred, r_pred, d_pred = self.dynamic_model(
+            (z_inputs, a_inputs, r_inputs),
+            mask=self.mask
         )
-        self.states = self.world_model.encode(o)
-        self.actions = torch.zeros(batch_size, 0, a.shape[-1])
-        self.rewards = r
-        self.dones = d
-        return self.states, {}
+        dynamic_loss = cross_entropy_loss_fn(z_pred, next_z_dist)
+        reward_loss = reward_loss_fn(r_targets, r_pred)
+        done_loss = done_loss_fn(d_pred, d_targets.float())
 
-    @property
-    def not_done(self):
-        return self.dones[:, -1, 0] <= 0.5
+        # Update observation_model and dynamic_model
+        consistency_loss = 0.01 * cross_entropy_loss_fn(next_z_dist, z_pred)
+        obs_loss = recon_loss + reg_loss + consistency_loss
+        self.observation_model_opt.step(obs_loss, retain_graph=True)
 
-    def step(self, action: torch.Tensor):
-        """Batched Step function for the environment
+        dyn_loss = dynamic_loss + 10 * reward_loss + done_loss
+        self.dynamic_model_opt.step(dyn_loss, retain_graph=False)
 
-        This function takes a batch of actions and returns the next state,
-        reward, and done status for each environment. The function also
-        updates the internal state of the environment.
-        
-        __Note__: The action tensor should have the same batch size as the
-        environment's internal state. Sometimes states are done as a result
-        of the last action, in which case the action tensor should not have
-        an action for that state. The self.not_done property is used to
-        filter out the states that are done.
-        """
-        self.world_model.eval()
-        assert action.shape[0] == self.actions[self.not_done].shape[0], \
-            "Some states are done, but actions are being passed for them."
-        self.actions = torch.cat([self.actions[self.not_done], action], dim=1)
-        z, r, d = self.world_model.step(
-            z=self.states[self.not_done],
-            a=self.actions,
-            r=self.rewards[self.not_done],
-            d=self.dones[self.not_done]
-        )
-        self.world_model.train()
-        self.states = z
-        self.rewards = r
-        self.dones = d
-        return (
-            self.states[:, [-1]],
-            self.rewards[:, [-1]],
-            self.dones[:, [-1]]
-        )
+        return {
+            'recon_loss': recon_loss.cpu().item(),
+            'reg_loss': reg_loss.cpu().item(),
+            'consistency_loss': consistency_loss.cpu().item(),
+            'dynamic_loss': dynamic_loss.cpu().item(),
+            'reward_loss': reward_loss.cpu().item(),
+            'done_loss': done_loss.cpu().item(),
+        }
+
+    def load(self):
+        pass
+
+    def save(self):
+        pass
