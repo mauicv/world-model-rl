@@ -45,7 +45,7 @@ def compute_TD_target(
     return targets.detach()
 
 
-class AgentTrainer:
+class Agent:
     def __init__(self, state_dim, action_space, actor_lr, critic_lr, tau=TAU):
         self.actor_lr = actor_lr
         self.critic_lr = critic_lr
@@ -132,8 +132,8 @@ class AgentTrainer:
         self.critic_2.to(device)
         self.target_critic_2.to(device)
 
-    def to_state_dict(self):
-        return {
+    def save(self, path):
+        state_dict = {
             'actor': self.actor.state_dict(),
             'target_actor': self.target_actor.state_dict(),
             'actor_optim': self.actor_optim.optimizer.state_dict(),
@@ -144,17 +144,19 @@ class AgentTrainer:
             'target_critic_2': self.target_critic_2.state_dict(),
             'critic_2_optim': self.critic_2_optim.optimizer.state_dict(),
         }
+        torch.save(state_dict, f'{path}/agent.pth')
 
-    def from_state_dict(self, state_dict):
-        self.actor.load_state_dict(state_dict['actor'])
-        self.target_actor.load_state_dict(state_dict['target_actor'])
+    def load(self, path):
+        checkpoint = torch.load(f'{path}/agent.pth')
+        self.actor.load_state_dict(checkpoint['actor'])
+        self.target_actor.load_state_dict(checkpoint['target_actor'])
         self.actor_optim.optimizer \
-            .load_state_dict(state_dict['actor_optim'])
-        self.critic_1.load_state_dict(state_dict['critic_1'])
-        self.target_critic_1.load_state_dict(state_dict['target_critic_1'])
+            .load_state_dict(checkpoint['actor_optim'])
+        self.critic_1.load_state_dict(checkpoint['critic_1'])
+        self.target_critic_1.load_state_dict(checkpoint['target_critic_1'])
         self.critic_1_optim.optimizer \
-            .load_state_dict(state_dict['critic_1_optim'])
-        self.critic_2.load_state_dict(state_dict['critic_2'])
-        self.target_critic_2.load_state_dict(state_dict['target_critic_2'])
+            .load_state_dict(checkpoint['critic_1_optim'])
+        self.critic_2.load_state_dict(checkpoint['critic_2'])
+        self.target_critic_2.load_state_dict(checkpoint['target_critic_2'])
         self.critic_2_optim.optimizer \
-            .load_state_dict(state_dict['critic_2_optim'])
+            .load_state_dict(checkpoint['critic_2_optim'])

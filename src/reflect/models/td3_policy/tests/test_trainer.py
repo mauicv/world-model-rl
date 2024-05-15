@@ -1,5 +1,5 @@
 import gymnasium as gym
-from reflect.models.td3_policy.trainer import AgentTrainer
+from reflect.models.td3_policy.trainer import Agent
 import torch
 import pytest
 
@@ -10,7 +10,7 @@ import pytest
 ])
 def test_agent_trainer_update_actor(environment):
     env = gym.make(environment)
-    trainer = AgentTrainer(
+    trainer = Agent(
         state_dim=32,
         action_space=env.action_space,
         actor_lr=0.001,
@@ -27,7 +27,7 @@ def test_agent_trainer_update_actor(environment):
 ])
 def test_agent_trainer_update_critic(environment):
     env = gym.make(environment)
-    trainer = AgentTrainer(
+    trainer = Agent(
         state_dim=32,
         action_space=env.action_space,
         actor_lr=0.001,
@@ -49,7 +49,7 @@ def test_agent_trainer_update_critic(environment):
 def test_agent_trainer_update_critic_target_network(environment):
     # TODO: should check correct difference between target and model
     env = gym.make(environment)
-    trainer = AgentTrainer(
+    trainer = Agent(
         state_dim=32,
         action_space=env.action_space,
         actor_lr=0.001,
@@ -65,10 +65,26 @@ def test_agent_trainer_update_critic_target_network(environment):
 def test_agent_trainer_update_actor_target_network(environment):
     # TODO: should check correct difference between target and model
     env = gym.make(environment)
-    trainer = AgentTrainer(
+    trainer = Agent(
         state_dim=32,
         action_space=env.action_space,
         actor_lr=0.001,
         critic_lr=0.001
     )
     trainer.update_actor_target_network()
+
+@pytest.mark.parametrize("environment", [
+    "Pendulum-v1",
+    "BipedalWalker-v3",
+])
+def test_agent_save_load(environment, tmp_path):
+    # TODO: should check correct difference between target and model
+    env = gym.make(environment)
+    trainer = Agent(
+        state_dim=32,
+        action_space=env.action_space,
+        actor_lr=0.001,
+        critic_lr=0.001
+    )
+    trainer.save(tmp_path)
+    trainer.load(tmp_path)
