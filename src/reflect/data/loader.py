@@ -88,7 +88,8 @@ class EnvDataLoader:
             self.img_buffer[run_index, index] = img
             self.action_buffer[run_index, index] = to_tensor(action)
             # weird issue with pendulum environment always returns 1 reward
-            if self.env.unwrapped.spec.id == "InvertedPendulum-v4":
+            if hasattr(self.env, 'unwrapped') and \
+                    self.env.unwrapped.spec.id == "InvertedPendulum-v4":
                 reward = -10 if done else 1
             self.reward_buffer[run_index, index] = to_tensor(reward)
             self.done_buffer[run_index, index] = to_tensor(done)
