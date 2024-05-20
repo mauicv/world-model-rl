@@ -36,7 +36,7 @@ class SimpleEnvironment:
         return self.actor_loc, reward, False
 
     def render(self):
-        screen = np.ones((self.size, self.size, 3), dtype=np.float32)
+        screen = np.ones((self.size, self.size, 3), dtype=np.float32) * 255
         screen[
             self.actor_loc[0]-2:self.actor_loc[0]+2,
             self.actor_loc[1]-2:self.actor_loc[1]+2,

@@ -12,6 +12,7 @@ from pytfex.transformer.attention import RelativeAttention
 from reflect.models.world_model.head import Head
 from reflect.models.world_model.embedder import Embedder
 from reflect.utils import CSVLogger
+import matplotlib.pyplot as plt
 import torch
 import os
 import click
@@ -241,7 +242,7 @@ def play_real():
                     action = np.array([0, 0.5], dtype=np.float32)
 
         env.step(action)
-        screen = env.render() * 255
+        screen = env.render()
         surface = pygame.surfarray.make_surface(screen)
         surface = pygame.transform.scale(surface, (HEIGHT, WIDTH))
         display.blit(surface, (0, 0))
@@ -304,7 +305,7 @@ def play_model():
         z_screen, *_ = wm_env.step(action[None, None, :])
         screen = wm_env.world_model.decode(z_screen)
         screen = screen[0, 0].detach().cpu().numpy().transpose(1, 2, 0)
-        screen = screen * 255
+        screen = (screen * 255).astype(np.uint8)
         surface = pygame.surfarray.make_surface(screen)
         surface = pygame.transform.scale(surface, (HEIGHT, WIDTH))
         display.blit(surface, (0, 0))
@@ -312,5 +313,39 @@ def play_model():
 
     pygame.quit()
 
+@cli.command()
+def test_observation_model():
+    world_model = make_models()
+    world_model.load("./experiments/wm/")
+
+    env = SimpleEnvironment(
+        size=env_size
+    )
+
+    loader = EnvDataLoader(
+        num_time_steps=t_dim,
+        batch_size=12,
+        num_runs=NUM_RUNS,
+        rollout_length=5*5,
+        transforms=lambda _: _,
+        img_shape=(3, env_size, env_size),
+        env=env,
+        observation_model=world_model.observation_model
+    )
+    loader.perform_rollout()
+
+    o, *_ = loader.sample()
+    o = o[0]
+    world_model.observation_model.eval()
+    r_o, *_ = world_model.observation_model(o)
+
+    fig, axs = plt.subplots(ncols=3, nrows=2)
+    for i in range(3):
+        axs[0, i].imshow(o[i].permute(1, 2, 0).detach())
+        axs[1, i].imshow(r_o[i].permute(1, 2, 0).detach())
+    plt.show()
+
+
 if __name__ == "__main__":
     cli()
+
