@@ -139,7 +139,7 @@ class WorldModel(torch.nn.Module):
 
         # Update observation_model and dynamic_model
         dyn_loss = dynamic_loss + 10 * reward_loss + done_loss
-        consistency_loss = 0.01 * cross_entropy_loss_fn(next_z_dist, z_pred)
+        consistency_loss = cross_entropy_loss_fn(next_z_dist, z_pred)
         obs_loss = recon_loss + reg_loss + consistency_loss
 
         self.dynamic_model_opt.backward(dyn_loss, retain_graph=True)
