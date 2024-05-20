@@ -1,8 +1,9 @@
-from reflect.models.world_model.observation_model import ObservationalModel
+# from reflect.models.world_model.observation_model import ObservationalModel
 from reflect.data.loader import EnvDataLoader
 from reflect.models.world_model import WorldModel
 from reflect.models.world_model.environment import Environment
-from reflect.models.world_model import DynamicsModel
+# from reflect.models.world_model import DynamicsModel
+from conftest import make_dynamic_model
 from reflect.models.world_model.embedder import Embedder as Embedder
 from reflect.models.world_model.head import Head as Head
 from torchvision.transforms import Resize, Compose
@@ -15,21 +16,15 @@ import pytest
     "InvertedPendulum-v4",
     "Ant-v4",
 ])
-def test_environment(env_name):
+def test_environment(env_name, observation_model):
     batch_size=10
     real_env = gym.make(env_name, render_mode="rgb_array")
     action_size = real_env.action_space.shape[0]
 
-    om = ObservationalModel()
-
-    dm = DynamicsModel(
-        hdn_dim=256,
-        num_heads=8,
-        a_size=action_size,
-    )
+    dm = make_dynamic_model(a_size=action_size)
 
     wm = WorldModel(
-        observation_model=om,
+        observation_model=observation_model,
         dynamic_model=dm,
         num_ts=16,
     )
@@ -40,7 +35,7 @@ def test_environment(env_name):
         transforms=Compose([
             Resize((64, 64))
         ]),
-        observation_model=om,
+        observation_model=observation_model,
         env=real_env
     )
 

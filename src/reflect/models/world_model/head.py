@@ -58,6 +58,6 @@ class Head(torch.nn.Module):
         r = self.reward(x)
         s = self.predictor(x)
         d = self.done_output_activation(self.done(x))
-        s = s.view(b, t, self.latent_dim, self.num_cat)
+        s = s.reshape(b, t, self.latent_dim, self.num_cat)
         z_dist = self.create_z_dist(s)
         return z_dist, r, d

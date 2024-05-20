@@ -13,11 +13,13 @@ class AdamOptim:
         self.grad_clip = grad_clip
         self.optimizer = Adam(self.parameters, lr=lr, betas=betas, eps=eps, weight_decay=weight_decay)
 
-    def step(self, loss, retain_graph=False):
+    def backward(self, loss, retain_graph=False):
         self.optimizer.zero_grad()
         loss.backward(retain_graph=retain_graph)
         if self.grad_clip > 0:
             torch.nn.utils.clip_grad_norm_(self.parameters, self.grad_clip)
+
+    def update_parameters(self):
         self.optimizer.step()
 
 
@@ -44,7 +46,7 @@ def cross_entropy_loss_fn(z, z_hat):
     observational model given o_(i).
     """
     cross_entropy = (z.base_dist.logits * z_hat.base_dist.probs).sum(-1)
-    return cross_entropy.mean()
+    return - cross_entropy.mean()
 
 
 def reward_loss_fn(r, r_pred):

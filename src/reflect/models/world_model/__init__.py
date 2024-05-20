@@ -1,7 +1,5 @@
-from reflect.models.td3_policy.actor import Actor
-from reflect.data.loader import EnvDataLoader
 from reflect.models.world_model.observation_model import ObservationalModel
-from reflect.models.world_model.dynamic_model import DynamicsModel
+from pytfex.transformer.gpt import GPT
 import torch
 from reflect.models.td3_policy import EPS
 from reflect.utils import (
@@ -12,8 +10,6 @@ from reflect.utils import (
     AdamOptim
 )
 import torch.distributions as D
-from torchvision.transforms import Resize, Compose
-torch.autograd.set_detect_anomaly(True)
 
 done_loss_fn = torch.nn.BCELoss()
 
@@ -34,13 +30,17 @@ class WorldModel(torch.nn.Module):
     def __init__(
             self,
             observation_model: ObservationalModel,
-            dynamic_model: DynamicsModel,
+            dynamic_model: GPT,
             num_ts: int,
+            num_cat: int=32,
+            num_latent: int=32,
         ):
         super().__init__()
         self.observation_model = observation_model
         self.dynamic_model = dynamic_model
         self.num_ts = num_ts
+        self.num_cat = num_cat
+        self.num_latent = num_latent
         self.mask = get_causal_mask(self.num_ts)
         self.observation_model_opt = AdamOptim(
             self.observation_model.parameters(),
@@ -70,6 +70,12 @@ class WorldModel(torch.nn.Module):
         z = self.observation_model.encode(image)
         return z.reshape(b, t, -1)
 
+    def decode(self, z):
+        b, t, _ = z.shape
+        z = z.reshape(b * t, -1)
+        image = self.observation_model.decode(z)
+        return image.reshape(b, t, *image.shape[1:])
+
     def step(
             self,
             z: torch.Tensor,
@@ -83,7 +89,7 @@ class WorldModel(torch.nn.Module):
             r[:, -self.num_ts:]
         ))
 
-        new_z = z_dist.sample()[:, -1].reshape(-1, 1, 32 * 32)
+        new_z = z_dist.sample()[:, -1].reshape(-1, 1, self.num_cat * self.num_latent)
         z = torch.cat([z, new_z], dim=1)
 
         new_r = new_r[:, -1].reshape(-1, 1, 1)
@@ -99,11 +105,12 @@ class WorldModel(torch.nn.Module):
             o: torch.Tensor,
             a: torch.Tensor,
             r: torch.Tensor,
-            d: torch.Tensor
+            d: torch.Tensor,
         ):
+        torch.autograd.set_detect_anomaly(True)
         self.mask.to(o.device)
-        b, t, *_  = o.shape
-        o = o.flatten(0, 1)
+        b, t, c, h, w  = o.shape
+        o = o.reshape(b * t, c, h, w)
 
         # Observational Model
         r_o, z, z_dist = self.observation_model(o)
@@ -116,7 +123,7 @@ class WorldModel(torch.nn.Module):
         z_logits = z_dist.base_dist.logits
         z_logits = z_logits.reshape(b, t, num_z, num_c)
         z_logits = z_logits[:, 1:]
-        next_z_dist = create_z_dist(z_logits.detach())
+        next_z_dist = create_z_dist(z_logits)
 
         z = z.reshape(b, t, -1)
         r_targets = r[:, 1:]
@@ -131,20 +138,22 @@ class WorldModel(torch.nn.Module):
         done_loss = done_loss_fn(d_pred, d_targets.float())
 
         # Update observation_model and dynamic_model
+        dyn_loss = dynamic_loss + 10 * reward_loss + done_loss
         consistency_loss = 0.01 * cross_entropy_loss_fn(next_z_dist, z_pred)
         obs_loss = recon_loss + reg_loss + consistency_loss
-        self.observation_model_opt.step(obs_loss, retain_graph=True)
 
-        dyn_loss = dynamic_loss + 10 * reward_loss + done_loss
-        self.dynamic_model_opt.step(dyn_loss, retain_graph=False)
+        self.dynamic_model_opt.backward(dyn_loss, retain_graph=True)
+        self.observation_model_opt.backward(obs_loss, retain_graph=False)
+        self.dynamic_model_opt.update_parameters()
+        self.observation_model_opt.update_parameters()
 
         return {
-            'recon_loss': recon_loss.cpu().item(),
-            'reg_loss': reg_loss.cpu().item(),
-            'consistency_loss': consistency_loss.cpu().item(),
-            'dynamic_loss': dynamic_loss.cpu().item(),
-            'reward_loss': reward_loss.cpu().item(),
-            'done_loss': done_loss.cpu().item(),
+            'recon_loss': recon_loss.detach().cpu().item(),
+            'reg_loss': reg_loss.detach().cpu().item(),
+            'consistency_loss': consistency_loss.detach().cpu().item(),
+            'dynamic_loss': dynamic_loss.detach().cpu().item(),
+            'reward_loss': reward_loss.detach().cpu().item(),
+            'done_loss': done_loss.detach().cpu().item(),
         }
 
     def load(self, path):

@@ -228,7 +228,7 @@ def train(environment):
             print(f"Iterations: {iterations}, True rewards: {true_rewards:.2f}, Target rewards: {target_rewards:.2f}")
         
         if (iterations > 0) and (iterations % 10) == 0:
-            torch.save(agent.to_state_dict(), f"./experiments/{environment}/models.pth")
+            agent.save(f"./experiments/{environment}/models.pth")
 
 if __name__ == "__main__":
     cli()

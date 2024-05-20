@@ -1,28 +1,16 @@
-from reflect.models.world_model.observation_model import ObservationalModel
-from reflect.data.loader import EnvDataLoader
 from reflect.models.world_model import WorldModel
-from reflect.models.world_model.environment import Environment
-from reflect.models.world_model import DynamicsModel
 from reflect.models.world_model.embedder import Embedder as Embedder
 from reflect.models.world_model.head import Head as Head
-from torchvision.transforms import Resize, Compose
 import gymnasium as gym
 import torch
 import pytest
 
 
 @pytest.mark.parametrize("timesteps", [5, 16, 18])
-def test_world_model(timesteps):
-    om = ObservationalModel()
-
-    dm = DynamicsModel(
-        hdn_dim=256,
-        num_heads=8,
-        a_size=8,
-    )
-
+def test_world_model(timesteps, observation_model, dynamic_model_8d_action):
+    dm = dynamic_model_8d_action
     wm = WorldModel(
-        observation_model=om,
+        observation_model=observation_model,
         dynamic_model=dm,
         num_ts=16,
     )
@@ -43,17 +31,10 @@ def test_world_model(timesteps):
 
 
 @pytest.mark.parametrize("timesteps", [16])
-def test_world_model(timesteps):
-    om = ObservationalModel()
-
-    dm = DynamicsModel(
-        hdn_dim=256,
-        num_heads=8,
-        a_size=8,
-    )
-
+def test_world_model(timesteps, observation_model, dynamic_model_8d_action):
+    dm = dynamic_model_8d_action
     wm = WorldModel(
-        observation_model=om,
+        observation_model=observation_model,
         dynamic_model=dm,
         num_ts=16,
     )
@@ -71,17 +52,10 @@ def test_world_model(timesteps):
         assert key in results
 
 
-def test_save_load(tmp_path):
-    om = ObservationalModel()
-
-    dm = DynamicsModel(
-        hdn_dim=256,
-        num_heads=8,
-        a_size=8,
-    )
-
+def test_save_load(tmp_path, observation_model, dynamic_model_8d_action):
+    dm = dynamic_model_8d_action
     wm = WorldModel(
-        observation_model=om,
+        observation_model=observation_model,
         dynamic_model=dm,
         num_ts=16,
     )    

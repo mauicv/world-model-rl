@@ -141,8 +141,8 @@ class EnvDataLoader:
         t_inds = torch.cat(t_inds, dim=0)
         t_inds = t_inds[:, None] + torch.arange(0, num_time_steps)
         return (
-            self.img_buffer[b_inds, t_inds],
-            self.action_buffer[b_inds, t_inds],
-            self.reward_buffer[b_inds, t_inds].unsqueeze(-1),
-            self.done_buffer[b_inds, t_inds].unsqueeze(-1),
+            self.img_buffer[b_inds, t_inds].detach(),
+            self.action_buffer[b_inds, t_inds].detach(),
+            self.reward_buffer[b_inds, t_inds].unsqueeze(-1).detach(),
+            self.done_buffer[b_inds, t_inds].unsqueeze(-1).detach(),
         )

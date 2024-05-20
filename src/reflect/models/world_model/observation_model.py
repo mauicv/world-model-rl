@@ -2,75 +2,21 @@ import torch
 from pytfex.convolutional.decoder import DecoderLayer, Decoder
 from pytfex.convolutional.encoder import EncoderLayer, Encoder
 import torch.distributions as D
+from functools import reduce
+import operator
 
 
 class ObservationalModel(torch.nn.Module):
-    def __init__(self, num_classes=32, num_latent=32):
+    def __init__(
+            self,
+            encoder=None,
+            decoder=None,
+            latent_space=None,
+        ):
         super().__init__()
-
-        encoder_layers = [
-            EncoderLayer(
-                in_channels=64,
-                out_channels=128,
-                num_residual=0,
-            ),
-            EncoderLayer(
-                in_channels=128,
-                out_channels=256,
-                num_residual=0,
-            ),
-            EncoderLayer(
-                in_channels=256,
-                out_channels=512,
-                num_residual=0,
-            ),
-            EncoderLayer(
-                in_channels=512,
-                out_channels=1024,
-                num_residual=0,
-            )
-        ]
-
-        self.encoder = Encoder(
-            nc=3,
-            ndf=64,
-            layers=encoder_layers,
-        )
-        
-        layers = [
-            DecoderLayer(
-                in_filters=1024,
-                out_filters=512,
-                num_residual=0,
-            ),
-            DecoderLayer(
-                in_filters=512,
-                out_filters=256,
-                num_residual=0,
-            ),
-            DecoderLayer(
-                in_filters=256,
-                out_filters=128,
-                num_residual=0,
-            ),
-            DecoderLayer(
-                in_filters=128,
-                out_filters=64,
-                num_residual=0,
-            ),
-        ]
-
-        self.decoder = Decoder(
-            nc=3,
-            ndf=64,
-            layers=layers,
-            output_activation=torch.nn.Sigmoid(),
-        )
-
-        self.latent_space = LatentSpace(
-            num_classes=num_classes,
-            num_latent=num_latent
-        )
+        self.encoder = encoder
+        self.decoder = decoder
+        self.latent_space = latent_space
 
     def forward(self, x):
         x_enc = self.encoder(x)
@@ -82,32 +28,44 @@ class ObservationalModel(torch.nn.Module):
         _, z, _ = self.latent_space(x_enc)
         return z
 
+    def decode(self, z):
+        y_enc = self.latent_space.decode(z)
+        return self.decoder(y_enc)
+
 
 class LatentSpace(torch.nn.Module):
-    def __init__(self, num_classes=32, num_latent=32):
+    def __init__(
+            self,
+            input_shape=(1024, 4, 4),
+            num_classes=32,
+            num_latent=32,
+            mid_size=768,    
+        ):
         super().__init__()
 
         self.num_classes = num_classes
         self.num_latent = num_latent
+        self.input_shape = input_shape
+        self.flat_size = reduce(operator.mul, input_shape , 1)
 
         self.enc_mlp = torch.nn.Sequential(
-            torch.nn.Linear(1024*4*4, 768),
+            torch.nn.Linear(self.flat_size, mid_size),
             torch.nn.Dropout(0.1),
             torch.nn.ELU(),
-            torch.nn.Linear(768, 768),
+            torch.nn.Linear(mid_size, mid_size),
             torch.nn.Dropout(0.1),
             torch.nn.ELU(),
-            torch.nn.Linear(768, num_classes*num_latent)
+            torch.nn.Linear(mid_size, num_classes*num_latent)
         )
 
         self.dec_mlp = torch.nn.Sequential(
-            torch.nn.Linear(num_classes*num_latent, 768),
+            torch.nn.Linear(num_classes*num_latent, mid_size),
             torch.nn.ELU(),
             torch.nn.Dropout(0.1),
-            torch.nn.Linear(768, 768),
+            torch.nn.Linear(mid_size, mid_size),
             torch.nn.Dropout(0.1),
             torch.nn.ELU(),
-            torch.nn.Linear(768, 1024*4*4),
+            torch.nn.Linear(mid_size, self.flat_size),
         )
 
     @staticmethod
@@ -117,9 +75,10 @@ class LatentSpace(torch.nn.Module):
         return D.Independent(dist, 1)
 
     def encode(self, x):
-        x = x.flatten(1)
+        b, *_ = x.shape
+        x = x.reshape(b, -1)
         logits = self.enc_mlp(x)
-        logits = logits.unflatten(-1, (self.num_latent, self.num_classes))
+        logits = logits.reshape(-1, self.num_latent, self.num_classes)
         return self.create_z_dist(logits)
 
     def forward(self, x):
@@ -130,5 +89,5 @@ class LatentSpace(torch.nn.Module):
     def decode(self, z):
         z = z.flatten(1)
         x = self.dec_mlp(z)
-        x = x.unflatten(-1, (1024, 4, 4))
+        x = x.unflatten(-1, self.input_shape)
         return x

@@ -8,7 +8,8 @@ class Environment():
             self,
             world_model: WorldModel,
             data_loader: EnvDataLoader,
-            batch_size: int
+            batch_size: int,
+            ignore_done: bool=False
         ) -> None:
         self.world_model = world_model
         self.data_loader = data_loader
@@ -17,6 +18,7 @@ class Environment():
         self.actions = None
         self.rewards = None
         self.dones = None
+        self.ignore_done=ignore_done
 
     def reset(self, batch_size=None):
         if batch_size is None:
@@ -33,6 +35,8 @@ class Environment():
 
     @property
     def not_done(self):
+        if self.ignore_done:
+            return torch.ones_like(self.dones[:, -1, 0]) > 0.5
         return self.dones[:, -1, 0] <= 0.5
 
     def step(self, action: torch.Tensor):
