@@ -26,7 +26,7 @@ BATCH_SIZE=32
 NUM_RUNS=1000
 env_size=16
 hdn_dim=256
-num_heads=8
+num_heads=4
 latent_dim=8
 num_cat=8
 t_dim=3
@@ -119,14 +119,7 @@ def make_models():
         latent_space=latent_space,
     )
 
-    world_model = WorldModel(
-        dynamic_model=dynamic_model,
-        observation_model=observation_model,
-        num_ts=t_dim-1,
-        num_cat=num_cat,
-        num_latent=latent_dim,
-    )
-    return world_model
+    return observation_model, dynamic_model
 
 
 @click.group()
@@ -160,8 +153,27 @@ def plot():
     
 
 @cli.command()
-def train():
-    world_model = make_models()
+@click.option('--dynamic-only', default=False)
+def train(dynamic_only):
+    observation_model, dynamic_model = make_models()
+
+    world_model = WorldModel(
+        dynamic_model=dynamic_model,
+        observation_model=observation_model,
+        num_ts=t_dim-1,
+        num_cat=num_cat,
+        num_latent=latent_dim,
+    )
+
+    if dynamic_only:
+        world_model.load(
+            path="./experiments/wm",
+            name="pretrained-observation-model.pth",
+            targets=[
+                "observation_model",
+                "observation_model_opt"
+            ]
+        )
 
     env = SimpleEnvironment(
         size=env_size
@@ -258,7 +270,16 @@ def play_model():
     HEIGHT, WIDTH = 256, 256
     display = pygame.display.set_mode((HEIGHT, WIDTH))
 
-    world_model = make_models()
+    observation_model, dynamic_model = make_models()
+
+    world_model = WorldModel(
+        dynamic_model=dynamic_model,
+        observation_model=observation_model,
+        num_ts=t_dim-1,
+        num_cat=num_cat,
+        num_latent=latent_dim,
+    )
+
     world_model.load("./experiments/wm/")
 
     env = SimpleEnvironment(
@@ -315,7 +336,16 @@ def play_model():
 
 @cli.command()
 def test_observation_model():
-    world_model = make_models()
+    observation_model, dynamic_model = make_models()
+
+    world_model = WorldModel(
+        dynamic_model=dynamic_model,
+        observation_model=observation_model,
+        num_ts=t_dim-1,
+        num_cat=num_cat,
+        num_latent=latent_dim,
+    )
+
     world_model.load("./experiments/wm/")
 
     env = SimpleEnvironment(

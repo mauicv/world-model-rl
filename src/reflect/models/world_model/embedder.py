@@ -16,14 +16,14 @@ class Embedder(torch.nn.Module):
         self.a_emb = torch.nn.Sequential(
             torch.nn.Linear(a_size, hidden_dim),
             torch.nn.ELU(),
-            torch.nn.Dropout(0.1),
+            torch.nn.Dropout(0.02),
             torch.nn.Linear(hidden_dim, hidden_dim),
         )
 
         self.z_emb = torch.nn.Sequential(
             torch.nn.Linear(z_dim, hidden_dim),
             torch.nn.ELU(),
-            torch.nn.Dropout(0.1),
+            torch.nn.Dropout(0.02),
             torch.nn.Linear(hidden_dim, hidden_dim),
         )
 

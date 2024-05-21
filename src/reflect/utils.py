@@ -22,6 +22,12 @@ class AdamOptim:
     def update_parameters(self):
         self.optimizer.step()
 
+    def load_state_dict(self, state_dict):
+        self.optimizer.load_state_dict(state_dict)
+
+    def state_dict(self):
+        return self.optimizer.state_dict()
+
 
 def recon_loss_fn(x, y):
     x, y = x.permute(0, 2, 3, 1), y.permute(0, 2, 3, 1)
@@ -46,7 +52,7 @@ def cross_entropy_loss_fn(z, z_hat):
     observational model given o_(i).
     """
     cross_entropy = (z.base_dist.logits * z_hat.base_dist.probs).sum(-1)
-    return - cross_entropy.mean()
+    return - cross_entropy.sum()
 
 
 def reward_loss_fn(r, r_pred):

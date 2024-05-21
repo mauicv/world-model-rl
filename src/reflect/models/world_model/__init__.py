@@ -51,7 +51,7 @@ class WorldModel(torch.nn.Module):
         )
         self.dynamic_model_opt = AdamOptim(
             self.dynamic_model.parameters(),
-            lr=0.0001,
+            lr=0.00001,
             eps=1e-5,
             weight_decay=1e-6,
             grad_clip=100
@@ -107,7 +107,13 @@ class WorldModel(torch.nn.Module):
             r: torch.Tensor,
             d: torch.Tensor,
         ):
+        #############
+        # test code #
+        #############
         torch.autograd.set_detect_anomaly(True)
+        def check_no_grad(*tensors):
+            return all((t is None or not t.requires_grad) for t in tensors)
+
         self.mask.to(o.device)
         b, t, c, h, w  = o.shape
         o = o.reshape(b * t, c, h, w)
@@ -120,15 +126,23 @@ class WorldModel(torch.nn.Module):
         # Dynamic Models
         z = z.detach()
         _, num_z, num_c = z_dist.base_dist.logits.shape
-        z_logits = z_dist.base_dist.logits
+        # Note this is wrong when training observation model, detaching z_dist logits
+        # will cause the gradients to not flow through the observation model!
+        z_logits = z_dist.base_dist.logits.detach()
         z_logits = z_logits.reshape(b, t, num_z, num_c)
         z_logits = z_logits[:, 1:]
         next_z_dist = create_z_dist(z_logits)
 
         z = z.reshape(b, t, -1)
-        r_targets = r[:, 1:]
-        d_targets = d[:, 1:]
+        r_targets = r[:, 1:].detach()
+        d_targets = d[:, 1:].detach()
+        
+        assert check_no_grad(next_z_dist.base_dist.logits, r_targets, d_targets) # test code
+
         z_inputs, r_inputs, a_inputs = z[:, :-1], r[:, :-1], a[:, :-1]
+
+        assert check_no_grad(z_inputs, r_inputs, a_inputs) # test code
+
         z_pred, r_pred, d_pred = self.dynamic_model(
             (z_inputs, a_inputs, r_inputs),
             mask=self.mask
@@ -143,9 +157,9 @@ class WorldModel(torch.nn.Module):
         obs_loss = recon_loss + reg_loss + consistency_loss
 
         self.dynamic_model_opt.backward(dyn_loss, retain_graph=True)
-        self.observation_model_opt.backward(obs_loss, retain_graph=False)
+        # self.observation_model_opt.backward(obs_loss, retain_graph=False)
         self.dynamic_model_opt.update_parameters()
-        self.observation_model_opt.update_parameters()
+        # self.observation_model_opt.update_parameters()
 
         return {
             'recon_loss': recon_loss.detach().cpu().item(),
@@ -156,26 +170,44 @@ class WorldModel(torch.nn.Module):
             'done_loss': done_loss.detach().cpu().item(),
         }
 
-    def load(self, path):
-        checkpoint = torch.load(f'{path}/world-model-checkpoint.pth')
-        self.observation_model.load_state_dict(
-            checkpoint['observation_model']
-        )
-        self.dynamic_model.load_state_dict(
-            checkpoint['dynamic_model']
-        )
-        self.observation_model_opt.optimizer.load_state_dict(
-            checkpoint['observation_model_opt']
-        )
-        self.dynamic_model_opt.optimizer.load_state_dict(
-            checkpoint['dynamic_model_opt']
-        )
+    def load(
+            self,
+            path,
+            name="world-model-checkpoint.pth",
+            targets=None
+        ):
+        checkpoint = torch.load(f'{path}/{name}')
+        if targets is None:
+            targets = [
+                'observation_model',
+                'dynamic_model',
+                'observation_model_opt',
+                'dynamic_model_opt'
+            ]
+        
+        for target in targets:
+            print(f'Loading {target}...')
+            getattr(self, target).load_state_dict(
+                checkpoint[target]
+            )
 
-    def save(self, path):
+
+    def save(
+            self,
+            path,
+            name="world-model-checkpoint.pth",
+            targets=None
+        ):
+        if targets is None:
+            targets = [
+                'observation_model',
+                'dynamic_model',
+                'observation_model_opt',
+                'dynamic_model_opt'
+            ]
+        
         checkpoint = {
-            'observation_model': self.observation_model.state_dict(),
-            'dynamic_model': self.dynamic_model.state_dict(),
-            'observation_model_opt': self.observation_model_opt.optimizer.state_dict(),
-            'dynamic_model_opt': self.dynamic_model_opt.optimizer.state_dict(),
+            target: getattr(self, target).state_dict()
+            for target in targets
         }
-        torch.save(checkpoint, f'{path}/world-model-checkpoint.pth')
+        torch.save(checkpoint, f'{path}/{name}')
