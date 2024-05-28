@@ -106,15 +106,18 @@ class Agent:
         loss_1 = loss_1.mean()
         loss_2 = (targets.detach() - current_state_action_values_2[:, 0])**2
         loss_2 = loss_2.mean()
-        self.critic_1_optim.step(loss_1)
-        self.critic_2_optim.step(loss_2)
+        self.critic_1_optim.backward(loss_1)
+        self.critic_1_optim.update_parameters()
+        self.critic_2_optim.backward(loss_2)
+        self.critic_2_optim.update_parameters()
         return loss_1.detach().item(), loss_2.detach().item()
 
     def update_actor(self, states):
         actions = self.actor(states)
         action_values = - self.critic_1(states, actions)
         actor_loss=action_values.mean()
-        self.actor_optim.step(actor_loss)
+        self.actor_optim.backward(actor_loss)
+        self.actor_optim.update_parameters()
         return actor_loss.detach().item()
 
     def update_critic_target_network(self):

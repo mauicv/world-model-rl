@@ -25,15 +25,16 @@ BURNIN_STEPS=100
 TRAIN_STEPS=1000
 BATCH_SIZE=32
 NUM_RUNS=1000
+
 env_size=16
-hdn_dim=128
-num_heads=2
-latent_dim=4
-num_cat=4
-input_dim=latent_dim*num_cat
+hdn_dim=256
+num_heads=4
+latent_dim=8
+num_cat=8
 t_dim=3
+input_dim=8*8
 num_layers=4
-dropout=0.0
+dropout=0.05
 a_size=2
 
 
@@ -98,7 +99,7 @@ def make_models():
             in_filters=128,
             out_filters=64,
             num_residual=0,
-        ),
+        )
     ]
 
     decoder = Decoder(
@@ -163,6 +164,15 @@ def train():
         num_ts=t_dim-1,
         num_cat=num_cat,
         num_latent=latent_dim,
+    )
+
+    world_model.load(
+        path='experiments/wm',
+        name="pretrained-observation-model.pth",
+        targets=[
+            "observation_model",
+            "observation_model_opt"
+        ]
     )
 
     env = SimpleEnvironment(
