@@ -1,4 +1,4 @@
-from reflect.data.simple_env import SimpleEnvironment
+from reflect.data.simple_rl_env import SimpleRLEnvironment
 from reflect.data.loader import EnvDataLoader
 from reflect.models.world_model.observation_model import ObservationalModel, LatentSpace
 from reflect.models.world_model.environment import Environment
@@ -175,7 +175,7 @@ def train():
         ]
     )
 
-    env = SimpleEnvironment(
+    env = SimpleRLEnvironment(
         size=env_size
     )
 
@@ -207,7 +207,7 @@ def train():
     for _ in range(BURNIN_STEPS):
         loader.perform_rollout()
 
-    for i in range(10000):
+    for i in range(100000):
         loader.perform_rollout()
         imgs, actions, rewards, dones = loader.sample()
         history = world_model.update(
@@ -217,7 +217,7 @@ def train():
             d=dones,
         )
         logger.log(**history)
-        print(f"i: {i}, recon_loss: {history['recon_loss']:.2f}, 'dynamic_loss': {history['dynamic_loss']:.2f}")
+        print(f"i: {i}, recon_loss: {history['recon_loss']:.2f}, 'dynamic_loss': {history['dynamic_loss']:.2f}, 'reward_loss': {history['reward_loss']:.2f}")
 
         if (i > 0) and (i % 100) == 0:
             world_model.save("./experiments/wm/")
@@ -230,13 +230,19 @@ def play_real():
     HEIGHT, WIDTH = 256, 256
     display = pygame.display.set_mode((HEIGHT, WIDTH))
 
-    env = SimpleEnvironment(
-        size=env_size
+    black=(0,0,0)
+    myFont = pygame.font.SysFont("Times New Roman", 18)
+    randNumLabel = myFont.render("reward:", 1, black)
+
+    env = SimpleRLEnvironment(
+        size=env_size,
+        num_threats=4
     )
     env.reset()
     screen = env.render()
     
     running = True
+    reward_sum = 0
     while running:
         time.sleep(0.1)
         action = np.array([0, 0], dtype=np.float32)
@@ -246,19 +252,23 @@ def play_real():
 
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_LEFT:
-                    action = np.array([-0.8, 0], dtype=np.float32)
+                    action = np.array([-0.2, 0], dtype=np.float32)
                 if event.key == pygame.K_RIGHT:
-                    action = np.array([0.8, 0], dtype=np.float32)
+                    action = np.array([0.2, 0], dtype=np.float32)
                 if event.key == pygame.K_UP:
-                    action = np.array([0, -0.8], dtype=np.float32)
+                    action = np.array([0, -0.2], dtype=np.float32)
                 if event.key == pygame.K_DOWN:
-                    action = np.array([0, 0.8], dtype=np.float32)
-        # action = env.action_space.sample()
-        env.step(action)
+                    action = np.array([0, 0.2], dtype=np.float32)
+
+        _, r, _ = env.step(action)
+        reward_sum += r
+        diceDisplay = myFont.render(str(reward_sum), 1, black)
         screen = env.render()
         surface = pygame.surfarray.make_surface(screen)
         surface = pygame.transform.scale(surface, (HEIGHT, WIDTH))
         display.blit(surface, (0, 0))
+        display.blit(randNumLabel, (0, 0))
+        display.blit(diceDisplay, (60, 0))
         pygame.display.update()
 
     pygame.quit()
@@ -270,6 +280,15 @@ def play_model():
     pygame.init()
     HEIGHT, WIDTH = 256, 256
     display = pygame.display.set_mode((HEIGHT, WIDTH))
+
+    black=(0,0,0)
+    myFont = pygame.font.SysFont("Times New Roman", 18)
+    randNumLabel = myFont.render("reward:", 1, black)
+
+    env = SimpleRLEnvironment(
+        size=env_size,
+        num_threats=4
+    )
 
     observation_model, dynamic_model = make_models()
 
@@ -283,7 +302,7 @@ def play_model():
 
     world_model.load("./experiments/wm/")
 
-    env = SimpleEnvironment(
+    env = SimpleRLEnvironment(
         size=env_size
     )
 
@@ -308,6 +327,7 @@ def play_model():
     
     wm_env.reset()
     running = True
+    reward_sum = 0
     while running:
         time.sleep(0.1)
 
@@ -318,21 +338,25 @@ def play_model():
 
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_LEFT:
-                    action = torch.tensor([-1, 0], dtype=torch.float32)
+                    action = torch.tensor([-0.2, 0], dtype=torch.float32)
                 if event.key == pygame.K_RIGHT:
-                    action = torch.tensor([1, 0], dtype=torch.float32)
+                    action = torch.tensor([0.2, 0], dtype=torch.float32)
                 if event.key == pygame.K_UP:
-                    action = torch.tensor([0, -1], dtype=torch.float32)
+                    action = torch.tensor([0, -0.2], dtype=torch.float32)
                 if event.key == pygame.K_DOWN:
-                    action = torch.tensor([0, 1], dtype=torch.float32)
+                    action = torch.tensor([0, 0.2], dtype=torch.float32)
 
-        z_screen, *_ = wm_env.step(action[None, None, :])
+        z_screen, r, *_ = wm_env.step(action[None, None, :])
+        reward_sum += r.item()
+        diceDisplay = myFont.render(str(reward_sum), 1, black)
         screen = wm_env.world_model.decode(z_screen)
         screen = screen[0, 0].detach().cpu().numpy().transpose(1, 2, 0)
         screen = (screen * 255).astype(np.uint8)
         surface = pygame.surfarray.make_surface(screen)
         surface = pygame.transform.scale(surface, (HEIGHT, WIDTH))
         display.blit(surface, (0, 0))
+        display.blit(randNumLabel, (0, 0))
+        display.blit(diceDisplay, (60, 0))
         pygame.display.update()
 
     pygame.quit()
@@ -351,7 +375,7 @@ def test_observation_model():
 
     world_model.load("./experiments/wm/")
 
-    env = SimpleEnvironment(
+    env = SimpleRLEnvironment(
         size=env_size
     )
 
