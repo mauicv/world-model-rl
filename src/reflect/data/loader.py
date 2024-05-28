@@ -72,15 +72,21 @@ class EnvDataLoader:
         self.transforms = transforms
 
     def perform_rollout(self, noise=0.5):
+        """Performs a rollout of the environment.
+
+        Iterate rollouts and store the images, actions, rewards, and done
+        signals in the corresponding buffers.
+
+        Note: we store (s_t, a_t, r_t, d_t) in the buffers. where _t denotes
+        the time step. So a_t is the action taken at time step t not the action
+        that generated s_t.
+        """
         _ = self.env.reset()
         img = self.env.render()
         img = self._preprocess(img)
         done = False
         reward = 0
         for index in range(self.rollout_length):
-            # Note: The image generates the current state. These are stored 
-            # pair-wise in the buffer. This is not the state-action pair
-            # where the state is the state generated from the action.
             action = self.compute_action(
                 img[None, :],
                 noise=noise

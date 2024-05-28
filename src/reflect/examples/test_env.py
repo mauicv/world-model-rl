@@ -4,18 +4,31 @@ from gymnasium.spaces import Box
 import numpy as np
 
 
+class Space():
+    def __init__(self, low, high, shape, dtype):
+        self.low = low
+        self.high = high
+        self.shape = shape
+        self.dtype = dtype
+
+    def sample(self):
+        if np.random.uniform() < 0.5:
+            return np.array([0, 0])
+        return np.random.uniform(self.low, self.high, self.shape).astype(self.dtype)
+
+
 class SimpleEnvironment:
     def __init__(self, size=64) -> None:
         self.actor_loc = None
         self.screen = None
         self.size = size
-        self.action_space = Box(
+        self.action_space = Space(
             low=-1,
             high=1,
             shape=(2, ),
             dtype=float
         )
-        self.observation_space = Box(
+        self.observation_space = Space(
             low=0,
             high=self.size,
             shape=(2, ),

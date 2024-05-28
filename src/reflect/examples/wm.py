@@ -19,16 +19,17 @@ import click
 import numpy as np
 import pygame
 from reflect.utils import create_z_dist
+import time
 
 BURNIN_STEPS=100
 TRAIN_STEPS=1000
 BATCH_SIZE=32
 NUM_RUNS=1000
-env_size=6
+env_size=16
 hdn_dim=128
 num_heads=2
-latent_dim=3
-num_cat=3
+latent_dim=4
+num_cat=4
 input_dim=latent_dim*num_cat
 t_dim=3
 num_layers=4
@@ -74,6 +75,11 @@ def make_models():
             out_channels=128,
             num_residual=0,
         ),
+        EncoderLayer(
+            in_channels=128,
+            out_channels=256,
+            num_residual=0,
+        ),
     ]
 
     encoder = Encoder(
@@ -82,7 +88,12 @@ def make_models():
         layers=encoder_layers,
     )
     
-    layers = [
+    decoder_layers = [
+        DecoderLayer(
+            in_filters=256,
+            out_filters=128,
+            num_residual=0,
+        ),
         DecoderLayer(
             in_filters=128,
             out_filters=64,
@@ -93,14 +104,14 @@ def make_models():
     decoder = Decoder(
         nc=3,
         ndf=64,
-        layers=layers,
+        layers=decoder_layers,
         output_activation=torch.nn.Sigmoid(),
     )
 
     latent_space = LatentSpace(
         num_latent=latent_dim,
         num_classes=num_cat,
-        input_shape=(128, 3, 3),
+        input_shape=(256, 4, 4),
     )
 
     observation_model = ObservationalModel(
@@ -217,6 +228,7 @@ def play_real():
     
     running = True
     while running:
+        time.sleep(0.1)
         action = np.array([0, 0], dtype=np.float32)
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -231,6 +243,7 @@ def play_real():
                     action = np.array([0, -0.8], dtype=np.float32)
                 if event.key == pygame.K_DOWN:
                     action = np.array([0, 0.8], dtype=np.float32)
+        # action = env.action_space.sample()
         env.step(action)
         screen = env.render()
         surface = pygame.surfarray.make_surface(screen)
@@ -286,6 +299,8 @@ def play_model():
     wm_env.reset()
     running = True
     while running:
+        time.sleep(0.1)
+
         action = torch.tensor([0, 0], dtype=torch.float32)
         for event in pygame.event.get():
             if event.type == pygame.QUIT:

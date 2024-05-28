@@ -1,3 +1,6 @@
+from typing import Optional
+from dataclasses import dataclass
+
 from reflect.models.world_model.observation_model import ObservationalModel
 from pytfex.transformer.gpt import GPT
 import torch
@@ -21,6 +24,16 @@ def get_causal_mask(l):
     return masked_indices
 
 
+@dataclass
+class WorldModelTrainingParams:
+    reg_coeff: float = 0.05
+    recon_coeff: float = 1.0
+    dynamic_coeff: float = 1.0
+    consistency_coeff: float = 0.001
+    reward_coeff: float = 10.0
+    done_coeff: float = 1.0
+
+
 class WorldModel(torch.nn.Module):
     def __init__(
             self,
@@ -29,8 +42,11 @@ class WorldModel(torch.nn.Module):
             num_ts: int,
             num_cat: int=32,
             num_latent: int=32,
+            params: Optional[WorldModelTrainingParams] = None,
         ):
         super().__init__()
+        if params is None:
+            self.params = WorldModelTrainingParams()
         self.observation_model = observation_model
         self.dynamic_model = dynamic_model
         self.num_ts = num_ts
@@ -100,7 +116,10 @@ class WorldModel(torch.nn.Module):
             a: torch.Tensor,
             r: torch.Tensor,
             d: torch.Tensor,
+            params: Optional[WorldModelTrainingParams] = None,
         ):
+        if params is None:
+            params = self.params
 
         self.mask.to(o.device)
         b, t, c, h, w  = o.shape
@@ -109,7 +128,7 @@ class WorldModel(torch.nn.Module):
         # Observational Model
         r_o, z, z_logits = self.observation_model(o)
         recon_loss = recon_loss_fn(o, r_o)
-        reg_loss = 0.1 * reg_loss_fn(z_logits)
+        reg_loss = reg_loss_fn(z_logits)
 
         # Dynamic Models
         z = z.detach()
@@ -138,11 +157,19 @@ class WorldModel(torch.nn.Module):
         done_loss = done_loss_fn(d_pred, d_targets.float())
 
         # Update observation_model and dynamic_model
-        dyn_loss = dynamic_loss + 10 * reward_loss + done_loss
+        dyn_loss = (
+            params.dynamic_coeff * dynamic_loss 
+            + params.reward_coeff * reward_loss
+            + params.done_coeff * done_loss
+        )
         consistency_loss = cross_entropy_loss_fn(c_z_dist, z_pred).detach()
         # TODO: Consistency loss seems to penalize both the observation 
         # model and the dynamic model? Why?
-        obs_loss = recon_loss + reg_loss + 0.01 * consistency_loss
+        obs_loss = (
+            params.recon_coeff * recon_loss 
+            + params.reg_coeff * reg_loss 
+            + params.consistency_coeff * consistency_loss
+        )
 
         self.dynamic_model_opt.backward(dyn_loss, retain_graph=False)
         self.observation_model_opt.backward(obs_loss, retain_graph=False)
