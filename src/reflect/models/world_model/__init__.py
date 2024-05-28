@@ -26,10 +26,10 @@ def get_causal_mask(l):
 
 @dataclass
 class WorldModelTrainingParams:
-    reg_coeff: float = 0.05
+    reg_coeff: float = 0.0
     recon_coeff: float = 1.0
     dynamic_coeff: float = 1.0
-    consistency_coeff: float = 0.001
+    consistency_coeff: float = 0.0
     reward_coeff: float = 10.0
     done_coeff: float = 1.0
 
@@ -46,7 +46,8 @@ class WorldModel(torch.nn.Module):
         ):
         super().__init__()
         if params is None:
-            self.params = WorldModelTrainingParams()
+            params = WorldModelTrainingParams()
+        self.params = params
         self.observation_model = observation_model
         self.dynamic_model = dynamic_model
         self.num_ts = num_ts
