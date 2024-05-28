@@ -8,7 +8,7 @@ class Embedder(torch.nn.Module):
             self,
             z_dim: int=None,
             a_size: int=None,
-            hidden_dim: int=None
+            hidden_dim: int=None,
         ):
         super(Embedder, self).__init__()
         self.r_emb = torch.nn.Linear(1, hidden_dim)
@@ -16,14 +16,12 @@ class Embedder(torch.nn.Module):
         self.a_emb = torch.nn.Sequential(
             torch.nn.Linear(a_size, hidden_dim),
             torch.nn.ELU(),
-            torch.nn.Dropout(0.02),
             torch.nn.Linear(hidden_dim, hidden_dim),
         )
 
         self.z_emb = torch.nn.Sequential(
             torch.nn.Linear(z_dim, hidden_dim),
             torch.nn.ELU(),
-            torch.nn.Dropout(0.02),
             torch.nn.Linear(hidden_dim, hidden_dim),
         )
 

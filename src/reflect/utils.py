@@ -35,23 +35,32 @@ def recon_loss_fn(x, y):
     return - y_dist.log_prob(x).mean()
 
 
-def reg_loss_fn(z_dist):
+def reg_loss_fn(z_logits, temperature=1):
+    z_dist = D.OneHotCategoricalStraightThrough(logits=z_logits / temperature)
+    z_dist = D.Independent(z_dist, 1)
     _, a, b = z_dist.base_dist.probs.shape
     max_entropy = a * math.log(b)
     return - z_dist.entropy().mean() / max_entropy
 
 
+def create_z_dist(logits, temperature=1):
+    assert temperature > 0
+    dist = D.OneHotCategoricalStraightThrough(logits=logits / temperature)
+    return D.Independent(dist, 1)
+
 def cross_entropy_loss_fn(z, z_hat):
     """
-    In the case of the observational model, the cross_entropy_loss_fn is the 
-    consistency loss. In that case the z is the output of the observational 
+    In the case of the observational model, the cross_entropy_loss_fn is the
+    consistency loss. In that case the z is the output of the observational
     model for o_(i) and z_hat is the output of the dynamic model from z_(i-1)
 
     In the case of the dynamic loss, these are the otherway around. So z is
     the output of the dynamic model given z_(i-1) and z_hat is the output of the
     observational model given o_(i).
     """
-    cross_entropy = (z.base_dist.logits * z_hat.base_dist.probs).sum(-1)
+    cross_entropy = (
+        z.base_dist.logits * z_hat.base_dist.probs.detach()
+    ).sum(-1)
     return - cross_entropy.sum()
 
 

@@ -18,21 +18,21 @@ import os
 import click
 import numpy as np
 import pygame
-
+from reflect.utils import create_z_dist
 
 BURNIN_STEPS=100
 TRAIN_STEPS=1000
 BATCH_SIZE=32
 NUM_RUNS=1000
-env_size=16
-hdn_dim=256
-num_heads=4
-latent_dim=8
-num_cat=8
+env_size=6
+hdn_dim=128
+num_heads=2
+latent_dim=3
+num_cat=3
+input_dim=latent_dim*num_cat
 t_dim=3
-input_dim=8*8
 num_layers=4
-dropout=0.05
+dropout=0.0
 a_size=2
 
 
@@ -74,11 +74,6 @@ def make_models():
             out_channels=128,
             num_residual=0,
         ),
-        EncoderLayer(
-            in_channels=128,
-            out_channels=256,
-            num_residual=0,
-        ),
     ]
 
     encoder = Encoder(
@@ -89,15 +84,10 @@ def make_models():
     
     layers = [
         DecoderLayer(
-            in_filters=256,
-            out_filters=128,
-            num_residual=0,
-        ),
-        DecoderLayer(
             in_filters=128,
             out_filters=64,
             num_residual=0,
-        )
+        ),
     ]
 
     decoder = Decoder(
@@ -110,7 +100,7 @@ def make_models():
     latent_space = LatentSpace(
         num_latent=latent_dim,
         num_classes=num_cat,
-        input_shape=(256, 4, 4),
+        input_shape=(128, 3, 3),
     )
 
     observation_model = ObservationalModel(
@@ -153,8 +143,7 @@ def plot():
     
 
 @cli.command()
-@click.option('--dynamic-only', default=False)
-def train(dynamic_only):
+def train():
     observation_model, dynamic_model = make_models()
 
     world_model = WorldModel(
@@ -164,16 +153,6 @@ def train(dynamic_only):
         num_cat=num_cat,
         num_latent=latent_dim,
     )
-
-    if dynamic_only:
-        world_model.load(
-            path="./experiments/wm",
-            name="pretrained-observation-model.pth",
-            targets=[
-                "observation_model",
-                "observation_model_opt"
-            ]
-        )
 
     env = SimpleEnvironment(
         size=env_size
@@ -207,7 +186,7 @@ def train(dynamic_only):
     for _ in range(BURNIN_STEPS):
         loader.perform_rollout()
 
-    for i in range(TRAIN_STEPS):
+    for i in range(10000):
         loader.perform_rollout()
         imgs, actions, rewards, dones = loader.sample()
         history = world_model.update(
@@ -245,14 +224,13 @@ def play_real():
 
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_LEFT:
-                    action = np.array([-0.5, 0], dtype=np.float32)
+                    action = np.array([-0.8, 0], dtype=np.float32)
                 if event.key == pygame.K_RIGHT:
-                    action = np.array([0.5, 0], dtype=np.float32)
+                    action = np.array([0.8, 0], dtype=np.float32)
                 if event.key == pygame.K_UP:
-                    action = np.array([0, -0.5], dtype=np.float32)
+                    action = np.array([0, -0.8], dtype=np.float32)
                 if event.key == pygame.K_DOWN:
-                    action = np.array([0, 0.5], dtype=np.float32)
-
+                    action = np.array([0, 0.8], dtype=np.float32)
         env.step(action)
         screen = env.render()
         surface = pygame.surfarray.make_surface(screen)
@@ -315,13 +293,13 @@ def play_model():
 
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_LEFT:
-                    action = torch.tensor([-0.5, 0], dtype=torch.float32)
+                    action = torch.tensor([-1, 0], dtype=torch.float32)
                 if event.key == pygame.K_RIGHT:
-                    action = torch.tensor([0.5, 0], dtype=torch.float32)
+                    action = torch.tensor([1, 0], dtype=torch.float32)
                 if event.key == pygame.K_UP:
-                    action = torch.tensor([0, -0.5], dtype=torch.float32)
+                    action = torch.tensor([0, -1], dtype=torch.float32)
                 if event.key == pygame.K_DOWN:
-                    action = torch.tensor([0, 0.5], dtype=torch.float32)
+                    action = torch.tensor([0, 1], dtype=torch.float32)
 
         z_screen, *_ = wm_env.step(action[None, None, :])
         screen = wm_env.world_model.decode(z_screen)
@@ -367,7 +345,9 @@ def test_observation_model():
     o, *_ = loader.sample()
     o = o[0]
     world_model.observation_model.eval()
-    r_o, *_ = world_model.observation_model(o)
+    r_o, _, logits = world_model.observation_model(o)
+    dist = create_z_dist(logits)
+    print(dist.base_dist.probs)
 
     fig, axs = plt.subplots(ncols=3, nrows=2)
     for i in range(3):

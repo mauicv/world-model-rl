@@ -75,15 +75,17 @@ class EnvDataLoader:
         _ = self.env.reset()
         img = self.env.render()
         img = self._preprocess(img)
+        done = False
+        reward = 0
         for index in range(self.rollout_length):
+            # Note: The image generates the current state. These are stored 
+            # pair-wise in the buffer. This is not the state-action pair
+            # where the state is the state generated from the action.
             action = self.compute_action(
                 img[None, :],
                 noise=noise
             )
-            _, reward, done, *_ \
-                = self.env.step(action.cpu().numpy())
-            img = self.env.render()
-            img = self._preprocess(img)
+
             run_index = self.rollout_ind % self.num_runs
             self.img_buffer[run_index, index] = img
             self.action_buffer[run_index, index] = to_tensor(action)
@@ -93,6 +95,11 @@ class EnvDataLoader:
                 reward = -10 if done else 1
             self.reward_buffer[run_index, index] = to_tensor(reward)
             self.done_buffer[run_index, index] = to_tensor(done)
+
+            _, reward, done, *_ \
+                = self.env.step(action.cpu().numpy())
+            img = self.env.render()
+            img = self._preprocess(img)
             if done and index > self.num_time_steps:
                 break
         self.end_index[run_index] = index

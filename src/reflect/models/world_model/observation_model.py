@@ -79,12 +79,13 @@ class LatentSpace(torch.nn.Module):
         x = x.reshape(b, -1)
         logits = self.enc_mlp(x)
         logits = logits.reshape(-1, self.num_latent, self.num_classes)
-        return self.create_z_dist(logits)
+        return logits
 
     def forward(self, x):
-        z_dist = self.encode(x)
+        z_logits = self.encode(x)
+        z_dist = self.create_z_dist(z_logits)
         z_sample = z_dist.rsample()
-        return self.decode(z_sample), z_sample, z_dist
+        return self.decode(z_sample), z_sample, z_logits
 
     def decode(self, z):
         z = z.flatten(1)
