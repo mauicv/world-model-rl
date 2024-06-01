@@ -1,5 +1,8 @@
 # World Model RL
 
+__Note__: This codebase is a work in progress.
+
+
 This repo contains code to perform reinforcement learning inside learnt world models. My focus is n continuous control tasks. It's based on a number of different papers:
 
 1. [World Models](https://arxiv.org/abs/1803.10122), see also [this blog post](https://worldmodels.github.io/). Introduce the idea of a world model. In particular they use a VAE to learn a latent space of the environment and an RNN to predict the next latent state. They then use a controller to generate actions based on the latent state. The controller is trained using CMA-ES.
