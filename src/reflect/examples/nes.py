@@ -1,7 +1,6 @@
 import gymnasium as gym
 import matplotlib.pyplot as plt
 import torch
-from tqdm import tqdm
 from reflect.models.nes_policy.model import NESPolicy, rank_transform
 
 
