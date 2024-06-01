@@ -16,9 +16,10 @@ classifiers = [
     "Programming Language :: Python :: 3",
 ]
 dependencies = [
-    "torch",
-    'importlib-metadata; python_version<"3.8"',
-    "pyyaml",
-    "numpy"
+    "pytfex@git+https://github.com/mauicv/transformers.git",
+    "pygame",
+    "click",
+    "matplotlib",
+    "gymnasium[mujoco]",
 ]
 dynamic = ["version"]

@@ -178,9 +178,9 @@ def train(environment):
                 reward_samples = torch.tensor(reward_samples)
                 done_samples = torch.tensor(done_samples)
                 action_samples = torch.tensor(action_samples)
-                nosie = torch.randn_like(action_samples) * ACTION_REG_SIG
+                noise = torch.randn_like(action_samples) * ACTION_REG_SIG
                 action_samples = action_samples + torch.clamp(
-                    nosie,
+                    noise,
                     -ACTION_REG_CLIP,
                     ACTION_REG_CLIP
                 )

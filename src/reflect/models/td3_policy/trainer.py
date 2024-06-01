@@ -6,9 +6,19 @@ from reflect.models.td3_policy.critic import Critic
 from reflect.utils import AdamOptim
 
 
+ACTION_REG_SIG=0.05
+ACTION_REG_CLIP = 0.2
+ACTOR_UPDATE_FREQ = 2
+TAU=5e-3
+ACTOR_LR=1e-3
+CRITIC_LR=1e-3
+GAMMA=0.99
+EPS=0.5
+
+
 def to_tensor(t):
     if isinstance(t, torch.Tensor):
-        return t
+        return t.detach()
     return torch.tensor(t)
 
 
@@ -46,7 +56,14 @@ def compute_TD_target(
 
 
 class Agent:
-    def __init__(self, state_dim, action_space, actor_lr, critic_lr, tau=TAU):
+    def __init__(
+            self,
+            state_dim,
+            action_space,
+            actor_lr,
+            critic_lr,
+            tau=TAU
+        ):
         self.actor_lr = actor_lr
         self.critic_lr = critic_lr
         self.tau = tau
@@ -68,6 +85,41 @@ class Agent:
         self.target_critic_2.load_state_dict(copy.deepcopy(self.critic_2.state_dict()))
         self.critic_2_optim = AdamOptim(self.critic_2.parameters(), lr=self.critic_lr)
 
+    def update(
+        self,
+        state_samples,
+        next_state_samples,
+        action_samples,
+        reward_samples,
+        done_samples
+    ):
+        actor_loss = None
+        noise = torch.randn_like(action_samples) * ACTION_REG_SIG
+        action_samples = action_samples + torch.clamp(
+            noise,
+            -ACTION_REG_CLIP,
+            ACTION_REG_CLIP
+        )
+
+        q_loss_1, q_loss_2 = self.update_critic(
+            state_samples,
+            next_state_samples,
+            action_samples,
+            reward_samples,
+            done_samples,
+            gamma=GAMMA
+        )
+        self.update_critic_target_network()
+
+        actor_loss = self.update_actor(state_samples)
+        self.update_actor_target_network()
+
+        return {
+            "critic_1_loss": q_loss_1,
+            "critic_2_loss": q_loss_2,
+            "actor_loss": actor_loss
+        }
+
     def update_critic(
             self,
             current_states,
@@ -77,6 +129,13 @@ class Agent:
             dones,
             gamma=GAMMA
         ):
+        current_actions = to_tensor(current_actions)
+        current_states = to_tensor(current_states)
+        next_states = to_tensor(next_states)
+        rewards = to_tensor(rewards)
+        dones = to_tensor(dones)
+
+
         targets_1 = compute_TD_target(
             next_states,
             rewards,
@@ -106,19 +165,20 @@ class Agent:
         loss_1 = loss_1.mean()
         loss_2 = (targets.detach() - current_state_action_values_2[:, 0])**2
         loss_2 = loss_2.mean()
-        self.critic_1_optim.backward(loss_1)
+        self.critic_1_optim.backward(loss_1, retain_graph=True)
         self.critic_1_optim.update_parameters()
         self.critic_2_optim.backward(loss_2)
         self.critic_2_optim.update_parameters()
-        return loss_1.detach().item(), loss_2.detach().item()
+        return loss_1.item(), loss_2.item()
 
     def update_actor(self, states):
+        states = states.detach()
         actions = self.actor(states)
         action_values = - self.critic_1(states, actions)
         actor_loss=action_values.mean()
         self.actor_optim.backward(actor_loss)
         self.actor_optim.update_parameters()
-        return actor_loss.detach().item()
+        return actor_loss.item()
 
     def update_critic_target_network(self):
         update_target_network(self.target_critic_1, self.critic_1, tau=self.tau)

@@ -39,6 +39,10 @@ class Environment():
             return torch.ones_like(self.dones[:, -1, 0]) > 0.5
         return self.dones[:, -1, 0] <= 0.5
 
+    @property
+    def done(self):
+        return torch.all(~self.not_done)
+
     def step(self, action: torch.Tensor):
         """Batched Step function for the environment
 

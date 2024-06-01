@@ -111,6 +111,29 @@ class WorldModel(torch.nn.Module):
 
         return z, r, d
 
+    def update_observation_model(
+            self,
+            o: torch.Tensor,
+            params: Optional[WorldModelTrainingParams] = None,
+        ):
+        if params is None:
+            params = self.params
+
+        self.mask.to(o.device)
+        b, t, c, h, w  = o.shape
+        o = o.reshape(b * t, c, h, w)
+        r_o, _, z_logits = self.observation_model(o)
+        recon_loss = recon_loss_fn(o, r_o)
+        reg_loss = reg_loss_fn(z_logits)
+        loss = params.recon_coeff * recon_loss + params.reg_coeff * reg_loss
+        self.observation_model_opt.backward(loss, retain_graph=False)
+        self.observation_model_opt.update_parameters()
+
+        return {
+            'recon_loss': recon_loss.detach().cpu().item(),
+            'reg_loss': reg_loss.detach().cpu().item(),
+        }
+
     def update(
             self,
             o: torch.Tensor,
