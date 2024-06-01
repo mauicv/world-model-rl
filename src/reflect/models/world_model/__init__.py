@@ -145,7 +145,7 @@ class WorldModel(torch.nn.Module):
         if params is None:
             params = self.params
 
-        self.mask.to(o.device)
+        self.mask = self.mask.to(o.device)
         b, t, c, h, w  = o.shape
         o = o.reshape(b * t, c, h, w)
 
