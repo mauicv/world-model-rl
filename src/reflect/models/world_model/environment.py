@@ -27,17 +27,22 @@ class Environment():
             batch_size=batch_size,
             num_time_steps=1
         )
+        device = next(self.world_model.parameters()).device
+        o, r, d = o.to(device), r.to(device), d.to(device)
         self.states = self.world_model.encode(o)
-        self.actions = torch.zeros(batch_size, 0, a.shape[-1])
+        self.actions = torch.zeros(batch_size, 0, a.shape[-1], device=device)
         self.rewards = r
         self.dones = d
         return self.states, {}
 
     @property
     def not_done(self):
+        device = next(self.world_model.parameters()).device
         if self.ignore_done:
-            return torch.ones_like(self.dones[:, -1, 0]) > 0.5
-        return self.dones[:, -1, 0] <= 0.5
+            done_bool = torch.ones_like(self.dones[:, -1, 0]) > 0.5
+            return done_bool.to(device)
+        done_bool = self.dones[:, -1, 0] <= 0.5
+        return done_bool.to(device)
 
     @property
     def done(self):
