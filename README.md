@@ -27,6 +27,14 @@ source venv/bin/activate
 pytest src
 ```
 
+## Experiments:
+
+1. [glass-peanut-soup](https://colab.research.google.com/drive/1s8FZ0mGFKeInGpBRuOouLCGHc6rzWB07) trains world model on the invereted pendulum task.
+2. [stone-salmon-hair](https://colab.research.google.com/drive/1bwKoxEkn-LHeCUKxaUiE9XjRTj5jFvag) adds a controller to the world model.
+3. [lead-run-garb](https://colab.research.google.com/drive/1TApLx--lVQwr64uMSiRYQLs2sbYnuFOl) trains world model on bipedal walker task.
+
+
+
 ## Examples
 
 Three examples are provided in the `examples` directory.

@@ -63,7 +63,7 @@ def play(environment):
         input_dim=state_dim,
         action_space=action_space,
     )
-    models_state_dict = torch.load(f"./experiments/{environment}/models.pth")
+    models_state_dict = torch.load(f"./experiments/{environment}/agent.pth")
     actor.load_state_dict(models_state_dict['actor'])
     actor.eval()
     state, _ = env.reset()
@@ -178,30 +178,18 @@ def train(environment):
                 reward_samples = torch.tensor(reward_samples)
                 done_samples = torch.tensor(done_samples)
                 action_samples = torch.tensor(action_samples)
-                noise = torch.randn_like(action_samples) * ACTION_REG_SIG
-                action_samples = action_samples + torch.clamp(
-                    noise,
-                    -ACTION_REG_CLIP,
-                    ACTION_REG_CLIP
-                )
 
-                q_loss_1, q_loss_2 = agent.update_critic(
+                history = agent.update(
                     state_samples,
                     next_state_samples,
                     action_samples,
                     reward_samples,
-                    done_samples,
-                    gamma=GAMMA
+                    done_samples
                 )
-                critic_1_losses.append(q_loss_1)
-                critic_2_losses.append(q_loss_2)
 
-                if (iterations % ACTOR_UPDATE_FREQ) == 0:
-                    actor_loss = agent.update_actor(state_samples)
-                    actor_losses.append(actor_loss)
-                    agent.update_actor_target_network()
-
-                agent.update_critic_target_network()
+                critic_1_losses.append(history['critic_1_loss'])
+                critic_2_losses.append(history['critic_2_loss'])
+                actor_losses.append(history['actor_loss'])
 
         if (iterations > BURNIN_EPOCHS) and (iterations % ACTOR_UPDATE_FREQ == 0):
             target_rewards, avg_action = test_policy(
@@ -228,7 +216,7 @@ def train(environment):
             print(f"Iterations: {iterations}, True rewards: {true_rewards:.2f}, Target rewards: {target_rewards:.2f}")
         
         if (iterations > 0) and (iterations % 10) == 0:
-            agent.save(f"./experiments/{environment}/models.pth")
+            agent.save(f"./experiments/{environment}")
 
 if __name__ == "__main__":
     cli()

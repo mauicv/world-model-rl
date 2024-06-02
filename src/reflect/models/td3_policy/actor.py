@@ -35,6 +35,14 @@ class Actor(torch.nn.Module):
             BIAS_FINAL_INIT
         )
 
+    def to(self, *args, **kwargs):
+        super().to(*args, **kwargs)
+        self.bounds = tuple(map(
+            lambda x: x.to(*args, **kwargs),
+            self.bounds
+        ))
+        return self
+
     def forward(self, x):
         x = self.fc1(x)
         x = F.relu(x)
@@ -45,12 +53,18 @@ class Actor(torch.nn.Module):
         return torch.sigmoid(x) * (u - l) + l
 
     def compute_action(self, state, eps=0):
+        device = next(self.parameters()).device
         self.eval()
         if len(state.shape) == 1: state=state[None, :]
-        if not torch.is_tensor(state): state = torch.tensor(state, dtype=torch.float32)
+        if not torch.is_tensor(state):
+            state = torch.tensor(
+                state,
+                dtype=torch.float32,
+                device=device
+            )
         action = self(state)
-        nosie = torch.randn_like(action, device=state.device) * eps
-        action = action + nosie
+        noise = torch.randn_like(action, device=device) * eps
+        action = action + noise
         action = torch.clip(action, *self.bounds)
         action = action.to(state.device)
         self.train()
