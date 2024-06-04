@@ -215,7 +215,11 @@ class WorldModel(torch.nn.Module):
             name="world-model-checkpoint.pth",
             targets=None
         ):
-        checkpoint = torch.load(f'{path}/{name}')
+        device = next(self.parameters()).device
+        checkpoint = torch.load(
+            f'{path}/{name}',
+            map_location=torch.device(device)
+        )
         if targets is None:
             targets = [
                 'observation_model',
@@ -229,7 +233,6 @@ class WorldModel(torch.nn.Module):
             getattr(self, target).load_state_dict(
                 checkpoint[target]
             )
-
 
     def save(
             self,
