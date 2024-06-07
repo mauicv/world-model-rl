@@ -180,11 +180,11 @@ def train(environment):
                 action_samples = torch.tensor(action_samples)
 
                 history = agent.update(
-                    state_samples,
-                    next_state_samples,
-                    action_samples,
-                    reward_samples,
-                    done_samples
+                    state_samples.detach(),
+                    next_state_samples.detach(),
+                    action_samples.detach(),
+                    reward_samples.detach(),
+                    done_samples.detach()
                 )
 
                 critic_1_losses.append(history['critic_1_loss'])

@@ -149,7 +149,8 @@ def make_models():
     )
 
     world_model.load(
-        "./experiments/pendulum-world-model/"
+        "./experiments/pendulum-world-model/",
+        name="world-model-checkpoint-3.pth"
     )
 
     env = gym.make(

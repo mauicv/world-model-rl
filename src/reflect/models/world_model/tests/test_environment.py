@@ -48,12 +48,11 @@ def test_environment(env_name, observation_model):
     )
     state, _ = env.reset()
     assert state.shape == (batch_size, 1, 1024)
-    
+    env.dones = torch.zeros((batch_size, 1, 1))
     cur_batch_size = batch_size
     for i in range(2, 25):
         actions = torch.zeros((cur_batch_size, 1, action_size))
         states, rewards, dones = env.step(actions)
-
         random_done = torch.randint(0, cur_batch_size, (1,)).item()
         dones[random_done, -1, 0] = 1
         env.dones[random_done, -1, 0] = 1

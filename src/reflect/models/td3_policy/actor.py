@@ -5,35 +5,40 @@ BIAS_FINAL_INIT = 3e-4
 
 
 class Actor(torch.nn.Module):
-    def __init__(self, input_dim, action_space):
+    def __init__(self, input_dim, action_space, num_layers=4, hidden_dim=512):
         super().__init__()
         self.input_dim = input_dim
         self.output_dim = action_space.shape[0]
         self.bounds = (
-            torch.tensor(
-                action_space.low,
-                dtype=torch.float32
-            ),
-            torch.tensor(
-                action_space.high,
-                dtype=torch.float32
-            )
+            torch.tensor(action_space.low, dtype=torch.float32),
+            torch.tensor(action_space.high, dtype=torch.float32)
         )
+        self.num_layers=num_layers
+        self.hidden_dim=hidden_dim
 
-        self.fc1 = torch.nn.Linear(self.input_dim, 400)
-        self.fc2 = torch.nn.Linear(400, 300)
-        self.fc3 = torch.nn.Linear(300, self.output_dim)
+        layers = []
+        layers.append(torch.nn.Linear(
+            self.input_dim, hidden_dim
+        ))
+        for _ in range(num_layers - 1):
+            layers.extend([
+                torch.nn.Linear(hidden_dim, hidden_dim),
+                torch.nn.SiLU()
+            ])
 
-        torch.nn.init.uniform_(
-            self.fc3.weight,
-            -WEIGHTS_FINAL_INIT,
-            WEIGHTS_FINAL_INIT
-        )
-        torch.nn.init.uniform_(
-            self.fc3.bias,
-            -BIAS_FINAL_INIT,
-            BIAS_FINAL_INIT
-        )
+        layers.append(torch.nn.Linear(hidden_dim, self.output_dim))
+        self.layers = torch.nn.Sequential(*layers)
+
+        # torch.nn.init.uniform_(
+        #     self.fc3.weight,
+        #     -WEIGHTS_FINAL_INIT,
+        #     WEIGHTS_FINAL_INIT
+        # )
+        # torch.nn.init.uniform_(
+        #     self.fc3.bias,
+        #     -BIAS_FINAL_INIT,
+        #     BIAS_FINAL_INIT
+        # )
 
     def to(self, *args, **kwargs):
         super().to(*args, **kwargs)
@@ -44,11 +49,7 @@ class Actor(torch.nn.Module):
         return self
 
     def forward(self, x):
-        x = self.fc1(x)
-        x = F.relu(x)
-        x = self.fc2(x)
-        x = F.relu(x)
-        x = self.fc3(x)
+        x = self.layers(x)
         l, u = self.bounds
         return torch.sigmoid(x) * (u - l) + l
 

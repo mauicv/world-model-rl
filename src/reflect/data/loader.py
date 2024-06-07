@@ -86,13 +86,13 @@ class EnvDataLoader:
         img = self._preprocess(img)
         done = False
         reward = 0
+        run_index = self.rollout_ind % self.num_runs
         for index in range(self.rollout_length):
             action = self.compute_action(
                 img[None, :],
                 noise=noise
             )
 
-            run_index = self.rollout_ind % self.num_runs
             self.img_buffer[run_index, index] = img
             self.action_buffer[run_index, index] = to_tensor(action)
             # weird issue with pendulum environment always returns 1 reward
@@ -149,7 +149,7 @@ class EnvDataLoader:
         end_inds = self.end_index[b_inds]
         t_inds = []
         for end_ind in end_inds:
-            t_ind = torch.randint(0, (end_ind - self.num_time_steps), (1, ))
+            t_ind = torch.randint(0, (end_ind - num_time_steps), (1, ))
             t_inds.append(t_ind)
         t_inds = torch.cat(t_inds, dim=0)
         t_inds = t_inds[:, None] + torch.arange(0, num_time_steps)
