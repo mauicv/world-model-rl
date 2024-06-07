@@ -5,7 +5,7 @@ BIAS_FINAL_INIT = 3e-4
 
 
 class Critic(torch.nn.Module):
-    def __init__(self, state_dim, action_space, num_layers=4, hidden_dim=512):
+    def __init__(self, state_dim, action_space, num_layers=3, hidden_dim=512):
         super().__init__()
         self.state_dim = state_dim
         self.action_dim = action_space.shape[0]
@@ -13,13 +13,16 @@ class Critic(torch.nn.Module):
         self.hidden_dim=hidden_dim
 
         layers = []
-        layers.append(torch.nn.Linear(
-            self.state_dim + self.action_dim, hidden_dim
-        ))
+        layers.extend([
+            torch.nn.Linear(
+                self.state_dim + self.action_dim, hidden_dim
+            ),
+            torch.nn.ReLU()
+        ])
         for _ in range(num_layers - 1):
             layers.extend([
                 torch.nn.Linear(hidden_dim, hidden_dim),
-                torch.nn.SiLU()
+                torch.nn.ReLU()
             ])
 
         final_layer = torch.nn.Linear(hidden_dim, 1)

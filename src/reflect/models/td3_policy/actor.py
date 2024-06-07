@@ -5,7 +5,7 @@ BIAS_FINAL_INIT = 3e-4
 
 
 class Actor(torch.nn.Module):
-    def __init__(self, input_dim, action_space, num_layers=4, hidden_dim=512):
+    def __init__(self, input_dim, action_space, num_layers=3, hidden_dim=512):
         super().__init__()
         self.input_dim = input_dim
         self.output_dim = action_space.shape[0]
@@ -17,9 +17,12 @@ class Actor(torch.nn.Module):
         self.hidden_dim=hidden_dim
 
         layers = []
-        layers.append(torch.nn.Linear(
-            self.input_dim, hidden_dim
-        ))
+        layers.extend([
+            torch.nn.Linear(
+                self.input_dim, hidden_dim
+            ),
+            torch.nn.ReLU()
+        ])
         for _ in range(num_layers - 1):
             layers.extend([
                 torch.nn.Linear(hidden_dim, hidden_dim),
