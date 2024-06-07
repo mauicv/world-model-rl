@@ -138,7 +138,22 @@ class EnvDataLoader:
         x = x / 256
         return x
 
-    def sample(self, batch_size=None, num_time_steps=None):
+    def sample(
+            self,
+            batch_size=None,
+            num_time_steps=None,
+            from_start=False
+        ):
+        """Sample a batch of data from the buffer.
+        
+        args:
+            batch_size: int, optional
+                The number of samples to return.
+            num_time_steps: int, optional
+                The number of time steps to sample.
+            from_start: bool, optional
+                If True, sample from the start of the rollout.
+        """
         if not batch_size:
             batch_size = self.batch_size
         if not num_time_steps:
@@ -148,10 +163,13 @@ class EnvDataLoader:
         b_inds = torch.randint(0, max_index, (batch_size, 1))
         end_inds = self.end_index[b_inds]
         t_inds = []
-        for end_ind in end_inds:
-            t_ind = torch.randint(0, (end_ind - num_time_steps), (1, ))
-            t_inds.append(t_ind)
-        t_inds = torch.cat(t_inds, dim=0)
+        if from_start:
+            t_inds = torch.zeros(batch_size, dtype=torch.int)
+        else:
+            for end_ind in end_inds:
+                t_ind = torch.randint(0, (end_ind - num_time_steps), (1, ))
+                t_inds.append(t_ind)
+            t_inds = torch.cat(t_inds, dim=0)
         t_inds = t_inds[:, None] + torch.arange(0, num_time_steps)
         return (
             self.img_buffer[b_inds, t_inds].detach(),

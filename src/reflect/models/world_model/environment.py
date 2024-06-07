@@ -25,7 +25,8 @@ class Environment():
             batch_size = self.batch_size
         o, a, r, d = self.data_loader.sample(
             batch_size=batch_size,
-            num_time_steps=1
+            num_time_steps=1,
+            from_start=True
         )
         device = next(self.world_model.parameters()).device
         o, r, d = o.to(device), r.to(device), d.to(device)
