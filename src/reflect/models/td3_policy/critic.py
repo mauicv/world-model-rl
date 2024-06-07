@@ -22,19 +22,20 @@ class Critic(torch.nn.Module):
                 torch.nn.SiLU()
             ])
 
-        layers.append(torch.nn.Linear(hidden_dim, 1))
+        final_layer = torch.nn.Linear(hidden_dim, 1)
+        layers.append(final_layer)
         self.layers = torch.nn.Sequential(*layers)
 
-        # torch.nn.init.uniform_(
-        #     self.fc3.weight,
-        #     -WEIGHTS_FINAL_INIT,
-        #     WEIGHTS_FINAL_INIT
-        # )
-        # torch.nn.init.uniform_(
-        #     self.fc3.bias,
-        #     -BIAS_FINAL_INIT,
-        #     BIAS_FINAL_INIT
-        # )
+        torch.nn.init.uniform_(
+            final_layer.weight,
+            -WEIGHTS_FINAL_INIT,
+            WEIGHTS_FINAL_INIT
+        )
+        torch.nn.init.uniform_(
+            final_layer.bias,
+            -BIAS_FINAL_INIT,
+            BIAS_FINAL_INIT
+        )
 
     def forward(self, states, actions):
         x = torch.cat((states, actions), dim=-1)

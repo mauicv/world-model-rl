@@ -26,19 +26,20 @@ class Actor(torch.nn.Module):
                 torch.nn.SiLU()
             ])
 
-        layers.append(torch.nn.Linear(hidden_dim, self.output_dim))
+        final_layer = torch.nn.Linear(hidden_dim, self.output_dim)
+        layers.append(final_layer)
         self.layers = torch.nn.Sequential(*layers)
 
-        # torch.nn.init.uniform_(
-        #     self.fc3.weight,
-        #     -WEIGHTS_FINAL_INIT,
-        #     WEIGHTS_FINAL_INIT
-        # )
-        # torch.nn.init.uniform_(
-        #     self.fc3.bias,
-        #     -BIAS_FINAL_INIT,
-        #     BIAS_FINAL_INIT
-        # )
+        torch.nn.init.uniform_(
+            final_layer.weight,
+            -WEIGHTS_FINAL_INIT,
+            WEIGHTS_FINAL_INIT
+        )
+        torch.nn.init.uniform_(
+            final_layer.bias,
+            -BIAS_FINAL_INIT,
+            BIAS_FINAL_INIT
+        )
 
     def to(self, *args, **kwargs):
         super().to(*args, **kwargs)
