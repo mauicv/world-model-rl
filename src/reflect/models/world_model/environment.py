@@ -20,7 +20,10 @@ class Environment():
         self.dones = None
         self.ignore_done=ignore_done
 
-    def reset(self, batch_size=None):
+    def reset(
+            self,
+            batch_size=None,
+        ):
         if batch_size is None:
             batch_size = self.batch_size
         o, a, r, d = self.data_loader.sample(
@@ -51,8 +54,9 @@ class Environment():
     def done(self):
         return torch.all(~self.not_done)
 
-    def step(self, action: torch.Tensor):
-        """Batched Step function for the environment
+    def step_filter(self, action: torch.Tensor):
+        """Batched Step function for the environment that also filters out
+        the states that are done.
 
         This function takes a batch of actions and returns the next state,
         reward, and done status for each environment. The function also
@@ -82,4 +86,39 @@ class Environment():
             self.states[:, [-1]],
             self.rewards[:, [-1]],
             (self.dones[:, [-1]] >= 0.5).to(int)
+        )
+
+    def step(self, action: torch.Tensor):
+        """Batched Step function for the environment
+
+        This function takes a batch of actions and returns the next state,
+        reward, and done status for each environment. The function also
+        updates the internal state of the environment.
+        """
+        assert action.shape[0] == self.actions.shape[0], \
+            "States and actions have different batch sizes."
+        self.actions = torch.cat([self.actions, action], dim=1)
+        z, r, d = self.world_model.step(
+            z=self.states,
+            a=self.actions,
+            r=self.rewards,
+            d=self.dones
+        )
+        self.states = z
+        self.rewards = r
+        prev_done = ~self.not_done
+        self.dones = d
+        self.dones[prev_done, [-1]] = 1
+        return (
+            self.states[:, [-1]],
+            self.rewards[:, [-1]],
+            (self.dones[:, [-1]] >= 0.5).to(int)
+        )
+
+    def get_rollouts(self):
+        return (
+            self.states[:, 1:],
+            self.actions[:, 1:],
+            self.rewards[:, 1:],
+            self.dones[:, 1:]
         )

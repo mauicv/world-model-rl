@@ -104,7 +104,7 @@ def play_agent():
                 running = False
 
         action = agent.actor.compute_action(z_screen)
-        z_screen, r, *_ = wm_env.step(action)
+        z_screen, r, *_ = wm_env.step_filter(action)
         reward_sum += r.item()
         diceDisplay = myFont.render(str(reward_sum), 1, black)
         screen = wm_env.world_model.decode(z_screen)

@@ -149,7 +149,7 @@ def train_full(load):
                 current_state,
                 eps=EPS
             )
-            next_state, reward, done = rl_env.step(action)
+            next_state, reward, done = rl_env.step_filter(action)
             rl_agent_history = agent.update(
                 state_samples=current_state,
                 next_state_samples=next_state,

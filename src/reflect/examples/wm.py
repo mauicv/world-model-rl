@@ -336,7 +336,7 @@ def play_model():
                 if event.key == pygame.K_DOWN:
                     action = torch.tensor([0, 1], dtype=torch.float32)
 
-        z_screen, r, *_ = wm_env.step(action[None, None, :])
+        z_screen, r, *_ = wm_env.step_filter(action[None, None, :])
         reward_sum += r.item()
         diceDisplay = myFont.render(str(reward_sum), 1, black)
         screen = wm_env.world_model.decode(z_screen)
