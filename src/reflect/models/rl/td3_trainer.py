@@ -1,8 +1,8 @@
 import copy
 import torch
-from reflect.models.td3_policy import TAU, GAMMA
-from reflect.models.td3_policy.actor import Actor
-from reflect.models.td3_policy.critic import Critic
+from reflect.models.rl import TAU, GAMMA
+from reflect.models.rl.actor import Actor
+from reflect.models.rl.critic import Critic
 from reflect.utils import AdamOptim
 
 
@@ -55,7 +55,7 @@ def compute_TD_target(
     return targets.detach()
 
 
-class Agent:
+class TD3Agent:
     def __init__(
             self,
             state_dim,

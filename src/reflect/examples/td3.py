@@ -1,6 +1,6 @@
-from reflect.models.td3_policy.trainer import Agent
-from reflect.models.td3_policy.actor import Actor
-from reflect.models.td3_policy.replay_buffer import ReplayBuffer
+from reflect.models.rl.td3_trainer import TD3Agent
+from reflect.models.rl.actor import Actor
+from reflect.models.rl.replay_buffer import ReplayBuffer
 from reflect.utils import CSVLogger
 import gymnasium as gym
 import torch
@@ -102,7 +102,7 @@ def train(environment):
 
     env = gym.make(environment)
 
-    agent = Agent(
+    agent = TD3Agent(
         state_dim=env.observation_space.shape[0],
         action_space=env.action_space,
         actor_lr=ACTOR_LR,

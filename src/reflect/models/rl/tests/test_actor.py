@@ -1,5 +1,5 @@
 import pytest
-from reflect.models.td3_policy.actor import Actor
+from reflect.models.rl.actor import Actor
 import gymnasium as gym
 import torch
 

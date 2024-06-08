@@ -1,5 +1,5 @@
 import pytest
-from reflect.models.td3_policy.critic import Critic
+from reflect.models.rl.critic import Critic
 import gymnasium as gym
 import torch
 

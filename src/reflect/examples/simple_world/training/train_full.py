@@ -1,5 +1,5 @@
 from reflect.data.simple_rl_env import SimpleRLEnvironment
-from reflect.models.td3_policy.trainer import Agent
+from reflect.models.rl.td3_trainer import TD3Agent
 from reflect.data.loader import EnvDataLoader
 from reflect.models.world_model.environment import Environment
 from reflect.models.world_model import WorldModel, WorldModelTrainingParams
@@ -79,7 +79,7 @@ def train_full(load):
         num_threats=NUM_THREATS
     )
 
-    agent = Agent(
+    agent = TD3Agent(
         state_dim=input_dim,
         action_space=env.action_space,
         actor_lr=ACTOR_LR,

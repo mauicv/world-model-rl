@@ -1,17 +1,9 @@
 from reflect.data.simple_rl_env import SimpleRLEnvironment
-from reflect.models.td3_policy.trainer import Agent
 from reflect.data.loader import EnvDataLoader
-from reflect.models.world_model.environment import Environment
-from reflect.models.world_model import WorldModel, WorldModelTrainingParams
-from reflect.utils import CSVLogger
+from reflect.models.world_model import WorldModel
 import matplotlib.pyplot as plt
-import torch
-import os
 import click
-import numpy as np
-import pygame
 from reflect.utils import create_z_dist
-import time
 from reflect.examples.simple_world.models import make_models
 
 # RL PARAMETERS

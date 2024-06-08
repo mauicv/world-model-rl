@@ -1,8 +1,6 @@
-from reflect.models.td3_policy.trainer import Agent
 from reflect.data.loader import EnvDataLoader
 from reflect.models.world_model.environment import Environment
-from reflect.models.world_model import WorldModel, WorldModelTrainingParams
-from reflect.utils import CSVLogger
+from reflect.models.world_model import WorldModel
 from torchvision.transforms import Resize, Compose
 from reflect.models.world_model.observation_model import ObservationalModel, LatentSpace
 from pytfex.convolutional.decoder import DecoderLayer, Decoder
@@ -13,16 +11,8 @@ from pytfex.transformer.mlp import MLP
 from pytfex.transformer.attention import RelativeAttention
 from reflect.models.world_model.head import Head
 from reflect.models.world_model.embedder import Embedder
-from reflect.utils import create_z_dist
 
 import gymnasium as gym
-import matplotlib.pyplot as plt
-import torch
-import os
-import click
-import numpy as np
-import pygame
-import time
 import torch
 
 hdn_dim=256

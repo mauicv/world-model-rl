@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from reflect.models.world_model.observation_model import ObservationalModel
 from pytfex.transformer.gpt import GPT
 import torch
-from reflect.models.td3_policy import EPS
+from reflect.models.rl import EPS
 from reflect.utils import (
     recon_loss_fn,
     reg_loss_fn,

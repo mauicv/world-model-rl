@@ -1,16 +1,11 @@
 from reflect.data.simple_rl_env import SimpleRLEnvironment
-from reflect.models.td3_policy.trainer import Agent
+from reflect.models.rl.td3_trainer import TD3Agent
 from reflect.data.loader import EnvDataLoader
 from reflect.models.world_model.environment import Environment
-from reflect.models.world_model import WorldModel, WorldModelTrainingParams
-from reflect.utils import CSVLogger
-import matplotlib.pyplot as plt
+from reflect.models.world_model import WorldModel
 import torch
-import os
 import click
-import numpy as np
 import pygame
-from reflect.utils import create_z_dist
 import time
 from reflect.examples.simple_world.models import make_models
 
@@ -71,7 +66,7 @@ def play_agent():
         num_threats=NUM_THREATS
     )
 
-    agent = Agent(
+    agent = TD3Agent(
         state_dim=input_dim,
         action_space=env.action_space,
         actor_lr=ACTOR_LR,

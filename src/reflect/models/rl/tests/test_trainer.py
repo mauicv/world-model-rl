@@ -1,5 +1,5 @@
 import gymnasium as gym
-from reflect.models.td3_policy.trainer import Agent
+from reflect.models.rl.td3_trainer import TD3Agent
 import torch
 import pytest
 
@@ -10,7 +10,7 @@ import pytest
 ])
 def test_agent_trainer_update_actor(environment):
     env = gym.make(environment)
-    trainer = Agent(
+    trainer = TD3Agent(
         state_dim=32,
         action_space=env.action_space,
         actor_lr=0.001,
@@ -27,7 +27,7 @@ def test_agent_trainer_update_actor(environment):
 ])
 def test_agent_trainer_update_critic(environment):
     env = gym.make(environment)
-    trainer = Agent(
+    trainer = TD3Agent(
         state_dim=32,
         action_space=env.action_space,
         actor_lr=0.001,
@@ -49,7 +49,7 @@ def test_agent_trainer_update_critic(environment):
 def test_agent_trainer_update_critic_target_network(environment):
     # TODO: should check correct difference between target and model
     env = gym.make(environment)
-    trainer = Agent(
+    trainer = TD3Agent(
         state_dim=32,
         action_space=env.action_space,
         actor_lr=0.001,
@@ -65,7 +65,7 @@ def test_agent_trainer_update_critic_target_network(environment):
 def test_agent_trainer_update_actor_target_network(environment):
     # TODO: should check correct difference between target and model
     env = gym.make(environment)
-    trainer = Agent(
+    trainer = TD3Agent(
         state_dim=32,
         action_space=env.action_space,
         actor_lr=0.001,
@@ -80,7 +80,7 @@ def test_agent_trainer_update_actor_target_network(environment):
 def test_agent_save_load(environment, tmp_path):
     # TODO: should check correct difference between target and model
     env = gym.make(environment)
-    trainer = Agent(
+    trainer = TD3Agent(
         state_dim=32,
         action_space=env.action_space,
         actor_lr=0.001,
