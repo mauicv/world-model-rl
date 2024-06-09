@@ -81,7 +81,7 @@ class WorldModel(torch.nn.Module):
         image = self.observation_model.decode(z)
         return image.reshape(b, t, *image.shape[1:])
 
-    def step(
+    def _step(
             self,
             z: torch.Tensor,
             a: torch.Tensor,
@@ -93,8 +93,6 @@ class WorldModel(torch.nn.Module):
             a[:, -self.num_ts:],
             r[:, -self.num_ts:]
         ))
-        new_z = z_dist.sample()[:, -1].reshape(-1, 1, self.num_cat * self.num_latent)
-        z = torch.cat([z, new_z], dim=1)
 
         new_r = new_r[:, -1].reshape(-1, 1, 1)
         r = torch.cat([r, new_r], dim=1)
@@ -102,7 +100,33 @@ class WorldModel(torch.nn.Module):
         new_d = new_d[:, -1].reshape(-1, 1, 1)
         d = torch.cat([d, new_d], dim=1)
 
-        return z, r, d
+        return z_dist, r, d
+
+    def step(
+            self,
+            z: torch.Tensor,
+            a: torch.Tensor,
+            r: torch.Tensor,
+            d: torch.Tensor,
+        ):
+        z_dist, new_r, new_d = self._step(z, a, r, d)
+        new_z = z_dist.sample()
+        new_z = new_z[:, -1].reshape(-1, 1, self.num_cat * self.num_latent)
+        new_z = torch.cat([z, new_z], dim=1)
+        return new_z, new_r, new_d
+
+    def rstep(
+            self,
+            z: torch.Tensor,
+            a: torch.Tensor,
+            r: torch.Tensor,
+            d: torch.Tensor,
+        ):
+        z_dist, new_r, new_d = self._step(z, a, r, d)
+        new_z = z_dist.rsample()
+        new_z = new_z[:, -1].reshape(-1, 1, self.num_cat * self.num_latent)
+        new_z = torch.cat([z, new_z], dim=1)
+        return new_z, new_r, new_d
 
     def update_observation_model(
             self,

@@ -98,11 +98,11 @@ class Environment():
         assert action.shape[0] == self.actions.shape[0], \
             "States and actions have different batch sizes."
         self.actions = torch.cat([self.actions, action], dim=1)
-        z, r, d = self.world_model.step(
+        z, r, d = self.world_model.rstep(
             z=self.states,
             a=self.actions,
             r=self.rewards,
-            d=self.dones
+            d=self.dones,
         )
         self.states = z
         self.rewards = r
