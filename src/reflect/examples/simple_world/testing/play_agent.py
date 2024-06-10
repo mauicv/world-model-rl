@@ -1,5 +1,5 @@
 from reflect.data.simple_rl_env import SimpleRLEnvironment
-from reflect.models.rl.td3_trainer import TD3Agent
+from reflect.models.rl.stgrad_trainer import STGradAgent
 from reflect.data.loader import EnvDataLoader
 from reflect.models.world_model.environment import Environment
 from reflect.models.world_model import WorldModel
@@ -8,6 +8,7 @@ import click
 import pygame
 import time
 from reflect.examples.simple_world.models import make_models
+import numpy as np
 
 # RL PARAMETERS
 ACTION_REG_SIG=0.05
@@ -66,11 +67,11 @@ def play_agent():
         num_threats=NUM_THREATS
     )
 
-    agent = TD3Agent(
+    agent = STGradAgent(
         state_dim=input_dim,
         action_space=env.action_space,
         actor_lr=ACTOR_LR,
-        critic_lr=CRITIC_LR,
+        # critic_lr=CRITIC_LR,
     )
     agent.load("./experiments/wm-td3/")
     agent.actor.bounds = torch.tensor([-2.0, 2.0])

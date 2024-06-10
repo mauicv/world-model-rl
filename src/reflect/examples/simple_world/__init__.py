@@ -19,7 +19,8 @@ cli.add_command(testing.test_obs)
 
 cli.add_command(training.train_obs)
 cli.add_command(training.train_wm)
-cli.add_command(training.train_full)
+cli.add_command(training.train_td3)
+cli.add_command(training.train_stgrad)
 
 
 

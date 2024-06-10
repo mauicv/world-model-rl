@@ -1,17 +1,12 @@
 from reflect.data.simple_rl_env import SimpleRLEnvironment
-from reflect.models.rl.td3_trainer import TD3Agent
+from reflect.models.rl.stgrad_trainer import STGradAgent
 from reflect.data.loader import EnvDataLoader
 from reflect.models.world_model.environment import Environment
 from reflect.models.world_model import WorldModel, WorldModelTrainingParams
 from reflect.utils import CSVLogger
-import matplotlib.pyplot as plt
 import torch
 import os
 import click
-import numpy as np
-import pygame
-from reflect.utils import create_z_dist
-import time
 from reflect.examples.simple_world.models import make_models
 
 # RL PARAMETERS
@@ -47,7 +42,7 @@ a_size=2
 
 @click.command()
 @click.option('--load', is_flag=True)
-def train_full(load):
+def train_stgrad(load):
     observation_model, dynamic_model = make_models()
 
     params = WorldModelTrainingParams(
@@ -79,11 +74,10 @@ def train_full(load):
         num_threats=NUM_THREATS
     )
 
-    agent = TD3Agent(
+    agent = STGradAgent(
         state_dim=input_dim,
         action_space=env.action_space,
         actor_lr=ACTOR_LR,
-        critic_lr=CRITIC_LR,
     )
 
     agent.actor.bounds = torch.tensor([-2.0, 2.0])
@@ -111,16 +105,14 @@ def train_full(load):
     logger = CSVLogger(
         path=f"./experiments/wm-td3/results.csv",
         fieldnames=[
-            'recon_loss',
-            'reg_loss',
-            'consistency_loss',
-            'dynamic_loss',
-            'reward_loss',
-            'done_loss',
-            'rewards',
+            # 'recon_loss',
+            # 'reg_loss',
+            # 'consistency_loss',
+            # 'dynamic_loss',
+            # 'reward_loss',
+            # 'done_loss',
             'actor_loss',
-            'critic_1_loss',
-            'critic_2_loss'
+            'rewards'
         ]).initialize()
 
     for _ in range(BURNIN_STEPS):
@@ -128,54 +120,64 @@ def train_full(load):
 
     iteration = 0
     for i in range(100000):
-        loader.perform_rollout()
-        imgs, actions, rewards, dones = loader.sample()
-        wm_history = world_model.update(
-            o=imgs,
-            a=actions,
-            r=rewards,
-            d=dones,
-        )
+        # loader.perform_rollout()
+        # imgs, actions, rewards, dones = loader.sample()
+        # wm_history = world_model.update(
+        #     o=imgs,
+        #     a=actions,
+        #     r=rewards,
+        #     d=dones,
+        # )
 
         # train agent
         current_state, _ = rl_env.reset()
-        rewards = []
         for _ in range(ROLLOUT_LENGTH):
             iteration += 1
             if rl_env.done:
                 break
-            current_state = current_state[rl_env.not_done]
-            action = agent.actor.compute_action(
-                current_state,
-                eps=EPS
-            )
-            next_state, reward, done = rl_env.step_filter(action)
-            rl_agent_history = agent.update(
-                state_samples=current_state,
-                next_state_samples=next_state,
-                action_samples=action,
-                reward_samples=reward,
-                done_samples=done
-            )
-            
+            action = agent.actor(current_state)
+            next_state, *_ = rl_env.step(action)
             current_state = next_state
 
-            rewards.append(reward.sum().item())
+        s, a, r, d = rl_env.get_rollouts()
+        d = torch.ones_like(d)
+        rl_agent_history = agent.update(
+            reward_samples=r,
+            done_samples=d
+        )
 
-        reward_total_avg = sum(rewards)/BATCH_SIZE
+        rewards = compute_rewards(agent, rl_env)
         logger.log(
-            **wm_history,
+            # **wm_history,
             **rl_agent_history,
-            rewards=reward_total_avg
+            rewards=rewards
         )
 
         print((
-            f"i: {i}, recon_loss: {wm_history['recon_loss']:.2f}, "
-            f"'dynamic_loss': {wm_history['dynamic_loss']:.2f}, "
-            f"'reward_loss': {wm_history['reward_loss']:.2f}, "
-            f"'rewards': {reward_total_avg:.2f},"
+            # f"i: {i}, recon_loss: {wm_history['recon_loss']:.2f}, "
+            # f"'dynamic_loss': {wm_history['dynamic_loss']:.2f}, "
+            # f"'reward_loss': {wm_history['reward_loss']:.2f}, "
+            f"'actor_loss': {rl_agent_history['actor_loss']:.2f}, "
+            f"rewards: {rewards:.2f}"
         ))
 
         if (i > 0) and (i % 100) == 0:
             world_model.save("./experiments/wm-td3/")
             agent.save("./experiments/wm-td3/")
+
+
+def compute_rewards(agent, rl_env):
+    with torch.no_grad():
+        current_state, _ = rl_env.reset()
+        for _ in range(ROLLOUT_LENGTH):
+            if rl_env.done:
+                break
+            action = agent.actor.compute_action(
+                current_state,
+                eps=0
+            )
+            next_state, *_ = rl_env.step(action)
+            current_state = next_state
+
+        s, a, r, d = rl_env.get_rollouts()
+        return (r.sum()/r.size(0)).item()

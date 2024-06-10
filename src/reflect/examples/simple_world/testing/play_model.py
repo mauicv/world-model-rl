@@ -6,6 +6,7 @@ import torch
 import click
 import pygame
 import time
+import numpy as np
 from reflect.examples.simple_world.models import make_models
 
 # RL PARAMETERS

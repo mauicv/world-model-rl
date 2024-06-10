@@ -11,7 +11,12 @@ class STGradAgent:
         ):
 
         self.actor_lr = actor_lr
-        self.actor = Actor(input_dim=state_dim, action_space=action_space)
+        self.actor = Actor(
+            input_dim=state_dim,
+            action_space=action_space,
+            num_layers=1,
+            hidden_dim=64
+        )
         self.actor_optim = AdamOptim(self.actor.parameters(), lr=self.actor_lr)
 
     def update(
@@ -19,13 +24,16 @@ class STGradAgent:
         reward_samples,
         done_samples
     ):
-        loss = - (reward_samples * done_samples).sum()
+        batch_size = reward_samples.shape[0]
+        loss = - (reward_samples).sum()/batch_size
         self.actor_optim.backward(loss)
         self.actor_optim.update_parameters()
+        return {
+            'actor_loss': loss.item()
+        }
 
     def to(self, device):
         self.actor.to(device)
-        self.target_actor.to(device)
 
     def save(self, path):
         state_dict = {
