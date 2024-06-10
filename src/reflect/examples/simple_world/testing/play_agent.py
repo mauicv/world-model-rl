@@ -1,5 +1,6 @@
 from reflect.data.simple_rl_env import SimpleRLEnvironment
 from reflect.models.rl.stgrad_trainer import STGradAgent
+from reflect.models.rl.actor import Actor
 from reflect.data.loader import EnvDataLoader
 from reflect.models.world_model.environment import Environment
 from reflect.models.world_model import WorldModel
@@ -67,11 +68,16 @@ def play_agent():
         num_threats=NUM_THREATS
     )
 
-    agent = STGradAgent(
-        state_dim=input_dim,
+    actor = Actor(
+        input_dim=input_dim,
         action_space=env.action_space,
+        hidden_dim=64,
+        num_layers=2
+    )
+
+    agent = STGradAgent(
+        actor=actor,
         actor_lr=ACTOR_LR,
-        # critic_lr=CRITIC_LR,
     )
     agent.load("./experiments/wm-td3/")
     agent.actor.bounds = torch.tensor([-2.0, 2.0])
