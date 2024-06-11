@@ -148,7 +148,7 @@ def train_stgrad(load):
             current_state = next_state
 
         s, a, r, d = rl_env.get_rollouts()
-        d = torch.ones_like(d)
+        d = torch.zeros_like(d)
         rl_agent_history = agent.update(
             reward_samples=r,
             done_samples=d

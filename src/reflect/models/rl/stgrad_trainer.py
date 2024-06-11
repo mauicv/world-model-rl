@@ -19,7 +19,7 @@ class STGradAgent:
         done_samples
     ):
         batch_size = reward_samples.shape[0]
-        loss = - (done_samples * reward_samples).sum()/batch_size
+        loss = - ((1 - done_samples) * reward_samples).sum()/batch_size
         self.actor_optim.backward(loss)
         self.actor_optim.update_parameters()
         return {
