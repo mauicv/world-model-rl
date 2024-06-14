@@ -62,6 +62,8 @@ class TD3Agent:
             action_space,
             actor_lr,
             critic_lr,
+            grad_clip=10,
+            weight_decay=1e-4,
             tau=TAU
         ):
         self.actor_lr = actor_lr
@@ -71,19 +73,34 @@ class TD3Agent:
         self.actor = Actor(input_dim=state_dim, action_space=action_space)
         self.target_actor = Actor(input_dim=state_dim, action_space=action_space)
         self.target_actor.load_state_dict(copy.deepcopy(self.actor.state_dict()))
-        self.actor_optim = AdamOptim(self.actor.parameters(), lr=self.actor_lr)
+        self.actor_optim = AdamOptim(
+            self.actor.parameters(),
+            lr=self.actor_lr,
+            grad_clip=grad_clip,
+            weight_decay=weight_decay
+        )
 
         # Init Critic 1
         self.critic_1 = Critic(state_dim=state_dim, action_space=action_space)
         self.target_critic_1 = Critic(state_dim=state_dim, action_space=action_space)
         self.target_critic_1.load_state_dict(copy.deepcopy(self.critic_1.state_dict()))
-        self.critic_1_optim = AdamOptim(self.critic_1.parameters(), lr=self.critic_lr)
+        self.critic_1_optim = AdamOptim(
+            self.critic_1.parameters(),
+            lr=self.critic_lr,
+            grad_clip=grad_clip,
+            weight_decay=weight_decay
+        )
 
         # Init Critic 2
         self.critic_2 = Critic(state_dim=state_dim, action_space=action_space)
         self.target_critic_2 = Critic(state_dim=state_dim, action_space=action_space)
         self.target_critic_2.load_state_dict(copy.deepcopy(self.critic_2.state_dict()))
-        self.critic_2_optim = AdamOptim(self.critic_2.parameters(), lr=self.critic_lr)
+        self.critic_2_optim = AdamOptim(
+            self.critic_2.parameters(),
+            lr=self.critic_lr,
+            grad_clip=grad_clip,
+            weight_decay=weight_decay
+        )
 
     def update(
         self,

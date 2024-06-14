@@ -8,7 +8,7 @@ import csv
 
 
 class AdamOptim:
-    def __init__(self, parameters, lr, betas=(0.9, 0.999), eps=1e-8, weight_decay=0, grad_clip=0):
+    def __init__(self, parameters, lr, betas=(0.9, 0.999), eps=1e-8, weight_decay=None, grad_clip=None):
         self.parameters = list(parameters)
         self.grad_clip = grad_clip
         self.optimizer = Adam(self.parameters, lr=lr, betas=betas, eps=eps, weight_decay=weight_decay)

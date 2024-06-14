@@ -6,12 +6,19 @@ import torch
 class STGradAgent:
     def __init__(self,
             actor,
-            actor_lr
+            actor_lr=0.001,
+            grad_clip=10,
+            weight_decay=1e-4
         ):
 
         self.actor_lr = actor_lr
         self.actor = actor
-        self.actor_optim = AdamOptim(self.actor.parameters(), lr=self.actor_lr)
+        self.actor_optim = AdamOptim(
+            self.actor.parameters(),
+            lr=self.actor_lr,
+            grad_clip=grad_clip,
+            weight_decay=weight_decay
+        )
 
     def update(
         self,
@@ -19,7 +26,7 @@ class STGradAgent:
         done_samples
     ):
         batch_size = reward_samples.shape[0]
-        loss = - ((1 - done_samples) * reward_samples).sum()/batch_size
+        loss = - ((1 - done_samples.detach()) * reward_samples).sum()/batch_size
         self.actor_optim.backward(loss)
         self.actor_optim.update_parameters()
         return {
