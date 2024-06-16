@@ -92,7 +92,6 @@ class EnvDataLoader:
                 img[None, :],
                 noise=noise
             )
-
             self.img_buffer[run_index, index] = img
             self.action_buffer[run_index, index] = to_tensor(action)
             # weird issue with pendulum environment always returns 1 reward
@@ -101,7 +100,6 @@ class EnvDataLoader:
                 reward = -10 if done else 1
             self.reward_buffer[run_index, index] = to_tensor(reward)
             self.done_buffer[run_index, index] = to_tensor(done)
-
             _, reward, done, *_ \
                 = self.env.step(action.cpu().numpy())
             img = self.env.render()
