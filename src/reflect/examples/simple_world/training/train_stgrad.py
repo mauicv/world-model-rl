@@ -1,5 +1,5 @@
 from reflect.data.simple_rl_env import SimpleRLEnvironment
-from reflect.models.rl.stgrad_trainer import STGradAgent
+from reflect.models.rl.reward_trainer import RewardGradTrainer
 from reflect.models.rl.actor import Actor
 from reflect.data.loader import EnvDataLoader
 from reflect.models.world_model.environment import Environment
@@ -84,7 +84,7 @@ def train_stgrad(load):
     
     actor.bounds = torch.tensor([-2.0, 2.0])
 
-    agent = STGradAgent(
+    agent = RewardGradTrainer(
         actor=actor,
         actor_lr=ACTOR_LR,
     )

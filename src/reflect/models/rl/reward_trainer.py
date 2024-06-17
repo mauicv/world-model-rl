@@ -3,12 +3,12 @@ from reflect.utils import AdamOptim
 import torch
 
 
-class STGradAgent:
+class RewardGradTrainer:
     def __init__(self,
-            actor,
-            actor_lr=0.001,
-            grad_clip=10,
-            weight_decay=1e-4
+            actor: Actor,
+            actor_lr: float=0.001,
+            grad_clip: float=10,
+            weight_decay: float=1e-4
         ):
 
         self.actor_lr = actor_lr
