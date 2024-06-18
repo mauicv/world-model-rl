@@ -42,7 +42,7 @@ class ValueGradTrainer:
         if self.gamma_rollout is None:
             self.gamma_rollout = torch.tensor([
                 self.gamma**i for i in range(big_h)
-            ])
+            ]).to(states.device)
         h = min(k, big_h - 1)
         R = (
             self.gamma_rollout[:h][None, :, None]
@@ -82,9 +82,9 @@ class ValueGradTrainer:
             done_samples  
         ):
         critic_update = self._update_critic(
-            state_samples,
-            reward_samples,
-            done_samples
+            state_samples.detach(),
+            reward_samples.detach(),
+            done_samples.detach()
         )
         actor_update = self._update_actor(
             state_samples=state_samples
@@ -95,7 +95,6 @@ class ValueGradTrainer:
         }
 
     def _update_actor(self, state_samples):
-        state_samples
         b, h, *l = state_samples.shape
         state_samples = state_samples.reshape(b*h, *l)
         loss = - self.critic(state_samples).mean()
@@ -119,7 +118,7 @@ class ValueGradTrainer:
         )
         loss = (targets.detach() - state_values)**2
         loss = loss.mean()
-        self.critic_optim.backward(loss)
+        self.critic_optim.backward(loss, retain_graph=True)
         self.critic_optim.update_parameters()
         return {
             'critic_loss': loss.item()
@@ -127,6 +126,7 @@ class ValueGradTrainer:
 
     def to(self, device):
         self.actor.to(device)
+        self.critic.to(device)
 
     def save(self, path):
         state_dict = {
