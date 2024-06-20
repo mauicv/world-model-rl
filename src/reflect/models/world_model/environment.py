@@ -23,13 +23,15 @@ class Environment():
     def reset(
             self,
             batch_size=None,
+            from_start=False,
+            num_time_steps=1
         ):
         if batch_size is None:
             batch_size = self.batch_size
         o, a, r, d = self.data_loader.sample(
             batch_size=batch_size,
-            num_time_steps=1,
-            from_start=True
+            num_time_steps=num_time_steps,
+            from_start=from_start
         )
         device = next(self.world_model.parameters()).device
         o, r, d = o.to(device), r.to(device), d.to(device)

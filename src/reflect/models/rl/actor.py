@@ -21,7 +21,7 @@ class Actor(torch.nn.Module):
             torch.nn.Linear(
                 self.input_dim, hidden_dim
             ),
-            torch.nn.ReLU()
+            torch.nn.SiLU()
         ])
         for _ in range(num_layers - 1):
             layers.extend([

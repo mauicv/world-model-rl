@@ -17,12 +17,12 @@ class Critic(torch.nn.Module):
             torch.nn.Linear(
                 self.state_dim + self.action_dim, hidden_dim
             ),
-            torch.nn.ReLU()
+            torch.nn.SiLU()
         ])
         for _ in range(num_layers - 1):
             layers.extend([
                 torch.nn.Linear(hidden_dim, hidden_dim),
-                torch.nn.ReLU()
+                torch.nn.SiLU()
             ])
 
         final_layer = torch.nn.Linear(hidden_dim, 1)
