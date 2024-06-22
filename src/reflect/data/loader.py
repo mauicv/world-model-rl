@@ -6,9 +6,6 @@ See also: https://colab.research.google.com/drive/10-QQlnSFZeWBC7JCm0mPraGBPLVU2
 import gymnasium as gym
 import torch
 
-num_time_steps=48
-
-
 def to_tensor(t):
     if isinstance(t, torch.Tensor):
         return t
@@ -110,9 +107,8 @@ class EnvDataLoader:
         self.rollout_ind += 1
 
     def compute_action(self, observation, noise=0.5):
-        device = next(self.observation_model.parameters()).device
         if self.policy:
-            observation = observation.to(device)
+            observation = observation.to(observation.device)
             z = self.observation_model.encode(observation)
             z = z.view(1, -1)
             action = (
@@ -123,7 +119,7 @@ class EnvDataLoader:
                 )
         else:
             action = self.env.action_space.sample()
-            action = torch.tensor(action, device=device)
+            action = torch.tensor(action, device=observation.device)
         return action
 
     def close(self):
@@ -143,7 +139,7 @@ class EnvDataLoader:
             from_start=False
         ):
         """Sample a batch of data from the buffer.
-        
+
         args:
             batch_size: int, optional
                 The number of samples to return.
