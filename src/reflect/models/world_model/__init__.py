@@ -7,10 +7,10 @@ import torch
 from reflect.models.rl import EPS
 from reflect.utils import (
     recon_loss_fn,
-    reg_loss_fn,
     cross_entropy_loss_fn,
     reward_loss_fn,
     AdamOptim,
+    detach_dist,
     create_z_dist
 )
 import torch.distributions as D
@@ -26,7 +26,6 @@ def get_causal_mask(l):
 
 @dataclass
 class WorldModelTrainingParams:
-    reg_coeff: float = 0.0
     recon_coeff: float = 1.0
     dynamic_coeff: float = 1.0
     consistency_coeff: float = 0.0
@@ -40,8 +39,7 @@ class WorldModel(torch.nn.Module):
             observation_model: ObservationalModel,
             dynamic_model: GPT,
             num_ts: int,
-            num_cat: int=32,
-            num_latent: int=32,
+            latent_dim: int=32,
             params: Optional[WorldModelTrainingParams] = None,
         ):
         super().__init__()
@@ -51,8 +49,7 @@ class WorldModel(torch.nn.Module):
         self.observation_model = observation_model
         self.dynamic_model = dynamic_model
         self.num_ts = num_ts
-        self.num_cat = num_cat
-        self.num_latent = num_latent
+        self.latent_dim = latent_dim
         self.mask = get_causal_mask(self.num_ts)
         self.observation_model_opt = AdamOptim(
             self.observation_model.parameters(),
@@ -111,7 +108,7 @@ class WorldModel(torch.nn.Module):
         ):
         z_dist, new_r, new_d = self._step(z, a, r, d)
         new_z = z_dist.sample()
-        new_z = new_z[:, -1].reshape(-1, 1, self.num_cat * self.num_latent)
+        new_z = new_z[:, [-1], :]
         new_z = torch.cat([z, new_z], dim=1)
         return new_z, new_r, new_d
 
@@ -124,7 +121,7 @@ class WorldModel(torch.nn.Module):
         ):
         z_dist, new_r, new_d = self._step(z, a, r, d)
         new_z = z_dist.rsample()
-        new_z = new_z[:, -1].reshape(-1, 1, self.num_cat * self.num_latent)
+        new_z = new_z[:, [-1], :]
         new_z = torch.cat([z, new_z], dim=1)
         return new_z, new_r, new_d
 
@@ -136,19 +133,14 @@ class WorldModel(torch.nn.Module):
         if params is None:
             params = self.params
 
-        self.mask = self.mask.to(o.device)
         b, t, c, h, w  = o.shape
         o = o.reshape(b * t, c, h, w)
-        r_o, _, z_logits = self.observation_model(o)
-        recon_loss = recon_loss_fn(o, r_o)
-        reg_loss = reg_loss_fn(z_logits)
-        loss = params.recon_coeff * recon_loss + params.reg_coeff * reg_loss
+        recon_loss, *_ = self.observation_model.loss(o)
+        loss = params.recon_coeff * recon_loss
         self.observation_model_opt.backward(loss, retain_graph=False)
         self.observation_model_opt.update_parameters()
-
         return {
             'recon_loss': recon_loss.detach().cpu().item(),
-            'reg_loss': reg_loss.detach().cpu().item(),
         }
 
     def update(
@@ -167,21 +159,16 @@ class WorldModel(torch.nn.Module):
         o = o.reshape(b * t, c, h, w)
 
         # Observational Model
-        r_o, z, z_logits = self.observation_model(o)
+        r_o, z, z_dist = self.observation_model(o)
         recon_loss = recon_loss_fn(o, r_o)
-        reg_loss = reg_loss_fn(z_logits)
 
         # Dynamic Models
-        z = z.detach()
-        _, num_z, num_c = z_logits.shape
         z = z.detach().reshape(b, t, -1)
-        _, num_z, num_c = z_logits.shape
-        z_logits = z_logits.reshape(b, t, num_z, num_c)
         r_targets = r[:, 1:].detach()
         d_targets = d[:, 1:].detach()
-        z_logits = z_logits[:, 1:]
-        next_z_dist = create_z_dist(z_logits.detach())
-        c_z_dist = create_z_dist(z_logits)
+        z_mean = z_dist.base_dist.mean.reshape(b, t, -1)[:, 1:]
+        z_std = z_dist.base_dist.stddev.reshape(b, t, -1)[:, 1:]
+        next_z_dist = create_z_dist(z_mean, z_std)
         
         z_inputs, r_inputs, a_inputs = (
             z[:, :-1].detach(),
@@ -193,7 +180,8 @@ class WorldModel(torch.nn.Module):
             (z_inputs, a_inputs, r_inputs),
             mask=self.mask
         )
-        dynamic_loss = cross_entropy_loss_fn(z_pred, next_z_dist)
+
+        dynamic_loss = cross_entropy_loss_fn(z_pred, detach_dist(next_z_dist))
         reward_loss = reward_loss_fn(r_targets, r_pred)
         done_loss = done_loss_fn(d_pred, d_targets.float())
 
@@ -203,27 +191,24 @@ class WorldModel(torch.nn.Module):
             + params.reward_coeff * reward_loss
             + params.done_coeff * done_loss
         )
-        consistency_loss = cross_entropy_loss_fn(c_z_dist, z_pred).detach()
-        # TODO: Consistency loss seems to penalize both the observation 
-        # model and the dynamic model? Why?
+
+        consistency_loss = cross_entropy_loss_fn(detach_dist(z_pred), next_z_dist)
         obs_loss = (
-            params.recon_coeff * recon_loss 
-            + params.reg_coeff * reg_loss 
-            + params.consistency_coeff * consistency_loss
+            params.recon_coeff * recon_loss + \
+            params.consistency_coeff * consistency_loss
         )
 
-        self.dynamic_model_opt.backward(dyn_loss, retain_graph=False)
+        self.dynamic_model_opt.backward(dyn_loss, retain_graph=True)
         self.observation_model_opt.backward(obs_loss, retain_graph=False)
         self.dynamic_model_opt.update_parameters()
         self.observation_model_opt.update_parameters()
 
         return {
             'recon_loss': recon_loss.detach().cpu().item(),
-            'reg_loss': reg_loss.detach().cpu().item(),
-            'consistency_loss': consistency_loss.detach().cpu().item(),
             'dynamic_loss': dynamic_loss.detach().cpu().item(),
             'reward_loss': reward_loss.detach().cpu().item(),
             'done_loss': done_loss.detach().cpu().item(),
+            'consistency_loss': consistency_loss.detach().cpu().item(),
         }
 
     def load(
