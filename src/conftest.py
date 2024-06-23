@@ -73,8 +73,7 @@ def observation_model():
     )
 
     latent_space = LatentSpace(
-        num_classes=32,
-        num_latent=32,
+        latent_dim=1024,
         input_shape=(1024, 4, 4),
     )
 
@@ -98,8 +97,7 @@ def dynamic_model_8d_action():
 def make_dynamic_model(a_size):
     hdn_dim=256
     num_heads=8
-    latent_dim=32
-    num_cat=32
+    latent_dim=1024
     t_dim=48
     input_dim=1024
     layers=10
@@ -116,7 +114,6 @@ def make_dynamic_model(a_size):
         ),
         head=Head(
             latent_dim=latent_dim,
-            num_cat=num_cat,
             hidden_dim=hdn_dim
         ),
         layers=[

@@ -42,26 +42,18 @@ def reg_loss_fn(z_logits, temperature=1):
     max_entropy = a * math.log(b)
     return - z_dist.entropy().mean() / max_entropy
 
+def create_z_dist(mean, std):
+    std = F.softplus(std) + 0.1
+    distribution = D.Normal(mean, std)
+    distribution = D.independent.Independent(distribution, 1)
+    return distribution
 
-def create_z_dist(logits, temperature=1):
-    assert temperature > 0
-    dist = D.OneHotCategoricalStraightThrough(logits=logits / temperature)
-    return D.Independent(dist, 1)
+def detach_dist(dist):
+    return D.Independent(D.Normal(dist.base_dist.mean.detach(), dist.base_dist.scale.detach()), 1)
 
 def cross_entropy_loss_fn(z, z_hat):
-    """
-    In the case of the observational model, the cross_entropy_loss_fn is the
-    consistency loss. In that case the z is the output of the observational
-    model for o_(i) and z_hat is the output of the dynamic model from z_(i-1)
-
-    In the case of the dynamic loss, these are the otherway around. So z is
-    the output of the dynamic model given z_(i-1) and z_hat is the output of the
-    observational model given o_(i).
-    """
-    cross_entropy = (
-        z.base_dist.logits * z_hat.base_dist.probs.detach()
-    ).sum(-1)
-    return - cross_entropy.sum()
+    kl_div = D.kl.kl_divergence(z.base_dist, z_hat.base_dist).mean()
+    return - kl_div
 
 
 def reward_loss_fn(r, r_pred):

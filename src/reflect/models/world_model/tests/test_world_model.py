@@ -46,8 +46,7 @@ def test_world_model(timesteps, observation_model, dynamic_model_8d_action):
 
     results = wm.update(o, a, r, d)
 
-    for key in ['recon_loss', 'reg_loss',
-                'consistency_loss', 'dynamic_loss',
+    for key in ['recon_loss', 'consistency_loss', 'dynamic_loss',
                 'reward_loss', 'done_loss']:
         assert key in results
 

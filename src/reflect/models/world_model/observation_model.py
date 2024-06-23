@@ -1,9 +1,9 @@
 import torch
-from pytfex.convolutional.decoder import DecoderLayer, Decoder
-from pytfex.convolutional.encoder import EncoderLayer, Encoder
+import torch.nn.functional as F
 import torch.distributions as D
 from functools import reduce
 import operator
+from reflect.utils import create_z_dist
 
 
 class ObservationalModel(torch.nn.Module):
@@ -25,67 +25,47 @@ class ObservationalModel(torch.nn.Module):
 
     def encode(self, x):
         x_enc = self.encoder(x)
-        _, z, _ = self.latent_space(x_enc)
+        _, z, *_ = self.latent_space(x_enc)
         return z
 
     def decode(self, z):
         y_enc = self.latent_space.decode(z)
         return self.decoder(y_enc)
 
+    def loss(self, x):
+        x_enc = self.encoder(x)
+        y_enc, _, z_dist = self.latent_space(x_enc)
+        obs_dist = self.decoder(y_enc)
+        obs_loss = -torch.mean(obs_dist.log_prob(x))
+        return obs_loss, {
+            'std': z_dist.std.mean().item(),
+        }
 
 class LatentSpace(torch.nn.Module):
     def __init__(
             self,
             input_shape=(1024, 4, 4),
-            num_classes=32,
-            num_latent=32,
-            mid_size=768,    
+            latent_dim=1024
         ):
         super().__init__()
 
-        self.num_classes = num_classes
-        self.num_latent = num_latent
+        self.latent_dim = latent_dim
         self.input_shape = input_shape
         self.flat_size = reduce(operator.mul, input_shape , 1)
-
-        self.enc_mlp = torch.nn.Sequential(
-            torch.nn.Linear(self.flat_size, mid_size),
-            torch.nn.Dropout(0.1),
-            torch.nn.ELU(),
-            torch.nn.Linear(mid_size, mid_size),
-            torch.nn.Dropout(0.1),
-            torch.nn.ELU(),
-            torch.nn.Linear(mid_size, num_classes*num_latent)
-        )
-
-        self.dec_mlp = torch.nn.Sequential(
-            torch.nn.Linear(num_classes*num_latent, mid_size),
-            torch.nn.ELU(),
-            torch.nn.Dropout(0.1),
-            torch.nn.Linear(mid_size, mid_size),
-            torch.nn.Dropout(0.1),
-            torch.nn.ELU(),
-            torch.nn.Linear(mid_size, self.flat_size),
-        )
-
-    @staticmethod
-    def create_z_dist(logits, temperature=1):
-        assert temperature > 0
-        dist = D.OneHotCategoricalStraightThrough(logits=logits / temperature)
-        return D.Independent(dist, 1)
+        self.fc_1 = torch.nn.Linear(self.flat_size, 2*latent_dim)
+        self.dec_mlp = torch.nn.Linear(latent_dim, self.flat_size)
 
     def encode(self, x):
-        b, *_ = x.shape
-        x = x.reshape(b, -1)
-        logits = self.enc_mlp(x)
-        logits = logits.reshape(-1, self.num_latent, self.num_classes)
-        return logits
+        x = self.fc_1(x.flatten(1))
+        mean, _ = x.chunk(2, dim=-1)
+        return mean
 
     def forward(self, x):
-        z_logits = self.encode(x)
-        z_dist = self.create_z_dist(z_logits)
+        x = self.fc_1(x.flatten(1))
+        mean, std = x.chunk(2, dim=-1)
+        z_dist = create_z_dist(mean, std)
         z_sample = z_dist.rsample()
-        return self.decode(z_sample), z_sample, z_logits
+        return self.decode(z_sample), z_sample, z_dist
 
     def decode(self, z):
         z = z.flatten(1)

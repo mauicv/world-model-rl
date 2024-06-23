@@ -10,6 +10,6 @@ def test_dynamic_model(observation_model, dynamic_model_8d_action):
     a = torch.zeros((2, 16, 8))
     r = torch.zeros((2, 16, 1))
     z_dist, r, d = dynamic_model_8d_action((z, a, r))
-    assert z_dist.base_dist.probs.shape == (2, 16, 32, 32)
+    assert z_dist.base_dist.mean.shape == (2, 16, 1024)
     assert r.shape == (2, 16, 1)
     assert d.shape == (2, 16, 1)
