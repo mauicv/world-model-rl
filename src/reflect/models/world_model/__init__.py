@@ -7,7 +7,7 @@ import torch
 from reflect.models.rl import EPS
 from reflect.utils import (
     recon_loss_fn,
-    cross_entropy_loss_fn,
+    kl_loss_fn,
     reward_loss_fn,
     AdamOptim,
     detach_dist,
@@ -181,7 +181,7 @@ class WorldModel(torch.nn.Module):
             mask=self.mask
         )
 
-        dynamic_loss = cross_entropy_loss_fn(z_pred, detach_dist(next_z_dist))
+        dynamic_loss = kl_loss_fn(z_pred, detach_dist(next_z_dist))
         reward_loss = reward_loss_fn(r_targets, r_pred)
         done_loss = done_loss_fn(d_pred, d_targets.float())
 
@@ -192,7 +192,7 @@ class WorldModel(torch.nn.Module):
             + params.done_coeff * done_loss
         )
 
-        consistency_loss = cross_entropy_loss_fn(detach_dist(z_pred), next_z_dist)
+        consistency_loss = kl_loss_fn(detach_dist(z_pred), next_z_dist)
         obs_loss = (
             params.recon_coeff * recon_loss + \
             params.consistency_coeff * consistency_loss

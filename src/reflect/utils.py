@@ -51,10 +51,8 @@ def create_z_dist(mean, std):
 def detach_dist(dist):
     return D.Independent(D.Normal(dist.base_dist.mean.detach(), dist.base_dist.scale.detach()), 1)
 
-def cross_entropy_loss_fn(z, z_hat):
-    kl_div = D.kl.kl_divergence(z.base_dist, z_hat.base_dist).mean()
-    return - kl_div
-
+def kl_loss_fn(z, z_hat):
+    return D.kl.kl_divergence(z.base_dist, z_hat.base_dist).mean()
 
 def reward_loss_fn(r, r_pred):
     r_pred_dist = D.Independent(D.Normal(r_pred, torch.ones_like(r_pred)), 1)
