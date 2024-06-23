@@ -26,7 +26,6 @@ def get_causal_mask(l):
 
 @dataclass
 class WorldModelTrainingParams:
-    reg_coeff: float = 0.0
     recon_coeff: float = 1.0
     dynamic_coeff: float = 1.0
     consistency_coeff: float = 0.0
@@ -40,8 +39,7 @@ class WorldModel(torch.nn.Module):
             observation_model: ObservationalModel,
             dynamic_model: GPT,
             num_ts: int,
-            num_cat: int=32,
-            num_latent: int=32,
+            latent_dim: int=32,
             params: Optional[WorldModelTrainingParams] = None,
         ):
         super().__init__()
@@ -51,8 +49,7 @@ class WorldModel(torch.nn.Module):
         self.observation_model = observation_model
         self.dynamic_model = dynamic_model
         self.num_ts = num_ts
-        self.num_cat = num_cat
-        self.num_latent = num_latent
+        self.latent_dim = latent_dim
         self.mask = get_causal_mask(self.num_ts)
         self.observation_model_opt = AdamOptim(
             self.observation_model.parameters(),
@@ -111,7 +108,7 @@ class WorldModel(torch.nn.Module):
         ):
         z_dist, new_r, new_d = self._step(z, a, r, d)
         new_z = z_dist.sample()
-        new_z = new_z[:, -1].reshape(-1, 1, self.num_cat * self.num_latent)
+        new_z = new_z[:, [-1], :]
         new_z = torch.cat([z, new_z], dim=1)
         return new_z, new_r, new_d
 
@@ -124,7 +121,7 @@ class WorldModel(torch.nn.Module):
         ):
         z_dist, new_r, new_d = self._step(z, a, r, d)
         new_z = z_dist.rsample()
-        new_z = new_z[:, -1].reshape(-1, 1, self.num_cat * self.num_latent)
+        new_z = new_z[:, [-1], :]
         new_z = torch.cat([z, new_z], dim=1)
         return new_z, new_r, new_d
 
