@@ -26,7 +26,8 @@ class EnvDataLoader:
             env=gym.make(
                 "InvertedPendulum-v4",
                 render_mode="rgb_array"
-            )
+            ),
+            noise_generator=None
         ):
         self.env = env
         _ = self.env.reset()
@@ -38,6 +39,7 @@ class EnvDataLoader:
         self.img_shape = img_shape
         self.observation_model = observation_model
         self.policy = policy
+        self.noise_generator = noise_generator
 
         self.rollout_ind = 0
         self.img_buffer = torch.zeros(
@@ -79,6 +81,8 @@ class EnvDataLoader:
         that generated s_t.
         """
         _ = self.env.reset()
+        if self.noise_generator is not None:
+            noise = self.noise_generator.reset()
         img = self.env.render()
         img = self._preprocess(img)
         done = False
@@ -118,7 +122,10 @@ class EnvDataLoader:
                     .detach()
                 )
         else:
-            action = self.env.action_space.sample()
+            if self.noise_generator is None:
+                action = self.env.action_space.sample()
+            else:
+                action = self.noise_generator()
             action = torch.tensor(action, device=observation.device)
         return action
 
