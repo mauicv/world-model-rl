@@ -49,23 +49,11 @@ class LatentSpace(torch.nn.Module):
         self.flat_size = reduce(operator.mul, input_shape , 1)
 
         self.enc_mlp = torch.nn.Sequential(
-            torch.nn.Linear(self.flat_size, mid_size),
-            torch.nn.Dropout(0.1),
-            torch.nn.ELU(),
-            torch.nn.Linear(mid_size, mid_size),
-            torch.nn.Dropout(0.1),
-            torch.nn.ELU(),
-            torch.nn.Linear(mid_size, num_classes*num_latent)
+            torch.nn.Linear(self.flat_size, num_classes*num_latent)
         )
 
         self.dec_mlp = torch.nn.Sequential(
-            torch.nn.Linear(num_classes*num_latent, mid_size),
-            torch.nn.ELU(),
-            torch.nn.Dropout(0.1),
-            torch.nn.Linear(mid_size, mid_size),
-            torch.nn.Dropout(0.1),
-            torch.nn.ELU(),
-            torch.nn.Linear(mid_size, self.flat_size),
+            torch.nn.Linear(num_classes*num_latent, self.flat_size)
         )
 
     @staticmethod
