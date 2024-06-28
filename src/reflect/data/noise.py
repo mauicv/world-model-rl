@@ -2,6 +2,86 @@ import numpy as np
 from scipy.interpolate import interp1d
 
 
+class EnvNoise:
+    def __init__(self, env):
+        self.env = env
+        self.reset()
+
+    def __call__(self):
+        return self.env.action_space.sample()
+
+    def reset(self):
+        return
+
+
+class NoNoise:
+    def __init__(self, dim):
+        self.dim = dim
+        self.reset()
+
+    def __call__(self):
+        return np.zeros(self.dim)
+
+    def reset(self):
+        return
+
+
+class NormalNoise:
+    def __init__(
+            self,
+            dim,
+            sigma=0.2,
+            dt=1e-2):
+        self.dim = dim
+        self.sigma = sigma
+        self.dt = dt
+        self.reset()
+
+    def __call__(self):
+        return self.sigma * np.sqrt(self.dt) * \
+            np.random.normal(loc=0, scale=1, size=(self.dim,))
+
+    def reset(self):
+        return
+
+
+class OUNoise:
+    """Ornstein-Uhlenbeck process.
+
+    Taken from https://keras.io/examples/rl/ddpg_pendulum/
+    Formula from https://www.wikipedia.org/wiki/Ornstein-Uhlenbeck_process.
+    """
+    def __init__(
+            self,
+            dim=1,
+            sigma=0.15,
+            theta=0.2,
+            dt=1e-2,
+            x_initial=None):
+        self.theta = theta
+        self.dim = dim
+        self.sigma = sigma/10
+        self.dt = dt
+        self.x_initial = x_initial
+        self.reset()
+
+    def __call__(self):
+        x = (
+            self.x_prev
+            + self.theta * (- self.x_prev) * self.dt
+            + self.sigma * np.sqrt(self.dt)
+            * np.random.normal(loc=0, scale=1, size=(self.dim,))
+        )
+        self.x_prev = x
+        return x
+
+    def reset(self):
+        if self.x_initial is not None:
+            self.x_prev = self.x_initial
+        else:
+            self.x_prev = np.zeros(self.dim)
+
+
 class LinearSegmentNoise1D:
     """1 Dimensional LinearSegmentNoise
 

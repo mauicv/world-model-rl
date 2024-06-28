@@ -4,6 +4,7 @@ See also: https://colab.research.google.com/drive/10-QQlnSFZeWBC7JCm0mPraGBPLVU2
 """
 
 import gymnasium as gym
+from reflect.data.noise import NoNoise
 import torch
 
 def to_tensor(t):
@@ -32,6 +33,16 @@ class EnvDataLoader:
         self.env = env
         _ = self.env.reset()
         self.action_dim = self.env.action_space.shape[0]
+        self.bounds = (
+            torch.tensor(
+                self.env.action_space.low,
+                dtype=torch.float32
+            ),
+            torch.tensor(
+                self.env.action_space.high,
+                dtype=torch.float32
+            )
+        )
         self.num_time_steps = num_time_steps
         self.batch_size = batch_size
         self.num_runs = num_runs
@@ -70,7 +81,10 @@ class EnvDataLoader:
         self.current_index = 0
         self.transforms = transforms
 
-    def perform_rollout(self, noise=0.5):
+        if noise_generator is None:
+            self.noise_generator = NoNoise(dim=self.action_dim)
+
+    def perform_rollout(self, eps=0.5):
         """Performs a rollout of the environment.
 
         Iterate rollouts and store the images, actions, rewards, and done
@@ -82,17 +96,14 @@ class EnvDataLoader:
         """
         _ = self.env.reset()
         if self.noise_generator is not None:
-            noise = self.noise_generator.reset()
+            self.noise_generator.reset()
         img = self.env.render()
         img = self._preprocess(img)
         done = False
         reward = 0
         run_index = self.rollout_ind % self.num_runs
         for index in range(self.rollout_length):
-            action = self.compute_action(
-                img[None, :],
-                noise=noise
-            )
+            action = self.compute_action(img[None, :], eps=eps)
             self.img_buffer[run_index, index] = img
             self.action_buffer[run_index, index] = to_tensor(action)
             # weird issue with pendulum environment always returns 1 reward
@@ -110,7 +121,7 @@ class EnvDataLoader:
         self.end_index[run_index] = index
         self.rollout_ind += 1
 
-    def compute_action(self, observation, noise=0.5):
+    def compute_action(self, observation, eps=1):
         if self.policy:
             device = next(self.observation_model.parameters()).device
             observation = observation.to(device)
@@ -118,16 +129,18 @@ class EnvDataLoader:
             z = z.view(1, -1)
             action = (
                 self.policy
-                    .compute_action(z, eps=noise)
+                    .compute_action(z)
                     .squeeze(0)
                     .detach()
                 )
+            noise = eps * self.noise_generator()
+            noise = torch.tensor(noise, device=device)
+            action = noise + action
         else:
-            if self.noise_generator is None:
-                action = self.env.action_space.sample()
-            else:
-                action = self.noise_generator()
+            action = eps * self.noise_generator()
             action = torch.tensor(action, device=observation.device)
+        l, u = self.bounds
+        action = torch.clamp(action, l, u)
         return action
 
     def close(self):

@@ -43,10 +43,8 @@ def compute_TD_target(
         target_critic,
         gamma=GAMMA
     ):
-    next_state_actions = target_actor.compute_action(
-        next_states,
-        eps=0
-    )
+    # TODO: Add noise to the next actions
+    next_state_actions = target_actor.compute_action(next_states)
     next_state_action_values = target_critic(
         next_states,
         next_state_actions
@@ -55,6 +53,7 @@ def compute_TD_target(
     return targets.detach()
 
 
+# TODO: Add noise generator arg, same pattern as loader...
 class TD3Agent:
     def __init__(
             self,

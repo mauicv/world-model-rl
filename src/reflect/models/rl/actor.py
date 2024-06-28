@@ -57,7 +57,7 @@ class Actor(torch.nn.Module):
         l, u = self.bounds
         return torch.sigmoid(x) * (u - l) + l
 
-    def compute_action(self, state, eps=0):
+    def compute_action(self, state):
         device = next(self.parameters()).device
         self.eval()
         if len(state.shape) == 1: state=state[None, :]
@@ -68,9 +68,6 @@ class Actor(torch.nn.Module):
                 device=device
             )
         action = self(state)
-        noise = torch.randn_like(action, device=device) * eps
-        action = action + noise
-        action = torch.clip(action, *self.bounds)
         action = action.to(state.device)
         self.train()
         return action.detach()
