@@ -81,12 +81,12 @@ class ValueGradTrainer:
             reward_samples,
             done_samples  
         ):
-        critic_update = self._update_critic(
+        critic_update = self.update_critic(
             state_samples.detach(),
             reward_samples.detach(),
             done_samples.detach()
         )
-        actor_update = self._update_actor(
+        actor_update = self.update_actor(
             state_samples=state_samples
         )
         return {
@@ -94,7 +94,7 @@ class ValueGradTrainer:
             **actor_update
         }
 
-    def _update_actor(self, state_samples):
+    def update_actor(self, state_samples):
         b, h, *l = state_samples.shape
         state_samples = state_samples.reshape(b*h, *l)
         loss = - self.critic(state_samples).mean()
@@ -104,7 +104,7 @@ class ValueGradTrainer:
             'actor_loss': loss.item()
         }
 
-    def _update_critic(
+    def update_critic(
             self,
             state_samples,
             reward_samples,

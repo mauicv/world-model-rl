@@ -112,7 +112,8 @@ class EnvDataLoader:
 
     def compute_action(self, observation, noise=0.5):
         if self.policy:
-            observation = observation.to(observation.device)
+            device = next(self.observation_model.parameters()).device
+            observation = observation.to(device)
             z = self.observation_model.encode(observation)
             z = z.view(1, -1)
             action = (
