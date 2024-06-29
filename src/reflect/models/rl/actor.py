@@ -52,10 +52,13 @@ class Actor(torch.nn.Module):
         ))
         return self
 
-    def forward(self, x):
+    def forward(self, x, deterministic=False):
         x = self.layers(x)
         l, u = self.bounds
-        return torch.sigmoid(x) * (u - l) + l
+        mean = torch.sigmoid(x) * (u - l) + l
+        if deterministic:
+            return mean
+        pass
 
     def compute_action(self, state):
         device = next(self.parameters()).device

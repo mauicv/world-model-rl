@@ -31,18 +31,27 @@ class NormalNoise:
             self,
             dim,
             sigma=0.2,
-            dt=1e-2):
+            dt=1e-2,
+            repeat=2):
         self.dim = dim
         self.sigma = sigma
         self.dt = dt
+        self.repeat = repeat
         self.reset()
+        self.count=0
+        self.current_action = None
 
     def __call__(self):
-        return self.sigma * np.sqrt(self.dt) * \
-            np.random.normal(loc=0, scale=1, size=(self.dim,))
+        self.count += 1
+        if self.count % self.repeat == 0:
+            self.reset()
+        return self.current_action
 
     def reset(self):
-        return
+        self.count = 0
+        self.current_action = self.sigma * np.sqrt(self.dt) * \
+            np.random.normal(loc=0, scale=1, size=(self.dim,))
+        return self.current_action
 
 
 class OUNoise:

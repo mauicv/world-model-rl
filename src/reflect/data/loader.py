@@ -140,6 +140,7 @@ class EnvDataLoader:
             action = eps * self.noise_generator()
             action = torch.tensor(action, device=observation.device)
         l, u = self.bounds
+        l, u = l.to(action.device), u.to(action.device)
         action = torch.clamp(action, l, u)
         return action
 
