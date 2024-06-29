@@ -125,7 +125,9 @@ class EnvDataLoader:
         if self.policy:
             device = next(self.observation_model.parameters()).device
             observation = observation.to(device)
+            self.observation_model.eval()
             z = self.observation_model.encode(observation)
+            self.observation_model.train()
             z = z.view(1, -1)
             action = (
                 self.policy
