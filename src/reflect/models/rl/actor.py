@@ -52,7 +52,7 @@ class Actor(torch.nn.Module):
         ))
         return self
 
-    def forward(self, x, deterministic=False):
+    def forward(self, x, deterministic=True):
         x = self.layers(x)
         l, u = self.bounds
         mean = torch.sigmoid(x) * (u - l) + l
