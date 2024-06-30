@@ -55,9 +55,11 @@ class Head(torch.nn.Module):
 
     def forward(self, x):
         b, t, _ = x.shape
-        r = self.reward(x)
-        s = self.predictor(x)
-        d = self.done_output_activation(self.done(x))
-        s = s.reshape(b, t, self.latent_dim, self.num_cat)
+        reshaped_x = x.view(b, -1, 3, self.hidden_dim)
+        s_emb, *_ = reshaped_x.unbind(dim=2)
+        r = self.reward(s_emb)
+        s = self.predictor(s_emb)
+        d = self.done_output_activation(self.done(s_emb))
+        s = s.reshape(b, int(t/3), self.latent_dim, self.num_cat)
         z_dist = self.create_z_dist(s)
         return z_dist, r, d
