@@ -1,14 +1,23 @@
 import torch
 import torch.nn.functional as F
+import torch.distributions as D
 WEIGHTS_FINAL_INIT = 3e-3
 BIAS_FINAL_INIT = 3e-4
 
 
 class Actor(torch.nn.Module):
-    def __init__(self, input_dim, action_space, num_layers=3, hidden_dim=512):
+    def __init__(
+            self,
+            input_dim,
+            action_space,
+            num_layers=3,
+            hidden_dim=512,
+            stochastic=False
+        ):
         super().__init__()
         self.input_dim = input_dim
         self.output_dim = action_space.shape[0]
+        self.stochastic = stochastic
         self.bounds = (
             torch.tensor(action_space.low, dtype=torch.float32),
             torch.tensor(action_space.high, dtype=torch.float32)
@@ -29,17 +38,28 @@ class Actor(torch.nn.Module):
                 torch.nn.SiLU()
             ])
 
-        final_layer = torch.nn.Linear(hidden_dim, self.output_dim)
-        layers.append(final_layer)
         self.layers = torch.nn.Sequential(*layers)
+        self.mu = torch.nn.Linear(hidden_dim, self.output_dim)
+        if self.stochastic:
+            self.stddev = torch.nn.Linear(hidden_dim, self.output_dim)
+            torch.nn.init.uniform_(
+                self.stddev.weight,
+                -WEIGHTS_FINAL_INIT,
+                WEIGHTS_FINAL_INIT
+            )
+            torch.nn.init.uniform_(
+                self.stddev.bias,
+                -BIAS_FINAL_INIT,
+                BIAS_FINAL_INIT
+            )
 
         torch.nn.init.uniform_(
-            final_layer.weight,
+            self.mu.weight,
             -WEIGHTS_FINAL_INIT,
             WEIGHTS_FINAL_INIT
         )
         torch.nn.init.uniform_(
-            final_layer.bias,
+            self.mu.bias,
             -BIAS_FINAL_INIT,
             BIAS_FINAL_INIT
         )
@@ -52,13 +72,19 @@ class Actor(torch.nn.Module):
         ))
         return self
 
-    def forward(self, x, deterministic=True):
+    def forward(self, x):
         x = self.layers(x)
-        l, u = self.bounds
-        mean = torch.sigmoid(x) * (u - l) + l
-        if deterministic:
+        mu = self.mu(x)
+        if not self.stochastic:
+            l, u = self.bounds
+            mean = torch.sigmoid(mu) * (u - l) + l
             return mean
-        pass
+        stddev = F.softplus(self.stddev(x)) + 1e-5
+        a_dist = D.normal.Normal(loc=mu, scale=stddev)
+        action = a_dist.rsample()
+        l, u = self.bounds
+        action_sample = torch.sigmoid(action) * (u - l) + l
+        return a_dist, action_sample
 
     def compute_action(self, state):
         device = next(self.parameters()).device
