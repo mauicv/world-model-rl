@@ -139,7 +139,7 @@ def make_models():
 
     world_model.load(
         "./experiments/ant-v4/",
-        name="world-model-checkpoint.pth"
+        name="world-model-checkpoint-2.pth"
     )
 
     env = gym.make(
