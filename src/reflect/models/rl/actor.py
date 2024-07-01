@@ -72,10 +72,10 @@ class Actor(torch.nn.Module):
         ))
         return self
 
-    def forward(self, x):
+    def forward(self, x, deterministic=True):
         x = self.layers(x)
         mu = self.mu(x)
-        if not self.stochastic:
+        if not self.stochastic or deterministic:
             l, u = self.bounds
             mean = torch.sigmoid(mu) * (u - l) + l
             return mean
@@ -96,7 +96,7 @@ class Actor(torch.nn.Module):
                 dtype=torch.float32,
                 device=device
             )
-        action = self(state)
+        action = self(state, deterministic=True)
         action = action.to(state.device)
         self.train()
         return action.detach()
