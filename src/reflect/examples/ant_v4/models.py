@@ -15,14 +15,23 @@ from reflect.models.world_model.embedder import Embedder
 import gymnasium as gym
 import torch
 
+# hdn_dim=512
+# num_heads=8
+# latent_dim=256
+# num_cat=32
+# t_dim=65
+# input_dim=32*256
+# num_layers=10
+# dropout=0.0
+# a_size=8
+
 hdn_dim=512
 num_heads=8
 latent_dim=256
 num_cat=32
-t_dim=65
+t_dim=32
 input_dim=32*256
 num_layers=10
-# num_layers=2
 dropout=0.0
 a_size=8
 
@@ -47,7 +56,8 @@ def make_models():
                 attn=RelativeAttention(
                     hidden_dim=hdn_dim,
                     num_heads=num_heads,
-                    num_positions=t_dim,
+                    num_positions=3*t_dim,
+                    # num_positions=t_dim,
                     dropout=dropout
                 ),
                 mlp=MLP(
@@ -139,7 +149,7 @@ def make_models():
 
     world_model.load(
         "./experiments/ant-v4/",
-        name="world-model-checkpoint.pth"
+        name="world-model-checkpoint-IL.pth"
     )
 
     env = gym.make(
