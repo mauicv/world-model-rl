@@ -84,7 +84,7 @@ class Actor(torch.nn.Module):
         action = a_dist.rsample()
         l, u = self.bounds
         action_sample = torch.sigmoid(action) * (u - l) + l
-        return a_dist, action_sample
+        return action_sample
 
     def compute_action(self, state):
         device = next(self.parameters()).device
