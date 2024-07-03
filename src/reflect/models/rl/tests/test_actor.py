@@ -58,8 +58,7 @@ def test_actor_stochastic(env_name, batch_size):
         stochastic=True
     )
     input = torch.rand((batch_size, 32*32))
-    a_dist, action = actor(input)
-    assert a_dist.mean.shape == (batch_size, gym_env.action_space.shape[0])
+    action = actor(input)
     assert action.shape == (batch_size, gym_env.action_space.shape[0])
     assert torch.all(action >= torch.tensor(gym_env.action_space.low))
     assert torch.all(action <= torch.tensor(gym_env.action_space.high))
