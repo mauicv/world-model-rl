@@ -94,11 +94,11 @@ class ValueGradTrainer:
             **actor_update
         }
 
-    def update_actor(self, state_samples):
+    def update_actor(self, state_samples, retain_graph=False):
         b, h, *l = state_samples.shape
         state_samples = state_samples.reshape(b*h, *l)
         loss = - self.critic(state_samples).mean()
-        self.actor_optim.backward(loss)
+        self.actor_optim.backward(loss, retain_graph=retain_graph)
         self.actor_optim.update_parameters()
         return {
             'actor_loss': loss.item()
@@ -108,7 +108,8 @@ class ValueGradTrainer:
             self,
             state_samples,
             reward_samples,
-            done_samples
+            done_samples,
+            retain_graph=False
         ):
         state_values = self.critic(state_samples[:, 0])
         targets = self.compute_value_target(
@@ -118,7 +119,7 @@ class ValueGradTrainer:
         )
         loss = (targets.detach() - state_values)**2
         loss = loss.mean()
-        self.critic_optim.backward(loss, retain_graph=True)
+        self.critic_optim.backward(loss, retain_graph=retain_graph)
         self.critic_optim.update_parameters()
         return {
             'critic_loss': loss.item()
