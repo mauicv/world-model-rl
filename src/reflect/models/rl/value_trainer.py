@@ -66,7 +66,7 @@ class ValueGradTrainer:
                 dones=dones,
                 k=k
             )
-            val_sum = (1 - self.lam) * self.lam**k * val
+            val_sum = val_sum + (1 - self.lam) * self.lam**k * val
         final_val = self.compute_rollout_value(
             rewards=rewards,
             states=states,
