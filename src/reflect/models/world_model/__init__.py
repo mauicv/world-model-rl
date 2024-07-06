@@ -53,7 +53,7 @@ class WorldModel(torch.nn.Module):
         self.num_ts = num_ts
         self.num_cat = num_cat
         self.num_latent = num_latent
-        self.mask = get_causal_mask(self.num_ts)
+        self.mask = get_causal_mask(self.num_ts * 3)
         self.observation_model_opt = AdamOptim(
             self.observation_model.parameters(),
             lr=0.0001,

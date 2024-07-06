@@ -11,6 +11,7 @@ class Embedder(torch.nn.Module):
             hidden_dim: int=None,
         ):
         super(Embedder, self).__init__()
+        self.hidden_dim = hidden_dim
         self.r_emb = torch.nn.Linear(1, hidden_dim)
 
         self.a_emb = torch.nn.Sequential(
@@ -27,8 +28,11 @@ class Embedder(torch.nn.Module):
 
     def forward(self, x):
         s, a, r = x
+        b, *_ = s.shape
         a_emb = self.a_emb(a)
         r_emb = self.r_emb(r.type(torch.float))
         s_emb = self.z_emb(s)
-        x = s_emb + a_emb + r_emb
-        return x
+        return (
+            torch.stack([s_emb, a_emb, r_emb], dim=2)
+            .view(b, -1, self.hidden_dim)
+        )
