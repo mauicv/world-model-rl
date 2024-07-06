@@ -12,12 +12,18 @@ class Actor(torch.nn.Module):
             action_space,
             num_layers=3,
             hidden_dim=512,
-            stochastic=False
+            stochastic=False,
+            repeat=1
         ):
         super().__init__()
         self.input_dim = input_dim
         self.output_dim = action_space.shape[0]
         self.stochastic = stochastic
+
+        self.repeat = repeat
+        self.count = 0
+        self.action = None
+
         self.bounds = (
             torch.tensor(action_space.low, dtype=torch.float32),
             torch.tensor(action_space.high, dtype=torch.float32)
@@ -72,7 +78,11 @@ class Actor(torch.nn.Module):
         ))
         return self
 
-    def forward(self, x, deterministic=True):
+    def reset(self):
+        self.count = 0
+        self.action = None
+
+    def _forward(self, x, deterministic=True):
         x = self.layers(x)
         mu = self.mu(x)
         if not self.stochastic or deterministic:
@@ -85,6 +95,20 @@ class Actor(torch.nn.Module):
         l, u = self.bounds
         action_sample = torch.sigmoid(action) * (u - l) + l
         return action_sample
+
+    def forward(self, x, deterministic=True):
+        if self.repeat == 1:
+            return self._forward(x, deterministic)
+
+        if self.action == None:
+            self.action = self._forward(x, deterministic)
+
+        if self.count == self.repeat:
+            self.count = 0
+            self.action = self._forward(x, deterministic)
+
+        self.count += 1
+        return self.action
 
     def compute_action(self, state):
         device = next(self.parameters()).device
