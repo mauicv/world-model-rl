@@ -42,9 +42,9 @@ class NormalNoise:
         self.current_action = None
 
     def __call__(self):
-        self.count += 1
         if self.count % self.repeat == 0:
             self.reset()
+        self.count += 1
         return self.current_action
 
     def reset(self):
