@@ -1,8 +1,8 @@
 import torch
 import torch.nn.functional as F
 import torch.distributions as D
-WEIGHTS_FINAL_INIT = 3e-3
-BIAS_FINAL_INIT = 3e-4
+WEIGHTS_FINAL_INIT = 3e-1
+BIAS_FINAL_INIT = 3e-2
 
 
 class Actor(torch.nn.Module):
