@@ -122,5 +122,5 @@ class Environment():
             self.states[:, 1:],
             self.actions[:, 1:],
             self.rewards[:, 1:],
-            self.dones[:, 1:]
+            (self.dones[:, 1:] >= 0.5).to(int)
         )
