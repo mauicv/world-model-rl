@@ -2,6 +2,19 @@ from reflect.models.rl.actor import Actor
 from reflect.models.rl.critic import Critic
 from reflect.utils import AdamOptim
 import torch
+import copy
+
+
+def update_target_network(target_model, model, tau=5e-3):
+    with torch.no_grad():
+        for target_weights, weights in zip(
+                target_model.parameters(),
+                model.parameters()
+            ):
+            target_weights.data = (
+                tau * weights.data
+                + (1 - tau) * target_weights.data
+            )
 
 
 class ValueGradTrainer:
@@ -28,6 +41,7 @@ class ValueGradTrainer:
 
         self.critic_lr = critic_lr
         self.critic = critic
+        self.target_critic = copy.deepcopy(self.critic)
         self.critic_optim = AdamOptim(
             self.critic.parameters(),
             lr=self.critic_lr,
@@ -51,7 +65,7 @@ class ValueGradTrainer:
         )
         final_values = (
             self.gamma_rollout[h]
-            * self.critic(states[:, [h]]).detach()
+            * self.target_critic(states[:, [h]]).detach()
             * (1 - dones[:, [h]])
         )
         return R.sum(1) + final_values[:, 0, :]
@@ -121,6 +135,7 @@ class ValueGradTrainer:
         loss = loss.mean()
         self.critic_optim.backward(loss, retain_graph=retain_graph)
         self.critic_optim.update_parameters()
+        update_target_network(self.target_critic, self.critic)
         return {
             'critic_loss': loss.item()
         }
