@@ -84,6 +84,8 @@ def test_actor_repeat(env_name, batch_size):
     input = torch.rand((batch_size, 32*32))
     action_4 = actor(input)
 
+    print(action_1)
+
     assert torch.all(action_1 == action_2)
     assert torch.all(action_2 == action_3)
     assert torch.all(action_3 != action_4)

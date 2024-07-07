@@ -39,7 +39,6 @@ class LatentSpace(torch.nn.Module):
             input_shape=(1024, 4, 4),
             num_classes=32,
             num_latent=32,
-            mid_size=768,    
         ):
         super().__init__()
 
