@@ -143,6 +143,7 @@ class ValueGradTrainer:
     def to(self, device):
         self.actor.to(device)
         self.critic.to(device)
+        self.target_critic.to(device)
 
     def save(self, path):
         state_dict = {
