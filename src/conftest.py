@@ -96,13 +96,13 @@ def dynamic_model_8d_action():
 
 
 def make_dynamic_model(a_size):
-    hdn_dim=256
+    hdn_dim=32
     num_heads=8
     latent_dim=32
     num_cat=32
     t_dim=48
     input_dim=1024
-    layers=10
+    layers=2
     dropout=0.05
 
     dynamic_model = GPT(
