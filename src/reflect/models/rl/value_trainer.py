@@ -1,5 +1,6 @@
 from reflect.models.rl.actor import Actor
 from reflect.models.rl.critic import Critic
+from reflect.models.world_model.environment import Environment
 from reflect.utils import AdamOptim
 import torch
 import copy
@@ -21,16 +22,17 @@ class ValueGradTrainer:
     def __init__(self,
             actor: Actor,
             critic: Critic,
+            env: Environment,
             actor_lr: float=0.001,
             critic_lr: float=0.001,
             grad_clip: float=10,
             weight_decay: float=1e-4,
             gamma: float=0.99,
             lam: float=0.95,
-            entropy_weight: float=1e-3
+            entropy_weight: float=1e-3,
         ):
         self.gamma = gamma
-
+        self.env = env
         self.actor_lr = actor_lr
         self.actor = actor
         self.actor_optim = AdamOptim(
@@ -91,63 +93,41 @@ class ValueGradTrainer:
         )
         return (1 - self.lam) * val_sum + self.lam**(big_h - 1) * final_val
 
-    def update(self, env, horizon=20):
+    def update(self, horizon=20):
         # train agent
-        current_state, _ = env.reset(batch_size=12)
+        current_state, _ = self.env.reset(batch_size=12)
         entropy_loss = 0
         for _ in range(horizon):
             action_dist = self.actor(current_state)
-            entropy_loss += self.entropy_weight * action_dist.entropy()
+            entropy_loss = entropy_loss + action_dist.entropy()
             action = action_dist.rsample()
-            next_state, *_ = env.step(action)
+            next_state, *_ = self.env.step(action)
             current_state = next_state
 
-        s, a, r, d = env.get_rollouts()
-        rl_agent_history = self.update_rollout(
-            state_samples=s,
-            reward_samples=r,
-            done_samples=d
-        )
-        return {
-            **rl_agent_history,
-            "entropy_loss": entropy_loss.item()
-        }
-
-    def update_rollout(
-            self,
-            state_samples,
-            reward_samples,
-            done_samples  
-        ):
-        critic_update = self.update_critic(
-            state_samples.detach(),
-            reward_samples.detach(),
-            done_samples.detach()
-        )
-        actor_update = self.update_actor(
-            state_samples=state_samples
-        )
-        return {
-            **critic_update,
-            **actor_update
-        }
-
-    def update_actor(self, state_samples, retain_graph=False):
-        b, h, *l = state_samples.shape
-        state_samples = state_samples.reshape(b*h, *l)
-        loss = - self.critic(state_samples).mean()
-        self.actor_optim.backward(loss, retain_graph=retain_graph)
+        s, _, r, d = self.env.get_rollouts()
+        critic_loss = self.critic_loss(s,r,d)
+        policy_loss = self.policy_loss(state_samples=s)
+        actor_loss = policy_loss + self.entropy_weight * entropy_loss.mean()
+        self.critic_optim.backward(critic_loss, retain_graph=True)
+        self.actor_optim.backward(actor_loss, retain_graph=False)
+        self.critic_optim.update_parameters()
         self.actor_optim.update_parameters()
         return {
-            'actor_loss': loss.item()
+            "critic_loss": critic_loss.item(),
+            "actor_loss": actor_loss.item(),
+            "entropy_loss": entropy_loss.mean().item(),
         }
 
-    def update_critic(
+    def policy_loss(self, state_samples):
+        b, h, *l = state_samples.shape
+        state_samples = state_samples.reshape(b*h, *l)
+        return - self.critic(state_samples).mean()
+
+    def critic_loss(
             self,
             state_samples,
             reward_samples,
             done_samples,
-            retain_graph=False
         ):
         state_values = self.critic(state_samples[:, 0])
         targets = self.compute_value_target(
@@ -156,13 +136,7 @@ class ValueGradTrainer:
             dones=done_samples
         )
         loss = 0.5 * (targets.detach() - state_values)**2
-        loss = loss.mean()
-        self.critic_optim.backward(loss, retain_graph=retain_graph)
-        self.critic_optim.update_parameters()
-        update_target_network(self.target_critic, self.critic)
-        return {
-            'critic_loss': loss.item()
-        }
+        return loss.mean()
 
     def to(self, device):
         self.actor.to(device)

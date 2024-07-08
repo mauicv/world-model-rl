@@ -203,7 +203,7 @@ class WorldModel(torch.nn.Module):
             + params.reward_coeff * reward_loss
             + params.done_coeff * done_loss
         )
-        consistency_loss = cross_entropy_loss_fn(c_z_dist, z_pred).detach()
+        consistency_loss = cross_entropy_loss_fn(c_z_dist, z_pred)
         # TODO: Consistency loss seems to penalize both the observation 
         # model and the dynamic model? Why?
         obs_loss = (

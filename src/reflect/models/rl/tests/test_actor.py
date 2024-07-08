@@ -17,7 +17,7 @@ def test_actor(env_name, batch_size):
         action_space=gym_env.action_space
     )
     input = torch.rand((batch_size, 32*32))
-    action = actor(input)
+    action = actor(input, deterministic=True)
 
     assert action.shape == (batch_size, gym_env.action_space.shape[0])
     assert torch.all(action >= torch.tensor(gym_env.action_space.low))
@@ -57,13 +57,13 @@ def test_actor_repeat(env_name, batch_size):
         repeat=3
     )
     input = torch.rand((batch_size, 32*32))
-    action_1 = actor(input)
+    action_1 = actor(input, deterministic=True)
     input = torch.rand((batch_size, 32*32))
-    action_2 = actor(input)
+    action_2 = actor(input, deterministic=True)
     input = torch.rand((batch_size, 32*32))
-    action_3 = actor(input)
+    action_3 = actor(input, deterministic=True)
     input = torch.rand((batch_size, 32*32))
-    action_4 = actor(input)
+    action_4 = actor(input, deterministic=True)
 
     print(action_1)
 

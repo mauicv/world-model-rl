@@ -89,7 +89,7 @@ class Actor(torch.nn.Module):
         self.count = 0
         self.action = None
 
-    def _forward(self, x, deterministic=True):
+    def _forward(self, x, deterministic=False):
         x = self.layers(x)
         mu = self.mu(x)
         if deterministic:
@@ -97,7 +97,7 @@ class Actor(torch.nn.Module):
             return action
         return tanh_normal(mu, self.stddev(x))
 
-    def forward(self, x, deterministic=True):
+    def forward(self, x, deterministic=False):
         if self.repeat == 1:
             return self._forward(x, deterministic)
 
