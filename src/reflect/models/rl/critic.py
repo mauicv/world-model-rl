@@ -1,7 +1,7 @@
 import torch
 import torch.nn.functional as F
-WEIGHTS_FINAL_INIT = 3e-3
-BIAS_FINAL_INIT = 3e-4
+WEIGHTS_FINAL_INIT = 3e-1
+BIAS_FINAL_INIT = 3e-2
 
 
 class Critic(torch.nn.Module):
@@ -17,12 +17,12 @@ class Critic(torch.nn.Module):
             torch.nn.Linear(
                 self.state_dim + self.action_dim, hidden_dim
             ),
-            torch.nn.SiLU()
+            torch.nn.ELU()
         ])
         for _ in range(num_layers - 1):
             layers.extend([
                 torch.nn.Linear(hidden_dim, hidden_dim),
-                torch.nn.SiLU()
+                torch.nn.ELU()
             ])
 
         final_layer = torch.nn.Linear(hidden_dim, 1)
