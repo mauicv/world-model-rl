@@ -47,9 +47,9 @@ class Environment():
     def not_done(self):
         device = next(self.world_model.parameters()).device
         if self.ignore_done:
-            not_done_bool = torch.ones_like(self.dones[:, -1, 0]) > 0.5
+            not_done_bool = torch.ones_like(self.dones[:, -1, 0]) == 1
             return not_done_bool.to(device)
-        not_done_bool = self.dones[:, -1, 0] <= 0.5
+        not_done_bool = self.dones[:, -1, 0] < 0.5
         return not_done_bool.to(device)
 
     @property

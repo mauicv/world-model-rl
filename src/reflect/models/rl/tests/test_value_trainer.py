@@ -90,7 +90,7 @@ def test_update():
     rewards = torch.rand((3, 12, 1))
     dones = torch.zeros((3, 12, 1))
 
-    history = trainer.update(
+    history = trainer.update_rollout(
         state_samples=states,
         reward_samples=rewards,
         done_samples=dones,

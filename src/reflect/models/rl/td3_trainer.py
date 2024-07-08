@@ -44,7 +44,10 @@ def compute_TD_target(
         gamma=GAMMA
     ):
     # TODO: Add noise to the next actions
-    next_state_actions = target_actor.compute_action(next_states)
+    next_state_actions = target_actor.compute_action(
+        next_states,
+        deterministic=True
+    )
     next_state_action_values = target_critic(
         next_states,
         next_state_actions

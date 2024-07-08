@@ -26,7 +26,8 @@ class ValueGradTrainer:
             grad_clip: float=10,
             weight_decay: float=1e-4,
             gamma: float=0.99,
-            lam: float=0.95
+            lam: float=0.95,
+            entropy_weight: float=1e-3
         ):
         self.gamma = gamma
 
@@ -50,6 +51,7 @@ class ValueGradTrainer:
         )
         self.lam = lam
         self.gamma_rollout = None
+        self.entropy_weight = entropy_weight
 
     def compute_rollout_value(self, rewards, states, dones, k):
         _, big_h, *_ = states.shape
@@ -73,23 +75,45 @@ class ValueGradTrainer:
     def compute_value_target(self, rewards, states, dones):
         val_sum = 0
         _, big_h, *_ = states.shape
-        for k in range(big_h - 1):
+        for k in range(1, big_h - 1):
             val = self.compute_rollout_value(
                 rewards=rewards,
                 states=states,
                 dones=dones,
                 k=k
             )
-            val_sum = val_sum + (1 - self.lam) * self.lam**k * val
+            val_sum = val_sum + self.lam**(k - 1) * val
         final_val = self.compute_rollout_value(
             rewards=rewards,
             states=states,
             dones=dones,
             k=big_h
         )
-        return val_sum + self.lam**(big_h - 1) * final_val
+        return (1 - self.lam) * val_sum + self.lam**(big_h - 1) * final_val
 
-    def update(
+    def update(self, env, horizon=20):
+        # train agent
+        current_state, _ = env.reset(batch_size=12)
+        entropy_loss = 0
+        for _ in range(horizon):
+            action_dist = self.actor(current_state)
+            entropy_loss += self.entropy_weight * action_dist.entropy()
+            action = action_dist.rsample()
+            next_state, *_ = env.step(action)
+            current_state = next_state
+
+        s, a, r, d = env.get_rollouts()
+        rl_agent_history = self.update_rollout(
+            state_samples=s,
+            reward_samples=r,
+            done_samples=d
+        )
+        return {
+            **rl_agent_history,
+            "entropy_loss": entropy_loss.item()
+        }
+
+    def update_rollout(
             self,
             state_samples,
             reward_samples,
@@ -131,7 +155,7 @@ class ValueGradTrainer:
             rewards=reward_samples,
             dones=done_samples
         )
-        loss = (targets.detach() - state_values)**2
+        loss = 0.5 * (targets.detach() - state_values)**2
         loss = loss.mean()
         self.critic_optim.backward(loss, retain_graph=retain_graph)
         self.critic_optim.update_parameters()
