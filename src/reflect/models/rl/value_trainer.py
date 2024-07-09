@@ -29,7 +29,7 @@ class ValueGradTrainer:
             weight_decay: float=1e-4,
             gamma: float=0.99,
             lam: float=0.95,
-            entropy_weight: float=1e-3,
+            entropy_weight: float=1e-4,
         ):
         self.gamma = gamma
         self.env = env
@@ -96,6 +96,7 @@ class ValueGradTrainer:
     def update(self, horizon=20):
         # train agent
         current_state, _ = self.env.reset(batch_size=12)
+        self.actor.reset()
         entropy_loss = 0
         for _ in range(horizon):
             action_dist = self.actor(current_state)

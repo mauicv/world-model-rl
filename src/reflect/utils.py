@@ -28,6 +28,13 @@ class AdamOptim:
     def state_dict(self):
         return self.optimizer.state_dict()
 
+    def to(self, device):
+        # see https://github.com/pytorch/pytorch/issues/2830
+        for state in self.optimizer.state.values():
+            for k, v in state.items():
+                if isinstance(v, torch.Tensor):
+                    state[k] = v.to(device)
+
 
 def recon_loss_fn(x, y):
     x, y = x.permute(0, 2, 3, 1), y.permute(0, 2, 3, 1)
