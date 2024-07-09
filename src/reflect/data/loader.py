@@ -97,8 +97,8 @@ class EnvDataLoader:
         _ = self.env.reset()
         if self.policy is not None:
             self.policy.reset()
-        if self.noise_generator is not None:
-            self.noise_generator.reset()
+        # if self.noise_generator is not None:
+        #     self.noise_generator.reset()
         img = self.env.render()
         img = self._preprocess(img)
         done = False
