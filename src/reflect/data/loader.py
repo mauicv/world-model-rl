@@ -84,7 +84,7 @@ class EnvDataLoader:
         if noise_generator is None:
             self.noise_generator = NoNoise(dim=self.action_dim)
 
-    def perform_rollout(self, eps=0.5):
+    def perform_rollout(self):
         """Performs a rollout of the environment.
 
         Iterate rollouts and store the images, actions, rewards, and done
@@ -95,6 +95,8 @@ class EnvDataLoader:
         that generated s_t.
         """
         _ = self.env.reset()
+        if self.policy is not None:
+            self.policy.reset()
         if self.noise_generator is not None:
             self.noise_generator.reset()
         img = self.env.render()
@@ -132,6 +134,7 @@ class EnvDataLoader:
                 z = z.view(1, -1)
                 action_dist = self.policy.compute_action(z)
                 action = action_dist.sample()
+                action = action.squeeze(0)
             else:
                 action = self.noise_generator()
                 action = torch.tensor(action, device=observation.device)

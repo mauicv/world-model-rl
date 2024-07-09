@@ -107,7 +107,7 @@ class ValueGradTrainer:
         s, _, r, d = self.env.get_rollouts()
         critic_loss = self.critic_loss(s,r,d)
         policy_loss = self.policy_loss(state_samples=s)
-        actor_loss = policy_loss + self.entropy_weight * entropy_loss.mean()
+        actor_loss = policy_loss - self.entropy_weight * entropy_loss.mean()
         self.critic_optim.backward(critic_loss, retain_graph=True)
         self.actor_optim.backward(actor_loss, retain_graph=False)
         self.critic_optim.update_parameters()
