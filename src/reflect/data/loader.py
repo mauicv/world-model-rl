@@ -5,6 +5,7 @@ See also: https://colab.research.google.com/drive/10-QQlnSFZeWBC7JCm0mPraGBPLVU2
 
 import gymnasium as gym
 from reflect.data.noise import NoNoise
+from reflect.utils import FreezeParameters
 import torch
 
 def to_tensor(t):
@@ -97,8 +98,6 @@ class EnvDataLoader:
         _ = self.env.reset()
         if self.policy is not None:
             self.policy.reset()
-        # if self.noise_generator is not None:
-        #     self.noise_generator.reset()
         img = self.env.render()
         img = self._preprocess(img)
         done = False
@@ -124,13 +123,11 @@ class EnvDataLoader:
         self.rollout_ind += 1
 
     def compute_action(self, observation):
-        with torch.no_grad():
+        with FreezeParameters([self.observation_model, self.policy]):
             if self.policy:
                 device = next(self.observation_model.parameters()).device
                 observation = observation.to(device)
-                self.observation_model.eval()
                 z = self.observation_model.encode(observation)
-                self.observation_model.train()
                 z = z.view(1, -1)
                 action_dist = self.policy.compute_action(z)
                 action = action_dist.sample()

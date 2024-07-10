@@ -1,4 +1,5 @@
-
+from typing import Iterable
+from torch.nn import Module
 from torch.optim import Adam
 import torch
 import math
@@ -113,3 +114,54 @@ class CSVLogger:
                 axs[i].set_title(fields)
                 axs[i].legend()
         plt.show()
+
+
+
+# see https://github.com/juliusfrost/dreamer-pytorch/blob/main/dreamer/utils/module.py
+def get_parameters(modules: Iterable[Module]):
+    """
+    Given a list of torch modules, returns a list of their parameters.
+    :param modules: iterable of modules
+    :returns: a list of parameters
+    """
+    model_parameters = []
+    for module in modules:
+        if module is not None:
+            model_parameters += list(module.parameters())
+    return model_parameters
+
+def set_eval(modules: Iterable[Module]):
+    for module in modules:
+        if module is not None:
+            module.eval()
+
+def set_train(modules: Iterable[Module]):
+    for module in modules:
+        if module is not None:
+            module.train()
+
+
+class FreezeParameters:
+    def __init__(self, modules: Iterable[Module]):
+        """
+        Context manager to locally freeze gradients.
+        In some cases with can speed up computation because gradients aren't calculated for these listed modules.
+        example:
+        ```
+        with FreezeParameters([module]):
+            output_tensor = module(input_tensor)
+        ```
+        :param modules: iterable of modules. used to call .parameters() to freeze gradients.
+        """
+        self.modules = modules
+        self.param_states = [p.requires_grad for p in get_parameters(self.modules)]
+
+    def __enter__(self):
+        set_eval(self.modules)
+        for param in get_parameters(self.modules):
+            param.requires_grad = False
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        set_train(self.modules)
+        for i, param in enumerate(get_parameters(self.modules)):
+            param.requires_grad = self.param_states[i]
