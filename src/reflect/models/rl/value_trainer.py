@@ -1,22 +1,23 @@
 from reflect.models.rl.actor import Actor
 from reflect.models.rl.critic import Critic
 from reflect.models.world_model.environment import Environment
+from reflect.utils import FreezeParameters
 from reflect.utils import AdamOptim
 import torch
 import copy
 
 
 def update_target_network(target_model, model, tau=5e-3):
-    with torch.no_grad():
-        for target_weights, weights in zip(
-                target_model.parameters(),
-                model.parameters()
-            ):
-            target_weights.data = (
-                tau * weights.data
-                + (1 - tau) * target_weights.data
-            )
-
+    with FreezeParameters([target_model, model]):
+        with torch.no_grad():
+            for target_weights, weights in zip(
+                    target_model.parameters(),
+                    model.parameters()
+                ):
+                target_weights.data = (
+                    tau * weights.data
+                    + (1 - tau) * target_weights.data
+                )
 
 class ValueGradTrainer:
     def __init__(self,
@@ -93,26 +94,30 @@ class ValueGradTrainer:
         )
         return (1 - self.lam) * val_sum + self.lam**(big_h - 1) * final_val
 
-    def update(self, horizon=20):
-        # train agent
-        current_state, _ = self.env.reset(batch_size=12)
+
+    def update(self, horizon=20, batch_size=12):
+        current_state, _ = self.env.reset(batch_size=batch_size)
         self.actor.reset()
         entropy_loss = 0
         for _ in range(horizon):
             action_dist = self.actor(current_state)
             entropy_loss = entropy_loss + action_dist.entropy()
             action = action_dist.rsample()
-            next_state, *_ = self.env.step(action)
+            with FreezeParameters([self.env.world_model]):
+                next_state, *_ = self.env.step(action)
             current_state = next_state
 
         s, _, r, d = self.env.get_rollouts()
-        critic_loss = self.critic_loss(s,r,d)
         policy_loss = self.policy_loss(state_samples=s)
         actor_loss = policy_loss - self.entropy_weight * entropy_loss.mean()
-        self.critic_optim.backward(critic_loss, retain_graph=True)
-        self.actor_optim.backward(actor_loss, retain_graph=False)
-        self.critic_optim.update_parameters()
+        self.actor_optim.backward(actor_loss)
         self.actor_optim.update_parameters()
+        
+        critic_loss = self.critic_loss(s.detach(),r.detach(),d.detach())
+        self.critic_optim.backward(critic_loss)
+        self.critic_optim.update_parameters()
+
+        update_target_network(self.target_critic, self.critic)
         return {
             "critic_loss": critic_loss.item(),
             "actor_loss": actor_loss.item(),

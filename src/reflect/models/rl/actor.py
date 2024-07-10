@@ -16,6 +16,16 @@ def tanh_normal(mu, std):
     return tanh
 
 
+def normal_tanh(mu, std, min_std=0.01, max_std=1.0):
+    # Normal(tanh(x))
+    mean = torch.tanh(mu)
+    std = max_std * torch.sigmoid(std) + min_std
+    normal = D.normal.Normal(mean, std)
+    normal = D.independent.Independent(normal, 1)
+    return normal
+
+
+
 class Actor(torch.nn.Module):
     def __init__(
             self,
@@ -23,7 +33,8 @@ class Actor(torch.nn.Module):
             action_space,
             num_layers=3,
             hidden_dim=512,
-            repeat=1
+            repeat=1,
+            output_dist_fn=tanh_normal
         ):
         super().__init__()
         self.input_dim = input_dim
@@ -31,6 +42,7 @@ class Actor(torch.nn.Module):
         self.repeat = repeat
         self.count = 0
         self.action = None
+        self.output_dist_fn = output_dist_fn
 
         self.bounds = (
             torch.tensor(action_space.low, dtype=torch.float32),
@@ -95,7 +107,7 @@ class Actor(torch.nn.Module):
         if deterministic:
             action = torch.tanh(5 * torch.tanh(mu / 5))
             return action
-        return tanh_normal(mu, self.stddev(x))
+        return self.output_dist_fn(mu, self.stddev(x))
 
     def forward(self, x, deterministic=False):
         if self.repeat == 1:
