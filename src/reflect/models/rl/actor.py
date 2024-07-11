@@ -66,10 +66,7 @@ class Actor(torch.nn.Module):
 
     def to(self, *args, **kwargs):
         super().to(*args, **kwargs)
-        self.bounds = tuple(map(
-            lambda x: x.to(*args, **kwargs),
-            self.bounds
-        ))
+        self.bound = self.bound.to(*args, **kwargs)
         return self
 
     def reset(self):
