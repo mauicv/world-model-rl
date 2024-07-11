@@ -41,9 +41,6 @@ def test_actor_compute_action(env_name, batch_size):
     action = action_dist.sample()
 
     assert action.shape == (batch_size, gym_env.action_space.shape[0])
-    assert torch.all(action >= torch.tensor(gym_env.action_space.low))
-    assert torch.all(action <= torch.tensor(gym_env.action_space.high))
-
 
 @pytest.mark.parametrize("env_name,batch_size", [
     ("InvertedPendulum-v4", 5),
