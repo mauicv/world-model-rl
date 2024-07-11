@@ -129,8 +129,8 @@ class EnvDataLoader:
                 observation = observation.to(device)
                 z = self.observation_model.encode(observation)
                 z = z.view(1, -1)
-                action_dist = self.policy.compute_action(z)
-                action = action_dist.sample()
+                action = self.policy.compute_action(z, deterministic=True)
+                action = action + torch.normal(torch.zeros_like(action), 0.3)
                 action = action.squeeze(0)
             else:
                 action = self.noise_generator()

@@ -1,29 +1,9 @@
 import torch
 import torch.nn.functional as F
 import torch.distributions as D
+from reflect.utils import FreezeParameters
 WEIGHTS_FINAL_INIT = 3e-1
 BIAS_FINAL_INIT = 3e-2
-
-
-def tanh_normal(mu, std):
-    # TanhTransform(Normal(5 tanh(x/5)))
-    mean = 5 * torch.tanh(mu / 5)  # clip tanh arg to (-5, 5)
-    std = F.softplus(std) + 0.1  # min_std = 0.1
-    normal = D.normal.Normal(mean, std)
-    normal = D.independent.Independent(normal, 1)
-    tanh = D.TransformedDistribution(normal, [D.TanhTransform()])
-    tanh.entropy = normal.entropy
-    return tanh
-
-
-def normal_tanh(mu, std, min_std=0.01, max_std=1.0):
-    # Normal(tanh(x))
-    mean = torch.tanh(mu)
-    std = max_std * torch.sigmoid(std) + min_std
-    normal = D.normal.Normal(mean, std)
-    normal = D.independent.Independent(normal, 1)
-    return normal
-
 
 
 class Actor(torch.nn.Module):
@@ -34,7 +14,6 @@ class Actor(torch.nn.Module):
             num_layers=3,
             hidden_dim=512,
             repeat=1,
-            output_dist_fn=tanh_normal
         ):
         super().__init__()
         self.input_dim = input_dim
@@ -42,12 +21,8 @@ class Actor(torch.nn.Module):
         self.repeat = repeat
         self.count = 0
         self.action = None
-        self.output_dist_fn = output_dist_fn
 
-        self.bounds = (
-            torch.tensor(action_space.low, dtype=torch.float32),
-            torch.tensor(action_space.high, dtype=torch.float32)
-        )
+        self.bound = torch.tensor(action_space.high, dtype=torch.float32)
         self.num_layers=num_layers
         self.hidden_dim=hidden_dim
 
@@ -104,10 +79,16 @@ class Actor(torch.nn.Module):
     def _forward(self, x, deterministic=False):
         x = self.layers(x)
         mu = self.mu(x)
+        mu = torch.tanh(mu) * self.bound
         if deterministic:
-            action = torch.tanh(5 * torch.tanh(mu / 5))
-            return action
-        return self.output_dist_fn(mu, self.stddev(x))
+            return mu
+
+        min_std=0.01
+        max_std=1.0
+        std = self.stddev(x)
+        std = max_std * torch.sigmoid(std) + min_std
+        normal = D.normal.Normal(mu, std)
+        return D.independent.Independent(normal, 1)
 
     def forward(self, x, deterministic=False):
         if self.repeat == 1:
@@ -124,15 +105,14 @@ class Actor(torch.nn.Module):
         return self.action
 
     def compute_action(self, state, deterministic=False):
-        device = next(self.parameters()).device
-        self.eval()
-        if len(state.shape) == 1: state=state[None, :]
-        if not torch.is_tensor(state):
-            state = torch.tensor(
-                state,
-                dtype=torch.float32,
-                device=device
-            )
-        action = self(state, deterministic=deterministic)
-        self.train()
-        return action
+        with FreezeParameters([self]):
+            device = next(self.parameters()).device
+            if len(state.shape) == 1: state=state[None, :]
+            if not torch.is_tensor(state):
+                state = torch.tensor(
+                    state,
+                    dtype=torch.float32,
+                    device=device
+                )
+            action = self(state, deterministic=deterministic)
+            return action
