@@ -7,7 +7,7 @@ class RewardGradTrainer:
     def __init__(self,
             actor: Actor,
             actor_lr: float=0.001,
-            grad_clip: float=10,
+            grad_clip: float=1,
             weight_decay: float=1e-4
         ):
 

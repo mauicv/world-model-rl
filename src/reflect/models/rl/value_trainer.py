@@ -26,7 +26,7 @@ class ValueGradTrainer:
             env: Environment,
             actor_lr: float=0.001,
             critic_lr: float=0.001,
-            grad_clip: float=10,
+            grad_clip: float=1,
             weight_decay: float=1e-4,
             gamma: float=0.99,
             lam: float=0.95,
@@ -52,6 +52,7 @@ class ValueGradTrainer:
             grad_clip=grad_clip,
             weight_decay=weight_decay
         )
+
         self.lam = lam
         self.gamma_rollout = None
         self.entropy_weight = entropy_weight
@@ -118,6 +119,7 @@ class ValueGradTrainer:
         self.critic_optim.update_parameters()
 
         update_target_network(self.target_critic, self.critic)
+
         return {
             "critic_loss": critic_loss.item(),
             "actor_loss": actor_loss.item(),
