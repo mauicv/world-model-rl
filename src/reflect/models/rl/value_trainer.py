@@ -6,7 +6,6 @@ from reflect.utils import AdamOptim
 import torch
 import copy
 
-
 def update_target_network(target_model, model, tau=5e-3):
     with FreezeParameters([target_model, model]):
         with torch.no_grad():
@@ -21,12 +20,12 @@ def update_target_network(target_model, model, tau=5e-3):
 
 class ValueGradTrainer:
     def __init__(self,
-            actor: Actor,
-            critic: Critic,
-            env: Environment,
+            actor,
+            critic,
+            env=None,
             actor_lr: float=0.001,
             critic_lr: float=0.001,
-            grad_clip: float=1,
+            grad_clip: float=0.5,
             weight_decay: float=1e-4,
             gamma: float=0.99,
             lam: float=0.95,
@@ -52,12 +51,18 @@ class ValueGradTrainer:
             grad_clip=grad_clip,
             weight_decay=weight_decay
         )
-
         self.lam = lam
         self.gamma_rollout = None
         self.entropy_weight = entropy_weight
 
-    def compute_rollout_value(self, rewards, states, dones, k):
+    def compute_rollout_value(
+            self,
+            target_state_values,
+            rewards,
+            states,
+            dones,
+            k
+        ):
         _, big_h, *_ = states.shape
         if self.gamma_rollout is None:
             self.gamma_rollout = torch.tensor([
@@ -71,16 +76,23 @@ class ValueGradTrainer:
         )
         final_values = (
             self.gamma_rollout[h]
-            * self.target_critic(states[:, [h]]).detach()
+            * target_state_values[:, [h]].detach()
             * (1 - dones[:, [h]])
         )
         return R.sum(1) + final_values[:, 0, :]
 
-    def compute_value_target(self, rewards, states, dones):
+    def compute_value_target(
+            self,
+            target_state_values,
+            rewards,
+            states,
+            dones
+        ):
         val_sum = 0
         _, big_h, *_ = states.shape
         for k in range(1, big_h - 1):
             val = self.compute_rollout_value(
+                target_state_values=target_state_values,
                 rewards=rewards,
                 states=states,
                 dones=dones,
@@ -88,6 +100,7 @@ class ValueGradTrainer:
             )
             val_sum = val_sum + self.lam**(k - 1) * val
         final_val = self.compute_rollout_value(
+            target_state_values=target_state_values,
             rewards=rewards,
             states=states,
             dones=dones,
@@ -95,6 +108,33 @@ class ValueGradTrainer:
         )
         return (1 - self.lam) * val_sum + self.lam**(big_h - 1) * final_val
 
+    def policy_loss(self, state_samples):
+        b, h, *l = state_samples.shape
+        state_samples = state_samples.reshape(b*h, *l)
+        return - self.critic(state_samples).mean()
+
+    def critic_loss(
+            self,
+            state_samples,
+            reward_samples,
+            done_samples,
+        ):
+        b, h, *l = state_samples.shape
+        state_sample_values = self.critic(state_samples)
+        with torch.no_grad():
+            target_state_values = self.target_critic(state_samples).detach()
+            targets = []
+            for i in range(h):
+                rollout_targets = self.compute_value_target(
+                    target_state_values=target_state_values[:, i:, :],
+                    states=state_samples[:, i:, :],
+                    rewards=reward_samples[:, i:, :],
+                    dones=done_samples[:, i:, :],
+                )
+                targets.append(rollout_targets)
+            target_values = torch.stack(targets, dim=1)
+        loss = 0.5 * (target_values.detach() - state_sample_values)**2
+        return loss.mean()
 
     def update(self, horizon=20, batch_size=12):
         current_state, _ = self.env.reset(batch_size=batch_size)
@@ -113,38 +153,17 @@ class ValueGradTrainer:
         actor_loss = policy_loss - self.entropy_weight * entropy_loss.mean()
         self.actor_optim.backward(actor_loss)
         self.actor_optim.update_parameters()
-        
+
         critic_loss = self.critic_loss(s.detach(),r.detach(),d.detach())
         self.critic_optim.backward(critic_loss)
         self.critic_optim.update_parameters()
 
         update_target_network(self.target_critic, self.critic)
-
         return {
             "critic_loss": critic_loss.item(),
             "actor_loss": actor_loss.item(),
             "entropy_loss": entropy_loss.mean().item(),
         }
-
-    def policy_loss(self, state_samples):
-        b, h, *l = state_samples.shape
-        state_samples = state_samples.reshape(b*h, *l)
-        return - self.critic(state_samples).mean()
-
-    def critic_loss(
-            self,
-            state_samples,
-            reward_samples,
-            done_samples,
-        ):
-        state_values = self.critic(state_samples[:, 0])
-        targets = self.compute_value_target(
-            states=state_samples,
-            rewards=reward_samples,
-            dones=done_samples
-        )
-        loss = 0.5 * (targets.detach() - state_values)**2
-        return loss.mean()
 
     def to(self, device):
         self.actor.to(device)

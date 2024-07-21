@@ -1,5 +1,4 @@
 import torch
-import torch.nn.functional as F
 import torch.distributions as D
 from reflect.utils import FreezeParameters
 WEIGHTS_FINAL_INIT = 3e-1
@@ -10,19 +9,20 @@ class Actor(torch.nn.Module):
     def __init__(
             self,
             input_dim,
-            action_space,
+            output_dim,
+            bound,
             num_layers=3,
             hidden_dim=512,
             repeat=1,
         ):
         super().__init__()
         self.input_dim = input_dim
-        self.output_dim = action_space.shape[0]
+        self.output_dim = output_dim
         self.repeat = repeat
         self.count = 0
         self.action = None
 
-        self.bound = torch.tensor(action_space.high, dtype=torch.float32)
+        self.bound = torch.tensor(bound, dtype=torch.float32)
         self.num_layers=num_layers
         self.hidden_dim=hidden_dim
 

@@ -1,81 +1,108 @@
 from reflect.data.differentiable_pendulum import DiffPendulumEnv
-from reflect.models.rl.reward_trainer import RewardGradTrainer
-import torch.nn as nn
+from reflect.models.rl.value_trainer import ValueGradTrainer, update_target_network
+from reflect.models.rl.actor import Actor
+from reflect.models.rl.value_critic import ValueCritic
 import torch
 import tqdm
 from collections import defaultdict
+import matplotlib.pyplot as plt
 
 
-class Policy(nn.Module):
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-        self.net = nn.Sequential(
-            nn.LazyLinear(64),
-            nn.Tanh(),
-            nn.LazyLinear(64),
-            nn.Tanh(),
-            nn.LazyLinear(64),
-            nn.Tanh(),
-            nn.LazyLinear(1),
-        )
-
-    def forward(self, x):
-        return self.net(x)
+def test_actor(actor, env, batch_size=10):
+    with torch.no_grad():
+        current_state, _ = env.reset(batch_size=batch_size)
+        rewards = []
+        for _ in range(100):
+            action = actor(current_state).sample().squeeze(1)
+            next_state, reward, _, _ = env.step(action)
+            current_state = next_state
+            rewards.append(reward.mean())
+        return sum(rewards)
 
 
 if __name__ == '__main__':
     batch_size = 32
-    policy = Policy()
     env = DiffPendulumEnv()
-    trainer = RewardGradTrainer(actor=policy)
     env.set_seed(0)
-    pbar = tqdm.tqdm(range(20_000 // batch_size))
+    actor = Actor(
+        input_dim=3,
+        output_dim=1,
+        hidden_dim=64,
+        num_layers=3,
+        bound=2
+    )
+
+    critic = ValueCritic(
+        state_dim=3,
+        hidden_dim=64,
+        num_layers=3
+    )
+
+    trainer = ValueGradTrainer(
+        actor=actor,
+        critic=critic,
+        actor_lr=0.0005,
+        critic_lr=0.0001,
+        env=None
+    )
     logs = defaultdict(list)
+    pbar = tqdm.tqdm(range(60_000 // batch_size))
     for _ in pbar:
-        current_state, _ = env.reset(batch_size=batch_size)
         rewards = []
         dones = []
-        for _ in range(100):
-            action = policy(current_state).squeeze(1)
+        states = []
+        entropy = 0
+        current_state, _ = env.reset(batch_size=batch_size)
+        for _ in range(40):
+            action_dist = trainer.actor(current_state)
+            action = action_dist.rsample()
+            entropy = entropy + action_dist.entropy()
+            action = action.squeeze(1)
+            states.append(current_state)
             next_state, reward, done, _ = env.step(action)
             current_state = next_state
             rewards.append(reward)
             dones.append(done)
 
-        rewards = torch.cat(rewards, dim=1)
-        dones = torch.cat(dones, dim=1).to(torch.float32)
+        rewards = torch.stack(rewards, dim=1)
+        states = torch.stack(states, dim=1)
+        dones = torch.stack(dones, dim=1).to(torch.float32)
 
-        actor_loss = trainer.update(rewards, dones)['actor_loss']
-        
+        action_loss = trainer.policy_loss(state_samples=states)
+        actor_loss = action_loss - trainer.entropy_weight * entropy.mean()
+        trainer.actor_optim.backward(actor_loss)
+        trainer.actor_optim.update_parameters()
+
+        critic_loss = trainer.critic_loss(
+            states.detach(),
+            rewards.detach(),
+            dones.detach()
+        )
+        trainer.critic_optim.backward(critic_loss)
+        trainer.critic_optim.update_parameters()
+        update_target_network(trainer.target_critic, trainer.critic)
+
+        reward = test_actor(actor, env, batch_size=10)
+
+        logs["return"].append(actor_loss.detach().item())
+        logs["reward"].append(reward)
+        logs["last_reward"].append(rewards[:, -1].detach().mean().item())
+        logs["action_loss"].append(action_loss.detach().mean().item())
+        logs["critic_loss"].append(critic_loss.detach().mean().item())
+        logs["entropy"].append(entropy.detach().mean().item())
+
         pbar.set_description(
-            f"reward: {actor_loss: 4.4f}, "
+            f"reward: {reward: 4.4f}, "
             f"last reward: {rewards[:, -1].mean(): 4.4f}"
         )
-        logs["return"].append(actor_loss)
-        logs["last_reward"].append(rewards[:, -1].mean().item())
-        # scheduler.step()
 
-    def plot():
-        import matplotlib
-        from matplotlib import pyplot as plt
-
-        is_ipython = "inline" in matplotlib.get_backend()
-        if is_ipython:
-            from IPython import display
-
-        with plt.ion():
-            plt.figure(figsize=(10, 5))
-            plt.subplot(1, 2, 1)
-            plt.plot(logs["return"])
-            plt.title("returns")
-            plt.xlabel("iteration")
-            plt.subplot(1, 2, 2)
-            plt.plot(logs["last_reward"])
-            plt.title("last reward")
-            plt.xlabel("iteration")
-            if is_ipython:
-                display.display(plt.gcf())
-                display.clear_output(wait=True)
-            plt.show()
-
-    plot()
+    fig, axs = plt.subplots(ncols=2, nrows=2)
+    axs[0, 0].plot(logs["reward"])
+    axs[0, 1].plot(logs["last_reward"])
+    axs[1, 0].plot(logs["critic_loss"])
+    axs[1, 1].plot(logs["action_loss"])
+    axs[1, 1].legend(["action_loss"])
+    axs[1, 0].legend(["critic_loss"])
+    axs[0, 0].legend(["reward"])
+    axs[0, 1].legend(["last_reward"])
+    plt.show()
