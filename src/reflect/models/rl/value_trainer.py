@@ -139,22 +139,26 @@ class ValueGradTrainer:
     def update(self, horizon=20, batch_size=12):
         current_state, _ = self.env.reset(batch_size=batch_size)
         self.actor.reset()
-        entropy_loss = 0
+        entropy = 0
         for _ in range(horizon):
             action_dist = self.actor(current_state)
-            entropy_loss = entropy_loss + action_dist.entropy()
             action = action_dist.rsample()
             with FreezeParameters([self.env.world_model]):
                 next_state, *_ = self.env.step(action)
+            entropy = entropy + action_dist.entropy().mean()
             current_state = next_state
 
         s, _, r, d = self.env.get_rollouts()
         policy_loss = self.policy_loss(state_samples=s)
-        actor_loss = policy_loss - self.entropy_weight * entropy_loss.mean()
+        actor_loss = policy_loss - self.entropy_weight * entropy
         self.actor_optim.backward(actor_loss)
         self.actor_optim.update_parameters()
 
-        critic_loss = self.critic_loss(s.detach(),r.detach(),d.detach())
+        critic_loss = self.critic_loss(
+            s.detach(),
+            r.detach(),
+            d.detach()
+        )
         self.critic_optim.backward(critic_loss)
         self.critic_optim.update_parameters()
 
@@ -162,7 +166,7 @@ class ValueGradTrainer:
         return {
             "critic_loss": critic_loss.item(),
             "actor_loss": actor_loss.item(),
-            "entropy_loss": entropy_loss.mean().item(),
+            "entropy_loss": entropy.item(),
         }
 
     def to(self, device):
