@@ -1,6 +1,5 @@
 import torch
 from collections import defaultdict
-from tqdm import tqdm
 
 from reflect.data.differentiable_pendulum import DiffPendulumEnv
 from reflect.models.rl.value_trainer import ValueGradTrainer, update_target_network
@@ -33,8 +32,8 @@ batch_size = 32
 env = DiffPendulumEnv()
 env.set_seed(0)
 logs = defaultdict(list)
-pbar = tqdm(range(500_000 // batch_size))
-for iteration in pbar:
+
+for iteration in range(500_000 // batch_size):
     current_state, _ = env.reset(batch_size=batch_size)
     rewards = []
     dones = []
@@ -75,8 +74,3 @@ for iteration in pbar:
         logs["policy_loss"].append(policy_loss.detach().mean().item())
         logs["critic_loss"].append(critic_loss.detach().mean().item())
         logs["entropy"].append(entropy.detach().item())
-
-
-import matplotlib.pyplot as plt
-plt.plot(logs["last_reward"])
-plt.show()
