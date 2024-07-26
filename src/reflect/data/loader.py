@@ -5,6 +5,7 @@ See also: https://colab.research.google.com/drive/10-QQlnSFZeWBC7JCm0mPraGBPLVU2
 
 import gymnasium as gym
 from reflect.data.noise import NoNoise
+from reflect.utils import FreezeParameters
 import torch
 
 def to_tensor(t):
@@ -84,7 +85,7 @@ class EnvDataLoader:
         if noise_generator is None:
             self.noise_generator = NoNoise(dim=self.action_dim)
 
-    def perform_rollout(self, eps=0.5):
+    def perform_rollout(self):
         """Performs a rollout of the environment.
 
         Iterate rollouts and store the images, actions, rewards, and done
@@ -95,15 +96,15 @@ class EnvDataLoader:
         that generated s_t.
         """
         _ = self.env.reset()
-        if self.noise_generator is not None:
-            self.noise_generator.reset()
+        if self.policy is not None:
+            self.policy.reset()
         img = self.env.render()
         img = self._preprocess(img)
         done = False
         reward = 0
         run_index = self.rollout_ind % self.num_runs
         for index in range(self.rollout_length):
-            action = self.compute_action(img[None, :], eps=eps)
+            action = self.compute_action(img[None, :])
             self.img_buffer[run_index, index] = img
             self.action_buffer[run_index, index] = to_tensor(action)
             # weird issue with pendulum environment always returns 1 reward
@@ -121,29 +122,22 @@ class EnvDataLoader:
         self.end_index[run_index] = index
         self.rollout_ind += 1
 
-    def compute_action(self, observation, eps=1):
-        if self.policy:
-            device = next(self.observation_model.parameters()).device
-            observation = observation.to(device)
-            self.observation_model.eval()
-            z = self.observation_model.encode(observation)
-            self.observation_model.train()
-            z = z.view(1, -1)
-            action = (
-                self.policy
-                    .compute_action(z)
-                    .squeeze(0)
-                    .detach()
-                )
-            noise = eps * self.noise_generator()
-            noise = torch.tensor(noise, device=device)
-            action = noise + action
-        else:
-            action = eps * self.noise_generator()
-            action = torch.tensor(action, device=observation.device)
-        l, u = self.bounds
-        l, u = l.to(action.device), u.to(action.device)
-        action = torch.clamp(action, l, u)
+    def compute_action(self, observation):
+        with FreezeParameters([self.observation_model, self.policy]):
+            if self.policy:
+                device = next(self.observation_model.parameters()).device
+                observation = observation.to(device)
+                z = self.observation_model.encode(observation)
+                z = z.view(1, -1)
+                action = self.policy.compute_action(z, deterministic=True)
+                action = action + torch.normal(torch.zeros_like(action), 0.3)
+                action = action.squeeze(0)
+            else:
+                action = self.noise_generator()
+                action = torch.tensor(action, device=observation.device)
+            l, u = self.bounds
+            l, u = l.to(action.device), u.to(action.device)
+            action = torch.clamp(action, l, u)
         return action
 
     def close(self):

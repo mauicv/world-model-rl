@@ -44,7 +44,10 @@ def compute_TD_target(
         gamma=GAMMA
     ):
     # TODO: Add noise to the next actions
-    next_state_actions = target_actor.compute_action(next_states)
+    next_state_actions = target_actor.compute_action(
+        next_states,
+        deterministic=True
+    )
     next_state_action_values = target_critic(
         next_states,
         next_state_actions
@@ -63,11 +66,13 @@ class TD3Agent:
             critic_lr,
             grad_clip=10,
             weight_decay=1e-4,
-            tau=TAU
+            tau=TAU,
+            entropy_weight: float=1e-3,
         ):
         self.actor_lr = actor_lr
         self.critic_lr = critic_lr
         self.tau = tau
+        self.entropy_weight = entropy_weight
         # Init Actor
         self.actor = Actor(input_dim=state_dim, action_space=action_space)
         self.target_actor = Actor(input_dim=state_dim, action_space=action_space)
@@ -143,14 +148,13 @@ class TD3Agent:
             current_actions,
             rewards,
             dones,
-            gamma=GAMMA
+            gamma=GAMMA,
         ):
         current_actions = to_tensor(current_actions)
         current_states = to_tensor(current_states)
         next_states = to_tensor(next_states)
         rewards = to_tensor(rewards)
         dones = to_tensor(dones)
-
 
         targets_1 = compute_TD_target(
             next_states,
@@ -189,9 +193,12 @@ class TD3Agent:
 
     def update_actor(self, states):
         states = states.detach()
-        actions = self.actor(states)
-        action_values = - self.critic_1(states, actions)
-        actor_loss=action_values.mean()
+        action_dist = self.actor(states)
+        action = action_dist.rsample()
+        entropy = action_dist.entropy().mean()
+        action_values = - self.critic_1(states, action)
+        actor_loss=action_values.mean() + \
+            self.entropy_weight * entropy
         self.actor_optim.backward(actor_loss)
         self.actor_optim.update_parameters()
         return actor_loss.item()
