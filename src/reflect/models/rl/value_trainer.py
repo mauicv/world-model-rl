@@ -191,3 +191,5 @@ class ValueGradTrainer:
         self.critic.load_state_dict(checkpoint['critic'])
         self.critic_optim.optimizer \
             .load_state_dict(checkpoint['critic_optim'])
+        self.target_critic = copy.deepcopy(self.critic)
+
