@@ -125,7 +125,6 @@ def test_environment_step(env_name, observation_model):
         assert env.actions.shape == (batch_size, i - 1, action_size)
 
     s, a, r, d = env.get_rollouts()
-
     assert s.shape == (batch_size, 23, 1024)
     assert a.shape == (batch_size, 22, action_size)
     assert r.shape == (batch_size, 23, 1)

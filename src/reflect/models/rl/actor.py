@@ -1,27 +1,28 @@
 import torch
-import torch.nn.functional as F
 import torch.distributions as D
-WEIGHTS_FINAL_INIT = 3e-3
-BIAS_FINAL_INIT = 3e-4
+from reflect.utils import FreezeParameters
+WEIGHTS_FINAL_INIT = 3e-1
+BIAS_FINAL_INIT = 3e-2
 
 
 class Actor(torch.nn.Module):
     def __init__(
             self,
             input_dim,
-            action_space,
+            output_dim,
+            bound,
             num_layers=3,
             hidden_dim=512,
-            stochastic=False
+            repeat=1,
         ):
         super().__init__()
         self.input_dim = input_dim
-        self.output_dim = action_space.shape[0]
-        self.stochastic = stochastic
-        self.bounds = (
-            torch.tensor(action_space.low, dtype=torch.float32),
-            torch.tensor(action_space.high, dtype=torch.float32)
-        )
+        self.output_dim = output_dim
+        self.repeat = repeat
+        self.count = 0
+        self.action = None
+
+        self.bound = torch.tensor(bound, dtype=torch.float32)
         self.num_layers=num_layers
         self.hidden_dim=hidden_dim
 
@@ -30,28 +31,27 @@ class Actor(torch.nn.Module):
             torch.nn.Linear(
                 self.input_dim, hidden_dim
             ),
-            torch.nn.SiLU()
+            torch.nn.ELU()
         ])
         for _ in range(num_layers - 1):
             layers.extend([
                 torch.nn.Linear(hidden_dim, hidden_dim),
-                torch.nn.SiLU()
+                torch.nn.ELU()
             ])
 
         self.layers = torch.nn.Sequential(*layers)
         self.mu = torch.nn.Linear(hidden_dim, self.output_dim)
-        if self.stochastic:
-            self.stddev = torch.nn.Linear(hidden_dim, self.output_dim)
-            torch.nn.init.uniform_(
-                self.stddev.weight,
-                -WEIGHTS_FINAL_INIT,
-                WEIGHTS_FINAL_INIT
-            )
-            torch.nn.init.uniform_(
-                self.stddev.bias,
-                -BIAS_FINAL_INIT,
-                BIAS_FINAL_INIT
-            )
+        self.stddev = torch.nn.Linear(hidden_dim, self.output_dim)
+        torch.nn.init.uniform_(
+            self.stddev.weight,
+            -WEIGHTS_FINAL_INIT,
+            WEIGHTS_FINAL_INIT
+        )
+        torch.nn.init.uniform_(
+            self.stddev.bias,
+            -BIAS_FINAL_INIT,
+            BIAS_FINAL_INIT
+        )
 
         torch.nn.init.uniform_(
             self.mu.weight,
@@ -66,37 +66,50 @@ class Actor(torch.nn.Module):
 
     def to(self, *args, **kwargs):
         super().to(*args, **kwargs)
-        self.bounds = tuple(map(
-            lambda x: x.to(*args, **kwargs),
-            self.bounds
-        ))
+        self.bound = self.bound.to(*args, **kwargs)
         return self
 
-    def forward(self, x, deterministic=True):
+    def reset(self):
+        self.count = 0
+        self.action = None
+
+    def _forward(self, x, deterministic=False):
         x = self.layers(x)
         mu = self.mu(x)
-        if not self.stochastic or deterministic:
-            l, u = self.bounds
-            mean = torch.sigmoid(mu) * (u - l) + l
-            return mean
-        stddev = F.softplus(self.stddev(x)) + 1e-5
-        a_dist = D.normal.Normal(loc=mu, scale=stddev)
-        action = a_dist.rsample()
-        l, u = self.bounds
-        action_sample = torch.sigmoid(action) * (u - l) + l
-        return action_sample
+        mu = torch.tanh(mu) * self.bound
+        if deterministic:
+            return mu
 
-    def compute_action(self, state):
-        device = next(self.parameters()).device
-        self.eval()
-        if len(state.shape) == 1: state=state[None, :]
-        if not torch.is_tensor(state):
-            state = torch.tensor(
-                state,
-                dtype=torch.float32,
-                device=device
-            )
-        action = self(state, deterministic=True)
-        action = action.to(state.device)
-        self.train()
-        return action.detach()
+        min_std=0.01
+        max_std=1.0
+        std = self.stddev(x)
+        std = max_std * torch.sigmoid(std) + min_std
+        normal = D.normal.Normal(mu, std)
+        return D.independent.Independent(normal, 1)
+
+    def forward(self, x, deterministic=False):
+        if self.repeat == 1:
+            return self._forward(x, deterministic)
+
+        if self.action == None:
+            self.action = self._forward(x, deterministic)
+
+        if self.count == self.repeat:
+            self.count = 0
+            self.action = self._forward(x, deterministic)
+
+        self.count += 1
+        return self.action
+
+    def compute_action(self, state, deterministic=False):
+        with FreezeParameters([self]):
+            device = next(self.parameters()).device
+            if len(state.shape) == 1: state=state[None, :]
+            if not torch.is_tensor(state):
+                state = torch.tensor(
+                    state,
+                    dtype=torch.float32,
+                    device=device
+                )
+            action = self(state, deterministic=deterministic)
+            return action
