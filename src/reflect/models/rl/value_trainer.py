@@ -108,33 +108,40 @@ class ValueGradTrainer:
         )
         return (1 - self.lam) * val_sum + self.lam**(big_h - 1) * final_val
 
-    def policy_loss(self, state_samples):
-        b, h, *l = state_samples.shape
-        state_samples = state_samples.reshape(b*h, *l)
-        return - self.critic(state_samples).mean()
-
+    def policy_loss(
+            self,
+            target_values
+        ):
+        return - target_values.mean()
+        
     def critic_loss(
+            self,
+            state_samples,
+            target_values,
+        ):
+        state_sample_values = self.critic(state_samples)
+        loss = 0.5 * (target_values.detach() - state_sample_values)**2
+        return loss.mean()
+
+    def compute_values(
             self,
             state_samples,
             reward_samples,
             done_samples,
         ):
         b, h, *l = state_samples.shape
-        state_sample_values = self.critic(state_samples)
-        with torch.no_grad():
-            target_state_values = self.target_critic(state_samples).detach()
-            targets = []
-            for i in range(h):
-                rollout_targets = self.compute_value_target(
-                    target_state_values=target_state_values[:, i:, :],
-                    states=state_samples[:, i:, :],
-                    rewards=reward_samples[:, i:, :],
-                    dones=done_samples[:, i:, :],
-                )
-                targets.append(rollout_targets)
-            target_values = torch.stack(targets, dim=1)
-        loss = 0.5 * (target_values.detach() - state_sample_values)**2
-        return loss.mean()
+        target_state_values = self.target_critic(state_samples).detach()
+        targets = []
+        for i in range(h):
+            rollout_targets = self.compute_value_target(
+                target_state_values=target_state_values[:, i:, :],
+                states=state_samples[:, i:, :],
+                rewards=reward_samples[:, i:, :],
+                dones=done_samples[:, i:, :],
+            )
+            targets.append(rollout_targets)
+        target_values = torch.stack(targets, dim=1)
+        return target_values
 
     def update(self, horizon=20, batch_size=12):
         current_state, _ = self.env.reset(batch_size=batch_size)
@@ -148,18 +155,23 @@ class ValueGradTrainer:
             entropy = entropy + action_dist.entropy().mean()
             current_state = next_state
 
-        s, _, r, d = self.env.get_rollouts()
-        policy_loss = self.policy_loss(state_samples=s)
+        states, _, rewards, dones = self.env.get_rollouts()
+        target_values = self.compute_values(
+            state_samples=states,
+            reward_samples=rewards,
+            done_samples=dones
+        )
+
+        policy_loss = self.policy_loss(target_values)
         actor_loss = policy_loss - self.entropy_weight * entropy
-        self.actor_optim.backward(actor_loss)
-        self.actor_optim.update_parameters()
+        self.actor_optim.backward(actor_loss, retain_graph=True)
 
         critic_loss = self.critic_loss(
-            s.detach(),
-            r.detach(),
-            d.detach()
+            state_samples=states,
+            target_values=target_values
         )
         self.critic_optim.backward(critic_loss)
+        self.actor_optim.update_parameters()
         self.critic_optim.update_parameters()
 
         update_target_network(self.target_critic, self.critic)
