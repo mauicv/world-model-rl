@@ -119,7 +119,7 @@ class ValueGradTrainer:
             state_samples,
             target_values,
         ):
-        state_sample_values = self.critic(state_samples)
+        state_sample_values = self.critic(state_samples.detach())
         loss = 0.5 * (target_values.detach() - state_sample_values)**2
         return loss.mean()
 
