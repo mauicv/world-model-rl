@@ -147,7 +147,12 @@ class EnvDataLoader:
         x = to_tensor(x.copy())
         x = x.permute(2, 0, 1)
         x = self.transforms(x)
-        x = x / 256
+        x = x / 256 - 0.5
+        return x
+
+    def postprocess(self, x):
+        x = x.permute(1, 2, 0)
+        x = (x + 0.5) * 256
         return x
 
     def sample(
