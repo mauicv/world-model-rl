@@ -74,8 +74,16 @@ class TD3Agent:
         self.tau = tau
         self.entropy_weight = entropy_weight
         # Init Actor
-        self.actor = Actor(input_dim=state_dim, action_space=action_space)
-        self.target_actor = Actor(input_dim=state_dim, action_space=action_space)
+        self.actor = Actor(
+            input_dim=state_dim,
+            output_dim=action_space.shape[0],
+            bound=action_space.high[0],
+        )
+        self.target_actor = Actor(
+            input_dim=state_dim,
+            output_dim=action_space.shape[0],
+            bound=action_space.high[0],
+        )
         self.target_actor.load_state_dict(copy.deepcopy(self.actor.state_dict()))
         self.actor_optim = AdamOptim(
             self.actor.parameters(),

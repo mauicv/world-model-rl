@@ -21,7 +21,8 @@ def test_compute_rollout_value(env_name, k):
     gym_env = gym.make(env_name)
     actor = Actor(
         input_dim=32*32,
-        action_space=gym_env.action_space
+        output_dim=gym_env.action_space.shape[0],
+        bound=gym_env.action_space.high
     )
     critic = ValueCritic(
         state_dim=32*32,
@@ -36,7 +37,10 @@ def test_compute_rollout_value(env_name, k):
     rewards = torch.rand((3, 12, 1))
     dones = torch.zeros((3, 12, 1))
 
+    target_state_values=trainer.target_critic(states)
+
     rollout_value = trainer.compute_rollout_value(
+        target_state_values=target_state_values,
         states=states,
         rewards=rewards,
         dones=dones,
@@ -54,7 +58,8 @@ def test_compute_value_target(env_name):
     gym_env = gym.make(env_name)
     actor = Actor(
         input_dim=32*32,
-        action_space=gym_env.action_space
+        output_dim=gym_env.action_space.shape[0],
+        bound=gym_env.action_space.high
     )
     critic = ValueCritic(
         state_dim=32*32,
@@ -69,7 +74,10 @@ def test_compute_value_target(env_name):
     rewards = torch.rand((3, 12, 1))
     dones = torch.zeros((3, 12, 1))
 
+    target_state_values=trainer.target_critic(states)
+
     rollout_value = trainer.compute_value_target(
+        target_state_values=target_state_values,
         states=states,
         rewards=rewards,
         dones=dones,
@@ -114,7 +122,8 @@ def test_update(env_name, observation_model):
     )
     actor = Actor(
         input_dim=32*32,
-        action_space=real_env.action_space
+        output_dim=real_env.action_space.shape[0],
+        bound=real_env.action_space.high,
     )
     critic = ValueCritic(
         state_dim=32*32,
