@@ -14,7 +14,8 @@ def test_actor(env_name, batch_size):
     gym_env = gym.make(env_name)
     actor = Actor(
         input_dim=32*32,
-        action_space=gym_env.action_space
+        output_dim=gym_env.action_space.shape[0],
+        bound=gym_env.action_space.high
     )
     input = torch.rand((batch_size, 32*32))
     action = actor(input, deterministic=True)
@@ -34,7 +35,8 @@ def test_actor_compute_action(env_name, batch_size):
     gym_env = gym.make(env_name)
     actor = Actor(
         input_dim=32*32,
-        action_space=gym_env.action_space
+        output_dim=gym_env.action_space.shape[0],
+        bound=gym_env.action_space.high
     )
     input = torch.rand((batch_size, 32*32))
     action_dist = actor.compute_action(input)
@@ -50,7 +52,8 @@ def test_actor_repeat(env_name, batch_size):
     gym_env = gym.make(env_name)
     actor = Actor(
         input_dim=32*32,
-        action_space=gym_env.action_space,
+        output_dim=gym_env.action_space.shape[0],
+        bound=gym_env.action_space.high,
         repeat=3
     )
     input = torch.rand((batch_size, 32*32))
