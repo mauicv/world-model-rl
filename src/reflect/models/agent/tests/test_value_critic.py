@@ -1,5 +1,5 @@
 import pytest
-from reflect.models.rl.value_critic import ValueCritic
+from reflect.models.agent.value_critic import ValueCritic
 import gymnasium as gym
 import torch
 

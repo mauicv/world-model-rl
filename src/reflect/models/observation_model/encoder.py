@@ -5,25 +5,13 @@ import torch.nn as nn
 import torch.distributions as distributions
 
 
-_str_to_activation = {
-    'relu': nn.ReLU(),
-    'elu' : nn.ELU(),
-    'tanh': nn.Tanh(),
-    'leaky_relu': nn.LeakyReLU(),
-    'sigmoid': nn.Sigmoid(),
-    'selu': nn.SELU(),
-    'softplus': nn.Softplus(),
-    'identity': nn.Identity(),
-}
-
 class ConvEncoder(nn.Module):
-
-    def __init__(self, input_shape, embed_size, activation, depth=32):
+    def __init__(self, input_shape, embed_size, activation=nn.ReLU(), depth=32):
 
         super().__init__()
 
         self.input_shape = input_shape
-        self.act_fn = _str_to_activation[activation]
+        self.act_fn = activation
         self.depth = depth
         self.kernels = [4, 4, 4, 4]
 
@@ -39,6 +27,8 @@ class ConvEncoder(nn.Module):
         self.conv_block = nn.Sequential(*layers)
 
     def forward(self, inputs):
-        reshaped = inputs.reshape(-1, *self.input_shape)
+        b, t, c, h, w = inputs.shape
+        assert (c, h, w) == self.input_shape
+        reshaped = inputs.reshape(b * t, c, h, w)
         embed = self.conv_block(reshaped)
-        return embed
+        return embed.reshape(b, t, -1)

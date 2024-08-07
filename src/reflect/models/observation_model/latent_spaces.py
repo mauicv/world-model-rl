@@ -1,45 +1,25 @@
 import torch
-from pytfex.convolutional.decoder import DecoderLayer, Decoder
-from pytfex.convolutional.encoder import EncoderLayer, Encoder
 import torch.distributions as D
 from functools import reduce
 import operator
 
 
-class ObservationalModel(torch.nn.Module):
-    def __init__(
-            self,
-            encoder=None,
-            decoder=None,
-            latent_space=None,
-        ):
-        super().__init__()
-        self.encoder = encoder
-        self.decoder = decoder
-        self.latent_space = latent_space
-
-    def forward(self, x):
-        x_enc = self.encoder(x)
-        y_enc, z, z_dist = self.latent_space(x_enc)
-        return self.decoder(y_enc), z, z_dist
-
-    def encode(self, x):
-        x_enc = self.encoder(x)
-        _, z, _ = self.latent_space(x_enc)
-        return z
-
-    def decode(self, z):
-        y_enc = self.latent_space.decode(z)
-        return self.decoder(y_enc)
-
-
-class LatentSpace(torch.nn.Module):
+class DiscreteLatentSpace(torch.nn.Module):
     def __init__(
             self,
             input_shape=(1024, 4, 4),
             num_classes=32,
             num_latent=32,
         ):
+        """DiscreteLatentSpace
+
+        Maps flattened input to 32 probability vectors of 32 classes.
+
+        Args:
+            input_shape (tuple, optional): Shape of the input tensor. Defaults to (1024, 4, 4).
+            num_classes (int, optional): Number of classes. Defaults to 32.
+            num_latent (int, optional): Number of latent variables. Defaults to 32.
+        """
         super().__init__()
 
         self.num_classes = num_classes

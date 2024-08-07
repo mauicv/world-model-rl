@@ -1,4 +1,4 @@
-from reflect.models.world_model.embedder import Embedder
+from reflect.models.transformer_world_model.embedder import Embedder
 import torch
 
 

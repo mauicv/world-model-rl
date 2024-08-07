@@ -1,5 +1,4 @@
 from reflect.data.loader import EnvDataLoader
-from reflect.models.world_model.observation_model import ObservationalModel
 from torchvision.transforms import Resize, Compose
 import gymnasium as gym
 import torch

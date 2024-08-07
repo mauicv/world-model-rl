@@ -1,5 +1,5 @@
 import pytest
-from reflect.models.rl.actor import Actor
+from reflect.models.agent.actor import Actor
 import gymnasium as gym
 import torch
 

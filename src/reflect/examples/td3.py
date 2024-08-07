@@ -1,6 +1,6 @@
-from reflect.models.rl.td3_trainer import TD3Agent
-from reflect.models.rl.actor import Actor
-from reflect.models.rl.replay_buffer import ReplayBuffer
+from reflect.models.agent.td3_trainer import TD3Agent
+from reflect.models.agent.actor import Actor
+from reflect.models.agent.replay_buffer import ReplayBuffer
 from reflect.utils import CSVLogger
 import gymnasium as gym
 import torch
