@@ -5,27 +5,15 @@ import torch.nn as nn
 import torch.distributions as distributions
 
 
-_str_to_activation = {
-    'relu': nn.ReLU(),
-    'elu' : nn.ELU(),
-    'tanh': nn.Tanh(),
-    'leaky_relu': nn.LeakyReLU(),
-    'sigmoid': nn.Sigmoid(),
-    'selu': nn.SELU(),
-    'softplus': nn.Softplus(),
-    'identity': nn.Identity(),
-}
-
 class ConvDecoder(nn.Module):
- 
-    def __init__(self, input_size, output_shape, activation, depth=32):
+    def __init__(self, input_size, output_shape, activation=nn.ReLU(), depth=32):
 
         super().__init__()
 
         self.output_shape = output_shape
         self.depth = depth
         self.kernels = [5, 5, 6, 6]
-        self.act_fn = _str_to_activation[activation]
+        self.act_fn = activation
         self.input_size = input_size
         
         self.dense = nn.Linear(input_size, 32*self.depth)
@@ -41,11 +29,11 @@ class ConvDecoder(nn.Module):
         self.convtranspose = nn.Sequential(*layers)
 
     def forward(self, features):
+        b, t, *_ = features.shape
         features = features.reshape(-1, self.input_size)
-        out_batch_shape = features.shape[:-1]
         out = self.dense(features)
         out = torch.reshape(out, [-1, 32*self.depth, 1, 1])
         out = self.convtranspose(out)
-        mean = torch.reshape(out, (*out_batch_shape, *self.output_shape))
+        mean = torch.reshape(out, (b, t, *self.output_shape))
         return mean
 

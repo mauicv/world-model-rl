@@ -1,8 +1,8 @@
 from reflect.data.simple_rl_env import SimpleRLEnvironment
-from reflect.models.rl.td3_trainer import TD3Agent
+from reflect.models.agent.td3_trainer import TD3Agent
 from reflect.data.loader import EnvDataLoader
-from reflect.models.world_model.environment import Environment
-from reflect.models.world_model import WorldModel, WorldModelTrainingParams
+from reflect.models.transformer_world_model.environment import Environment
+from reflect.models.transformer_world_model import WorldModel, WorldModelTrainingParams
 from reflect.utils import CSVLogger
 import matplotlib.pyplot as plt
 import torch
