@@ -45,6 +45,13 @@ def get_norm_dist(means, stds=None):
     return D.independent.Independent(normal, 1)
 
 
+def observation_loss(obs, decoded_obs):
+    obs = obs.reshape(-1, *obs.shape[2:])
+    decoded_obs = decoded_obs.reshape(-1, *decoded_obs.shape[2:])
+    normal = D.Independent(D.Normal(decoded_obs, 1.0), 3)
+    return -normal.log_prob(obs).mean()
+
+
 class WorldModel(torch.nn.Module):
     def __init__(
             self,
@@ -114,7 +121,7 @@ class WorldModel(torch.nn.Module):
         decoded_obs = self.decoder(
             prior_state_sequence.get_features()
         )
-        recon_loss = torch.nn.functional.mse_loss(decoded_obs, obs)
+        recon_loss = observation_loss(decoded_obs, obs)
         loss = self.params.recon_coeff * recon_loss + \
             self.params.dynamic_coeff * dynamic_model_kl_loss + \
             self.params.reward_coeff * reward_loss + \
