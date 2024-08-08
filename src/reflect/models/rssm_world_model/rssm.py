@@ -85,6 +85,12 @@ class InternalStateSequence:
             std=stds.reshape(-1, *stds.shape[2:])
         )
 
+    def to(self, device):
+        self.deter_states = self.deter_states.to(device)
+        self.stoch_states = self.stoch_states.to(device)
+        self.means = self.means.to(device)
+        self.stds = self.stds.to(device)
+
 
 class RSSM(torch.nn.Module):
     def __init__(
@@ -177,7 +183,9 @@ class RSSM(torch.nn.Module):
         ) -> Tuple[InternalStateSequence, InternalStateSequence]:
         batch, n_steps, *_ = obs_embeds.shape
         prior_state_sequence = self.initial_state_sequence(batch)
+        prior_state_sequence.to(obs_embeds.device)
         posterior_state_sequence = self.initial_state_sequence(batch)
+        posterior_state_sequence.to(obs_embeds.device)
         state = posterior_state_sequence.get_last()
         for i in range(n_steps):
             obs_embed = obs_embeds[:, i]
@@ -200,15 +208,14 @@ class RSSM(torch.nn.Module):
             obs_embed: torch.Tensor
         ) -> InternalStateSequence:
         prior_state_sequence = InternalStateSequence.from_init(initial_states)
-        # b, *_ = obs_embed.shape
-        # prior_state_sequence = self.initial_state_sequence(b)
+        prior_state_sequence.to(obs_embed.device)
         state = prior_state_sequence.get_last()
         for i in range(n_steps):
             action_input = torch.cat([
                     state.stoch_state,
                     state.deter_state
             ], dim=-1)
-        #     # TODO: do we detach action input here?
+            # TODO: do we detach action input here?
             action_emb = actor(action_input.detach(), deterministic=True)
             prior, _ = self.observe_step(obs_embed, action_emb, state)
             prior_state_sequence.append_(prior)
