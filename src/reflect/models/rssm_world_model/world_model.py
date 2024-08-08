@@ -8,7 +8,7 @@ from reflect.models.observation_model import ConvEncoder, ConvDecoder
 import torch.distributions as D
 import torch.nn.functional as F
 import torch
-from reflect.utils import AdamOptim
+from reflect.utils import AdamOptim, FreezeParameters
 
 
 @dataclass
@@ -18,14 +18,15 @@ class WorldModelTrainingParams:
     reward_coeff: float = 10.0
     done_coeff: float = 1.0
     rho: float = 3.0
-    lr: float = 1e-3
+    lr: float = 6e-4
     grad_clip: float = 1.0
 
 
 @dataclass
 class WorldModelLosses:
     recon_loss: float
-    dynamic_model_kl_loss: float
+    dynamic_model_loss: float
+    dynamic_model_loss_clamped: float
     reward_loss: float
     done_loss: float
     loss: float
@@ -107,15 +108,15 @@ class WorldModel(torch.nn.Module):
         prior_dist = prior_state_sequence.get_dist()
         posterior_dist = posterior_state_sequence.get_dist()
         reward_dist = get_norm_dist(prior_rewards)
-        dynamic_model_kl_loss = D.kl_divergence(
+        dynamic_model_loss = D.kl_divergence(
             prior_dist,
             posterior_dist
         )
-        # dynamic_model_kl_loss = torch.max(
-        #     dynamic_model_kl_loss,
-        #     torch.ones_like(dynamic_model_kl_loss) * self.params.rho
-        # )
-        dynamic_model_kl_loss = dynamic_model_kl_loss.mean()
+        dynamic_model_loss_clamped = torch.max(
+            dynamic_model_loss,
+            torch.ones_like(dynamic_model_loss) * self.params.rho
+        ).mean()
+        dynamic_model_loss_clamped = dynamic_model_loss_clamped.mean()
         reward_loss = -reward_dist.log_prob(reward).mean()
         done_loss = F.binary_cross_entropy_with_logits(prior_dones, done.float())
         decoded_obs = self.decoder(
@@ -123,7 +124,7 @@ class WorldModel(torch.nn.Module):
         )
         recon_loss = observation_loss(decoded_obs, obs)
         loss = self.params.recon_coeff * recon_loss + \
-            self.params.dynamic_coeff * dynamic_model_kl_loss + \
+            self.params.dynamic_coeff * dynamic_model_loss_clamped + \
             self.params.reward_coeff * reward_loss + \
             self.params.done_coeff * done_loss
 
@@ -132,7 +133,8 @@ class WorldModel(torch.nn.Module):
         
         return WorldModelLosses(
             recon_loss=recon_loss.item(),
-            dynamic_model_kl_loss=dynamic_model_kl_loss.item(),
+            dynamic_model_loss=dynamic_model_loss.mean().item(),
+            dynamic_model_loss_clamped=dynamic_model_loss_clamped.item(),
             reward_loss=reward_loss.item(),
             done_loss=done_loss.item(),
             loss=loss.item()
@@ -146,18 +148,19 @@ class WorldModel(torch.nn.Module):
             n_steps: int,
             with_observations: bool = False
         ):
-        state_sequence = self.dynamic_model.imagine_rollout(
-            initial_states=initial_states,
-            obs_embed=o_emb,
-            actor=actor,
-            n_steps=n_steps
-        )
-        features = state_sequence.get_features()
-        rewards = self.reward_model(features)
-        dones = self.done_model(features)
-        obs = None
-        if with_observations:
-            obs = self.decoder(features)
+        with FreezeParameters([self]):
+            state_sequence = self.dynamic_model.imagine_rollout(
+                initial_states=initial_states,
+                obs_embed=o_emb,
+                actor=actor,
+                n_steps=n_steps
+            )
+            features = state_sequence.get_features()
+            rewards = self.reward_model(features)
+            dones = self.done_model(features)
+            obs = None
+            if with_observations:
+                obs = self.decoder(features)
         return ImaginedRollouts(
             rewards=rewards,
             dones=dones,
