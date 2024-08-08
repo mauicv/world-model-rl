@@ -2,19 +2,20 @@ import pytest
 import gymnasium as gym
 from reflect.models.observation_model.observation_model import ObservationalModel
 from reflect.models.observation_model.latent_spaces import DiscreteLatentSpace
+from pytfex.transformer.gpt import GPT
+from pytfex.transformer.layer import TransformerLayer
+from pytfex.transformer.mlp import MLP
+from pytfex.transformer.attention import RelativeAttention
+from reflect.models.transformer_world_model.head import Head
+from reflect.models.transformer_world_model.embedder import Embedder
+from reflect.data.loader import EnvDataLoader
+
 from reflect.models.observation_model.encoder import ConvEncoder
 from reflect.models.observation_model.decoder import ConvDecoder
 from reflect.models.rssm_world_model.models import DenseModel
 from reflect.models.rssm_world_model.rssm import RSSM
 from reflect.models.rssm_world_model.world_model import WorldModel
-from pytfex.transformer.gpt import GPT
-from pytfex.transformer.layer import TransformerLayer
-from pytfex.transformer.mlp import MLP
-from pytfex.transformer.attention import RelativeAttention
 from reflect.models.agent.actor import Actor
-from reflect.models.transformer_world_model.head import Head
-from reflect.models.transformer_world_model.embedder import Embedder
-from reflect.data.loader import EnvDataLoader
 from reflect.models.agent.reward_trainer import RewardGradTrainer
 
 import torch

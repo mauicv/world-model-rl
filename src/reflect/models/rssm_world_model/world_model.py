@@ -6,6 +6,7 @@ from reflect.models.rssm_world_model.models import DenseModel
 from reflect.models.agent.actor import Actor
 from reflect.models.observation_model import ConvEncoder, ConvDecoder
 import torch.distributions as D
+import torch.nn.functional as F
 import torch
 from reflect.utils import AdamOptim
 
@@ -93,24 +94,23 @@ class WorldModel(torch.nn.Module):
         prior_rewards = self.reward_model(
             prior_state_sequence.get_features()
         )
-        prior_dones = self.reward_model(
+        prior_dones = self.done_model(
             prior_state_sequence.get_features()
         )
         prior_dist = prior_state_sequence.get_dist()
         posterior_dist = posterior_state_sequence.get_dist()
         reward_dist = get_norm_dist(prior_rewards)
-        done_dist = get_norm_dist(prior_dones)
         dynamic_model_kl_loss = D.kl_divergence(
             prior_dist,
             posterior_dist
         )
-        dynamic_model_kl_loss = torch.max(
-            dynamic_model_kl_loss,
-            torch.ones_like(dynamic_model_kl_loss) * self.params.rho
-        )
+        # dynamic_model_kl_loss = torch.max(
+        #     dynamic_model_kl_loss,
+        #     torch.ones_like(dynamic_model_kl_loss) * self.params.rho
+        # )
         dynamic_model_kl_loss = dynamic_model_kl_loss.mean()
         reward_loss = -reward_dist.log_prob(reward).mean()
-        done_loss = -done_dist.log_prob(done).mean()
+        done_loss = F.binary_cross_entropy_with_logits(prior_dones, done.float())
         decoded_obs = self.decoder(
             prior_state_sequence.get_features()
         )
@@ -129,7 +129,7 @@ class WorldModel(torch.nn.Module):
             reward_loss=reward_loss.item(),
             done_loss=done_loss.item(),
             loss=loss.item()
-        ), posterior_state_sequence
+        )
 
     def imagine_rollout(
             self,
