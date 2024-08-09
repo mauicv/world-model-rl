@@ -29,6 +29,12 @@ class InternalState:
             self.stoch_state
         ], dim=-1)
 
+    def to(self, device: torch.device):
+        self.deter_state=self.deter_state.to(device)
+        self.stoch_state=self.stoch_state.to(device)
+        self.mean=self.mean.to(device)
+        self.std=self.std.to(device)
+
 
 @dataclass
 class InternalStateSequence:
