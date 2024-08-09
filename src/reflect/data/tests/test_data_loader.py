@@ -9,7 +9,7 @@ import pytest
     "InvertedPendulum-v4",
     "Ant-v4",
 ])
-def test_data_loader(env_name, observation_model):
+def test_data_loader(env_name):
     num_time_steps = 18
     env = gym.make(env_name, render_mode="rgb_array")
     action_shape, = env.action_space.shape
@@ -17,7 +17,6 @@ def test_data_loader(env_name, observation_model):
         num_time_steps=num_time_steps + 1,
         img_shape=(3, 64, 64),
         transforms=Compose([Resize((64, 64))]),
-        observation_model=observation_model,
         env=env
     )
     for _ in range(4):
