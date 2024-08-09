@@ -16,6 +16,9 @@ class WorldModelActor:
     def reset(self):
         self.state = self.world_model.dynamic_model.initial_state(1)
         self.action = torch.zeros(1, self.actor.output_dim)
+        device = next(self.actor.parameters()).device
+        self.state.to(device)
+        self.action = self.action.to(device)
 
     def __call__(self, obs: torch.Tensor) -> torch.Tensor:
         """
