@@ -22,6 +22,13 @@ class InternalState:
     @property
     def shapes(self) -> Tuple[int, int]:
         return self.deter_state.shape, self.stoch_state.shape
+    
+    def get_features(self):
+        return torch.cat([
+            self.deter_state,
+            self.stoch_state
+        ], dim=-1)
+
 
 @dataclass
 class InternalStateSequence:
@@ -124,12 +131,15 @@ class RSSM(torch.nn.Module):
 
     def initial_state_sequence(self, batch_size):
         return InternalStateSequence.from_init(
-            init_state=InternalState(
-                deter_state=torch.zeros(batch_size, self.deter_size),
-                stoch_state=torch.zeros(batch_size, self.stoch_size),
-                mean=torch.zeros(batch_size, self.stoch_size),
-                std=torch.zeros(batch_size, self.stoch_size)
-            )
+            init_state=self.initial_state(batch_size)
+        )
+
+    def initial_state(self, batch_size):
+        return InternalState(
+            deter_state=torch.zeros(batch_size, self.deter_size),
+            stoch_state=torch.zeros(batch_size, self.stoch_size),
+            mean=torch.zeros(batch_size, self.stoch_size),
+            std=torch.zeros(batch_size, self.stoch_size)
         )
 
     def prior(self, action_emb: torch.Tensor, state: InternalState):
@@ -153,7 +163,7 @@ class RSSM(torch.nn.Module):
             std=std
         )
 
-    def posterior(self, obs_embed, state: InternalState):
+    def posterior(self, obs_embed: torch.Tensor, state: InternalState):
         """Computes the posterior distribution given the current hidden state
         and the embedding observation.
 

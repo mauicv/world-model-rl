@@ -15,6 +15,7 @@ from reflect.models.observation_model.decoder import ConvDecoder
 from reflect.models.rssm_world_model.models import DenseModel
 from reflect.models.rssm_world_model.rssm import RSSM
 from reflect.models.rssm_world_model.world_model import WorldModel
+from reflect.models.rssm_world_model.memory_actor import WorldModelActor
 from reflect.models.agent.actor import Actor
 from reflect.models.agent.reward_trainer import RewardGradTrainer
 
@@ -99,13 +100,13 @@ def world_model(rssm, encoder, decoder, done_model, reward_model):
     )
 
 @pytest.fixture
-def env_data_loader(encoder):
+def env_data_loader(world_model_actor):
     env = gym.make("InvertedPendulum-v4", render_mode="rgb_array")
     return EnvDataLoader(
         num_time_steps=10,
         img_shape=(3, 64, 64),
         transforms=Compose([Resize((64, 64))]),
-        observation_model=encoder,
+        policy=world_model_actor,
         env=env
     )
 
@@ -132,6 +133,13 @@ def reward_grad_trainer(actor):
         actor=actor,
         lr=0.001,
         grad_clip=1.0
+    )
+
+@pytest.fixture
+def world_model_actor(world_model, actor):
+    return WorldModelActor(
+        actor=actor,
+        world_model=world_model
     )
 
 @pytest.fixture
