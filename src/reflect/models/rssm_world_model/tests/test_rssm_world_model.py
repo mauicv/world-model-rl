@@ -83,3 +83,9 @@ def test_world_model_train_step(
     )
 
     assert losses.actor_loss
+
+
+def test_save_and_load(world_model, tmp_path):
+    world_model.save(tmp_path)
+    world_model.load(tmp_path)
+    assert world_model
