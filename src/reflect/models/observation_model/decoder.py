@@ -43,5 +43,4 @@ class ConvDecoder(nn.Module):
         out = torch.reshape(out, [-1, 32*self.depth, 1, 1])
         out = self.convtranspose(out)
         out = torch.reshape(out, (b, t, *self.output_shape))
-        return self.ouput_act(out)
-
+        return self.ouput_act(out) * 0.5
