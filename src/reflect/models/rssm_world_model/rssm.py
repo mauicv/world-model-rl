@@ -118,7 +118,7 @@ class RSSM(torch.nn.Module):
         self.hidden_size = hidden_size
         self.deter_size = deter_size
         self.stoch_size = stoch_size
-        self.act = torch.nn.ReLU()
+        self.act = torch.nn.ELU()
         self.rnn = torch.nn.GRUCell(deter_size, deter_size)
         self.fc_state_action_embed = torch.nn.Linear(
             stoch_size+action_size,

@@ -11,7 +11,7 @@ class RewardGradTrainerLosses:
 class RewardGradTrainer:
     def __init__(self,
             actor: Actor,
-            lr: float=0.001,
+            lr: float=8e-05,
             grad_clip: float=1,
         ):
 
@@ -21,7 +21,7 @@ class RewardGradTrainer:
         self.actor_optim = AdamOptim(
             self.actor.parameters(),
             grad_clip=self.grad_clip,
-            lr=self.lr,
+            lr=self.lr
         )
 
     def update(
