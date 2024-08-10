@@ -6,7 +6,13 @@ import torch.distributions as distributions
 
 
 class ConvDecoder(nn.Module):
-    def __init__(self, input_size, output_shape, activation=nn.ReLU(), depth=32):
+    def __init__(self,
+            input_size,
+            output_shape,
+            activation=nn.ReLU(),
+            depth=32,
+            output_activation=nn.Tanh()
+        ):
 
         super().__init__()
 
@@ -14,9 +20,11 @@ class ConvDecoder(nn.Module):
         self.depth = depth
         self.kernels = [5, 5, 6, 6]
         self.act_fn = activation
+        self.ouput_act = output_activation
         self.input_size = input_size
         
         self.dense = nn.Linear(input_size, 32*self.depth)
+
 
         layers = []
         for i, kernel_size in enumerate(self.kernels):
@@ -34,6 +42,6 @@ class ConvDecoder(nn.Module):
         out = self.dense(features)
         out = torch.reshape(out, [-1, 32*self.depth, 1, 1])
         out = self.convtranspose(out)
-        mean = torch.reshape(out, (b, t, *self.output_shape))
-        return mean
+        out = torch.reshape(out, (b, t, *self.output_shape))
+        return self.ouput_act(out)
 
