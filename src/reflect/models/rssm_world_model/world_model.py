@@ -30,6 +30,7 @@ class WorldModelLosses:
     reward_loss: float
     done_loss: float
     loss: float
+    grad_norm: float
 
 
 @dataclass
@@ -137,7 +138,7 @@ class WorldModel(torch.nn.Module):
             self.params.reward_coeff * reward_loss + \
             self.params.done_coeff * done_loss
 
-        self.opt.backward(loss)
+        grad_norm = self.opt.backward(loss)
         self.opt.update_parameters()
         
         return WorldModelLosses(
@@ -146,7 +147,8 @@ class WorldModel(torch.nn.Module):
             dynamic_model_loss_clamped=dynamic_model_loss_clamped.item(),
             reward_loss=reward_loss.item(),
             done_loss=done_loss.item(),
-            loss=loss.item()
+            loss=loss.item(),
+            grad_norm=grad_norm.item()
         )
 
     def imagine_rollout(

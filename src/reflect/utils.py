@@ -9,7 +9,7 @@ import csv
 
 
 class AdamOptim:
-    def __init__(self, parameters, lr, betas=(0.9, 0.999), eps=1e-8, grad_clip=None):
+    def __init__(self, parameters, lr, betas=(0.9, 0.999), eps=1e-8, grad_clip=torch.inf):
         self.parameters = list(parameters)
         self.grad_clip = grad_clip
         self.optimizer = Adam(self.parameters, lr=lr, betas=betas, eps=eps)
@@ -17,8 +17,8 @@ class AdamOptim:
     def backward(self, loss, retain_graph=False):
         self.optimizer.zero_grad()
         loss.backward(retain_graph=retain_graph)
-        if self.grad_clip > 0:
-            torch.nn.utils.clip_grad_norm_(self.parameters, self.grad_clip)
+        grad_norm = torch.nn.utils.clip_grad_norm_(self.parameters, self.grad_clip)
+        return grad_norm
 
     def update_parameters(self):
         self.optimizer.step()
