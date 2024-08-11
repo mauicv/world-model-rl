@@ -5,7 +5,8 @@ import torch
 
 @dataclass
 class RewardGradTrainerLosses:
-    actor_loss: torch.Tensor
+    actor_loss: float
+    grad_norm: float
 
 
 class RewardGradTrainer:
@@ -31,10 +32,11 @@ class RewardGradTrainer:
     ) -> RewardGradTrainerLosses:
         batch_size = reward_samples.shape[0]
         loss = - ((1 - done_samples.detach()) * reward_samples).sum()/batch_size
-        self.actor_optim.backward(loss)
+        grad_norm = self.actor_optim.backward(loss)
         self.actor_optim.update_parameters()
         return RewardGradTrainerLosses(
-            actor_loss=loss.item()
+            actor_loss=loss.item(),
+            grad_norm=grad_norm.item()
         )
 
     def to(self, device):
