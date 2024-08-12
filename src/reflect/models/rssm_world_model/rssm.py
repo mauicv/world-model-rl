@@ -160,7 +160,7 @@ class RSSM(torch.nn.Module):
         prior_deter_state = self.rnn(embedded_state_action, state.deter_state)
         stoch_mean_std = self.state_prior(prior_deter_state)
         mean, std = torch.split(stoch_mean_std, self.stoch_size, dim=-1)
-        std = torch.nn.functional.softplus(std) + 1e-5
+        std = torch.nn.functional.softplus(std) + 0.1
         stoch_state = mean + std * torch.randn_like(mean)
         return InternalState(
             deter_state=prior_deter_state,
@@ -178,7 +178,7 @@ class RSSM(torch.nn.Module):
         hidden = torch.cat([state.deter_state, obs_embed], dim=-1)
         posterior_mean_std = self.state_posterior(hidden)
         mean, std = torch.split(posterior_mean_std, self.stoch_size, dim=-1)
-        std = torch.nn.functional.softplus(std) + 1e-5
+        std = torch.nn.functional.softplus(std) + 0.1
         stoch_state = mean + std * torch.randn_like(mean)
         return InternalState(
             deter_state=state.deter_state,
