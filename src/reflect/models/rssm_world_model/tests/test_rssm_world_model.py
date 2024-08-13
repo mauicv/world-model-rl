@@ -35,7 +35,7 @@ def test_world_model_imagine_rollout(
         = world_model.observe_rollout(o, a)
 
     initial_states = posterior_sequence.flatten_batch_time().detach()
-    o_emb = o_emb.reshape(-1, *o_emb.shape[2:])
+    o_emb = o_emb[:, 1:].reshape(-1, *o_emb.shape[2:])
     rollout = world_model.imagine_rollout(
         initial_states=initial_states,
         actor=actor,
@@ -43,7 +43,7 @@ def test_world_model_imagine_rollout(
         n_steps=10
     )
 
-    assert rollout.rewards.shape == (320, 10, 1)
+    assert rollout.rewards.shape == (288, 10, 1)
 
 
 def test_world_model_train_step(
@@ -67,7 +67,7 @@ def test_world_model_train_step(
     assert losses
 
     initial_states = posterior_sequence.flatten_batch_time().detach()
-    o_emb = o_emb.reshape(-1, *o_emb.shape[2:])
+    o_emb = o_emb[:, 1:].reshape(-1, *o_emb.shape[2:])
     rollout = world_model.imagine_rollout(
         initial_states=initial_states,
         actor=actor,
@@ -75,7 +75,7 @@ def test_world_model_train_step(
         n_steps=10
     )
 
-    assert rollout.rewards.shape == (320, 10, 1)
+    assert rollout.rewards.shape == (288, 10, 1)
 
     losses = reward_grad_trainer.update(
         reward_samples=rollout.rewards,

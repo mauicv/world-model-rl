@@ -19,12 +19,12 @@ def test_rssm_observe_rollout(
         action_batch,
     )
 
-    assert prior_state_sequence.stoch_states.shape == (32, 11, 30)
-    assert posterior_state_sequence.stoch_states.shape == (32, 11, 30)
+    assert prior_state_sequence.stoch_states.shape == (32, 10, 30)
+    assert posterior_state_sequence.stoch_states.shape == (32, 10, 30)
 
     z = torch.cat([posterior_state_sequence.deter_states, posterior_state_sequence.stoch_states], dim=-1)
     decoder_output = decoder(z)
-    assert decoder_output.shape == (32, 11, 3, 64, 64)
+    assert decoder_output.shape == (32, 10, 3, 64, 64)
 
 
 def test_rssm_imagine_rollout(

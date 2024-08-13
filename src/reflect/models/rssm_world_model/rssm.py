@@ -203,9 +203,12 @@ class RSSM(torch.nn.Module):
         posterior_state_sequence = self.initial_state_sequence(batch)
         posterior_state_sequence.to(obs_embeds.device)
         state = posterior_state_sequence.get_last()
-        for i in range(n_steps):
-            obs_embed = obs_embeds[:, i]
-            action_emb = action_embs[:, i]
+        for t in range(n_steps - 1):
+            # The observe step computes the t+1 prior from the t-th
+            # state. We then use this and the t+1-th observation to
+            # compute the posterior. 
+            obs_embed = obs_embeds[:, t+1]
+            action_emb = action_embs[:, t]
             prior, posterior = self.observe_step(
                 obs_embed,
                 action_emb,
