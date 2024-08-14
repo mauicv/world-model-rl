@@ -126,12 +126,12 @@ class RSSM(torch.nn.Module):
         )
         self.state_prior = torch.nn.Sequential(
             torch.nn.Linear(deter_size, hidden_size),
-            torch.nn.ReLU(),
+            torch.nn.ELU(),
             torch.nn.Linear(hidden_size, 2 * stoch_size)
         )
         self.state_posterior = torch.nn.Sequential(
             torch.nn.Linear(deter_size+obs_embed_size, hidden_size),
-            torch.nn.ReLU(),
+            torch.nn.ELU(),
             torch.nn.Linear(hidden_size, 2 * stoch_size)
         )
 
@@ -224,10 +224,10 @@ class RSSM(torch.nn.Module):
             initial_states: InternalState,
             actor: torch.nn.Module,
             n_steps: int,
-            obs_embed: torch.Tensor
         ) -> InternalStateSequence:
         prior_state_sequence = InternalStateSequence.from_init(initial_states)
-        prior_state_sequence.to(obs_embed.device)
+        device = next(actor.parameters()).device
+        prior_state_sequence.to(device)
         state = prior_state_sequence.get_last()
         for i in range(n_steps):
             action_input = torch.cat([
@@ -236,7 +236,7 @@ class RSSM(torch.nn.Module):
             ], dim=-1)
             # TODO: do we detach action input here?
             action_emb = actor(action_input.detach(), deterministic=True)
-            prior, _ = self.observe_step(obs_embed, action_emb, state)
+            prior = self.prior(action_emb, state)
             prior_state_sequence.append_(prior)
             state = prior
         return prior_state_sequence

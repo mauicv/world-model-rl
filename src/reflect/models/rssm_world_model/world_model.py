@@ -109,15 +109,12 @@ class WorldModel(torch.nn.Module):
             reward: torch.Tensor,
             done: torch.Tensor,
         ) -> WorldModelLosses:
-        prior_rewards = self.reward_model(
-            prior_state_sequence.get_features()
-        )
-        prior_dones = self.done_model(
-            prior_state_sequence.get_features()
-        )
+        posterior_features = posterior_state_sequence.get_features()
+        posterior_rewards = self.reward_model(posterior_features)
+        posterior_dones = self.done_model(posterior_features)
         prior_dist = prior_state_sequence.get_dist()
         posterior_dist = posterior_state_sequence.get_dist()
-        reward_dist = get_norm_dist(prior_rewards)
+        reward_dist = get_norm_dist(posterior_rewards)
         dynamic_model_loss = D.kl_divergence(
             prior_dist,
             posterior_dist
@@ -130,10 +127,8 @@ class WorldModel(torch.nn.Module):
         # the reward and done is predicted from the prior state sequence which
         # is one step ahead
         reward_loss = -reward_dist.log_prob(reward[:, 1:]).mean()
-        done_loss = F.binary_cross_entropy_with_logits(prior_dones, done[:, 1:].float())
-        decoded_obs = self.decoder(
-            prior_state_sequence.get_features()
-        )
+        done_loss = F.binary_cross_entropy_with_logits(posterior_dones, done[:, 1:].float())
+        decoded_obs = self.decoder(posterior_features)
 
         # decoded observations are from the prior state sequence
         # so are one step ahead
@@ -160,14 +155,12 @@ class WorldModel(torch.nn.Module):
             self,
             initial_states: InternalState,
             actor: Actor,
-            o_emb: torch.Tensor,
             n_steps: int,
             with_observations: bool = False
         ):
         with FreezeParameters([self]):
             state_sequence = self.dynamic_model.imagine_rollout(
                 initial_states=initial_states,
-                obs_embed=o_emb,
                 actor=actor,
                 n_steps=n_steps
             )

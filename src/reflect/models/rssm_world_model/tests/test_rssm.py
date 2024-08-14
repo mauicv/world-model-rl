@@ -43,7 +43,6 @@ def test_rssm_imagine_rollout(
     )
 
     imagined_state_sequence = rssm.imagine_rollout(
-        obs_embed=obs_embed.reshape(-1, 1024),
         initial_states=initial_states,
         actor=actor,
         n_steps=10
