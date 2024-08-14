@@ -28,9 +28,11 @@ class EnvDataLoader:
                 "InvertedPendulum-v4",
                 render_mode="rgb_array"
             ),
-            noise_generator=None
+            noise_generator=None,
+            seed=None
         ):
         self.env = env
+        self.seed = seed
         _ = self.env.reset()
         self.action_dim = self.env.action_space.shape[0]
         self.bounds = (
@@ -93,7 +95,7 @@ class EnvDataLoader:
         the time step. So a_t is the action taken at time step t not the action
         that generated s_t.
         """
-        _ = self.env.reset()
+        _ = self.env.reset(seed=self.seed)
         if self.policy is not None:
             self.policy.reset()
         img = self.env.render()
