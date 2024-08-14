@@ -39,7 +39,6 @@ def test_world_model_imagine_rollout(
     rollout = world_model.imagine_rollout(
         initial_states=initial_states,
         actor=actor,
-        o_emb=o_emb,
         n_steps=10
     )
 
@@ -71,7 +70,6 @@ def test_world_model_train_step(
     rollout = world_model.imagine_rollout(
         initial_states=initial_states,
         actor=actor,
-        o_emb=o_emb,
         n_steps=10
     )
 
