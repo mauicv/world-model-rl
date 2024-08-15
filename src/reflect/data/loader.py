@@ -29,10 +29,12 @@ class EnvDataLoader:
                 render_mode="rgb_array"
             ),
             noise_generator=None,
-            seed=None
+            seed=None,
+            noise_size=0.05
         ):
         self.env = env
         self.seed = seed
+        self.noise_size = noise_size
         _ = self.env.reset()
         self.action_dim = self.env.action_space.shape[0]
         self.bounds = (
@@ -122,10 +124,10 @@ class EnvDataLoader:
         self.end_index[run_index] = index
         self.rollout_ind += 1
 
-    def compute_action(self, observation, noise_size=0.05):
+    def compute_action(self, observation):
         if self.policy:
             action = self.policy(observation)
-            action = action + torch.normal(torch.zeros_like(action), noise_size)
+            action = action + torch.normal(torch.zeros_like(action), self.noise_size)
             action = action.squeeze(0)
         else:
             action = self.noise_generator()
