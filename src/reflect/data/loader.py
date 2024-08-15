@@ -122,10 +122,10 @@ class EnvDataLoader:
         self.end_index[run_index] = index
         self.rollout_ind += 1
 
-    def compute_action(self, observation):
+    def compute_action(self, observation, noise_size=0.05):
         if self.policy:
             action = self.policy(observation)
-            action = action + torch.normal(torch.zeros_like(action), 0.3)
+            action = action + torch.normal(torch.zeros_like(action), noise_size)
             action = action.squeeze(0)
         else:
             action = self.noise_generator()
