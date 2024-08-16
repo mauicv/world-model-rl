@@ -13,12 +13,10 @@ class Actor(torch.nn.Module):
             bound,
             num_layers=3,
             hidden_dim=512,
-            repeat=1,
         ):
         super().__init__()
         self.input_dim = input_dim
         self.output_dim = output_dim
-        self.repeat = repeat
         self.count = 0
         self.action = None
 
@@ -69,11 +67,7 @@ class Actor(torch.nn.Module):
         self.bound = self.bound.to(*args, **kwargs)
         return self
 
-    def reset(self):
-        self.count = 0
-        self.action = None
-
-    def _forward(self, x, deterministic=False):
+    def forward(self, x, deterministic=False):
         x = self.layers(x)
         mu = self.mu(x)
         mu = torch.tanh(mu) * self.bound
@@ -86,20 +80,6 @@ class Actor(torch.nn.Module):
         std = max_std * torch.sigmoid(std) + min_std
         normal = D.normal.Normal(mu, std)
         return D.independent.Independent(normal, 1)
-
-    def forward(self, x, deterministic=False):
-        if self.repeat == 1:
-            return self._forward(x, deterministic)
-
-        if self.action == None:
-            self.action = self._forward(x, deterministic)
-
-        if self.count == self.repeat:
-            self.count = 0
-            self.action = self._forward(x, deterministic)
-
-        self.count += 1
-        return self.action
 
     def compute_action(self, state, deterministic=False):
         with FreezeParameters([self]):
