@@ -81,12 +81,11 @@ def rssm():
 @pytest.fixture
 def actor():
     return Actor(
-        230,
-        1,
-        1,
+        input_dim=230,
+        output_dim=1,
+        bound=1,
         num_layers=3,
         hidden_dim=512,
-        repeat=1
     )
 
 @pytest.fixture
