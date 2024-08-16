@@ -230,12 +230,9 @@ class RSSM(torch.nn.Module):
         prior_state_sequence.to(device)
         state = prior_state_sequence.get_last()
         for i in range(n_steps):
-            action_input = torch.cat([
-                    state.stoch_state,
-                    state.deter_state
-            ], dim=-1)
             # TODO: do we detach action input here?
-            action_emb = actor(action_input.detach(), deterministic=True)
+            action_input = state.get_features().detach()
+            action_emb = actor(action_input, deterministic=True)
             prior = self.prior(action_emb, state)
             prior_state_sequence.append_(prior)
             state = prior
