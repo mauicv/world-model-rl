@@ -1,7 +1,7 @@
 import gymnasium as gym
 import matplotlib.pyplot as plt
 import torch
-from reflect.models.nes_policy.model import NESPolicy, rank_transform
+from reflect.components.trainers.natural.model import NESPolicy, rank_transform
 
 
 class GymEnvs:

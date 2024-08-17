@@ -1,9 +1,9 @@
 from reflect.data.simple_rl_env import SimpleRLEnvironment
-from reflect.models.agent.reward_trainer import RewardGradTrainer
-from reflect.models.agent.actor import Actor
+from reflect.components.trainers.reward.reward_trainer import RewardGradTrainer
+from reflect.components.actor import Actor
 from reflect.data.loader import EnvDataLoader
-from reflect.models.transformer_world_model.environment import Environment
-from reflect.models.transformer_world_model import WorldModel
+from reflect.components.transformer_world_model.environment import Environment
+from reflect.components.transformer_world_model import WorldModel
 import torch
 import click
 import pygame

@@ -1,13 +1,13 @@
-from reflect.models.observation_model import ObservationalModel
-from reflect.models.observation_model.latent_spaces import DiscreteLatentSpace
+from reflect.components.observation_model import ObservationalModel
+from reflect.components.observation_model.latent_spaces import DiscreteLatentSpace
 from pytfex.convolutional.decoder import DecoderLayer, Decoder
 from pytfex.convolutional.encoder import EncoderLayer, Encoder
 from pytfex.transformer.gpt import GPT
 from pytfex.transformer.layer import TransformerLayer
 from pytfex.transformer.mlp import MLP
 from pytfex.transformer.attention import RelativeAttention
-from reflect.models.transformer_world_model.head import Head
-from reflect.models.transformer_world_model.embedder import Embedder
+from reflect.components.transformer_world_model.head import Head
+from reflect.components.transformer_world_model.embedder import Embedder
 import torch
 
 hdn_dim=256
