@@ -1,5 +1,6 @@
 from reflect.utils import FreezeParameters
 from reflect.utils import AdamOptim
+from dataclasses import dataclass
 import torch
 import copy
 
@@ -15,20 +16,26 @@ def update_target_network(target_model, model, tau=5e-3):
                     + (1 - tau) * target_weights.data
                 )
 
+
+@dataclass
+class ValueGradTrainerLosses:
+    actor_loss: float
+    actor_grad_norm: float
+    value_loss: float
+    value_grad_norm: float
+
+
 class ValueGradTrainer:
     def __init__(self,
             actor,
             critic,
-            env=None,
             actor_lr: float=0.001,
             critic_lr: float=0.001,
-            grad_clip: float=0.5,
+            grad_clip: float=100,
             gamma: float=0.99,
             lam: float=0.95,
-            entropy_weight: float=1e-4,
         ):
         self.gamma = gamma
-        self.env = env
         self.actor_lr = actor_lr
         self.actor = actor
         self.actor_optim = AdamOptim(
@@ -47,7 +54,6 @@ class ValueGradTrainer:
         )
         self.lam = lam
         self.gamma_rollout = None
-        self.entropy_weight = entropy_weight
 
     def compute_rollout_value(
             self,
@@ -107,7 +113,7 @@ class ValueGradTrainer:
         state_samples = state_samples.reshape(b*h, *l)
         return - self.critic(state_samples).mean()
 
-    def critic_loss(
+    def value_loss(
             self,
             state_samples,
             reward_samples,
@@ -130,38 +136,31 @@ class ValueGradTrainer:
         loss = 0.5 * (target_values.detach() - state_sample_values)**2
         return loss.mean()
 
-    def update(self, horizon=20, batch_size=12):
-        current_state, _ = self.env.reset(batch_size=batch_size)
-        self.actor.reset()
-        entropy = 0
-        for _ in range(horizon):
-            action_dist = self.actor(current_state)
-            action = action_dist.rsample()
-            with FreezeParameters([self.env.world_model]):
-                next_state, *_ = self.env.step(action)
-            entropy = entropy + action_dist.entropy().mean()
-            current_state = next_state
-
-        s, _, r, d = self.env.get_rollouts()
-        policy_loss = self.policy_loss(state_samples=s)
-        actor_loss = policy_loss - self.entropy_weight * entropy
-        self.actor_optim.backward(actor_loss)
+    def update(
+            self,
+            state_samples,
+            reward_samples,
+            done_samples,
+        ):
+        actor_loss = self.policy_loss(state_samples=state_samples)
+        actor_gn = self.actor_optim.backward(actor_loss)
         self.actor_optim.update_parameters()
 
-        critic_loss = self.critic_loss(
-            s.detach(),
-            r.detach(),
-            d.detach()
+        value_loss = self.value_loss(
+            state_samples=state_samples.detach(),
+            reward_samples=reward_samples.detach(),
+            done_samples=done_samples.detach()
         )
-        self.critic_optim.backward(critic_loss)
+        value_gn = self.critic_optim.backward(value_loss)
         self.critic_optim.update_parameters()
 
         update_target_network(self.target_critic, self.critic)
-        return {
-            "critic_loss": critic_loss.item(),
-            "actor_loss": actor_loss.item(),
-            "entropy_loss": entropy.item(),
-        }
+        return ValueGradTrainerLosses(
+            value_loss=value_loss.item(),
+            value_grad_norm=value_gn.item(),
+            actor_loss=actor_loss.item(),
+            actor_grad_norm=actor_gn.item()
+        )
 
     def to(self, device):
         self.actor.to(device)

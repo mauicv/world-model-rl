@@ -36,7 +36,16 @@ class WorldModelLosses:
 class ImaginedRollouts:
     rewards: torch.Tensor
     dones: torch.Tensor
+    features: torch.Tensor
     observations: Optional[torch.Tensor] = None
+
+    @property
+    def shapes(self):
+        return (
+            self.rewards.shape,
+            self.dones.shape,
+            self.features.shape
+        )
 
 
 def get_norm_dist(means, stds=None):
@@ -167,6 +176,7 @@ class WorldModel(torch.nn.Module):
         return ImaginedRollouts(
             rewards=rewards,
             dones=dones,
+            features=features,
             observations=obs
         )
 
