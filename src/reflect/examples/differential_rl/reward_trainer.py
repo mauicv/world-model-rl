@@ -1,5 +1,5 @@
 from reflect.data.differentiable_pendulum import DiffPendulumEnv
-from reflect.models.agent.reward_trainer import RewardGradTrainer
+from reflect.components.trainers.reward.reward_trainer import RewardGradTrainer
 import torch.nn as nn
 import torch
 import tqdm

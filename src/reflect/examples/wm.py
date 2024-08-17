@@ -1,16 +1,16 @@
 from reflect.data.simple_rl_env import SimpleRLEnvironment
 from reflect.data.loader import EnvDataLoader
 from reflect.models.world_model.observation_model import ObservationalModel, LatentSpace
-from reflect.models.transformer_world_model.environment import Environment
-from reflect.models.transformer_world_model import WorldModel, WorldModelTrainingParams
+from reflect.components.transformer_world_model.environment import Environment
+from reflect.components.transformer_world_model import WorldModel, WorldModelTrainingParams
 from pytfex.convolutional.decoder import DecoderLayer, Decoder
 from pytfex.convolutional.encoder import EncoderLayer, Encoder
 from pytfex.transformer.gpt import GPT
 from pytfex.transformer.layer import TransformerLayer
 from pytfex.transformer.mlp import MLP
 from pytfex.transformer.attention import RelativeAttention
-from reflect.models.transformer_world_model.head import Head
-from reflect.models.transformer_world_model.embedder import Embedder
+from reflect.components.transformer_world_model.head import Head
+from reflect.components.transformer_world_model.embedder import Embedder
 from reflect.utils import CSVLogger
 import matplotlib.pyplot as plt
 import torch
