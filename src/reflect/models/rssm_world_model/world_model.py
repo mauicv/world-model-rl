@@ -124,14 +124,9 @@ class WorldModel(torch.nn.Module):
             torch.ones_like(dynamic_model_loss) * self.params.rho
         ).mean()
         dynamic_model_loss_clamped = dynamic_model_loss_clamped.mean()
-        # the reward and done is predicted from the prior state sequence which
-        # is one step ahead
         reward_loss = -reward_dist.log_prob(reward[:, 1:]).mean()
         done_loss = F.binary_cross_entropy_with_logits(posterior_dones, done[:, 1:].float())
         decoded_obs = self.decoder(posterior_features)
-
-        # decoded observations are from the prior state sequence
-        # so are one step ahead
         recon_loss = observation_loss(decoded_obs, obs[:, 1:])
         loss = self.params.recon_coeff * recon_loss + \
             self.params.dynamic_coeff * dynamic_model_loss_clamped + \
