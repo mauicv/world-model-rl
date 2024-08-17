@@ -18,6 +18,8 @@ from reflect.components.rssm_world_model.world_model import WorldModel
 from reflect.components.rssm_world_model.memory_actor import WorldModelActor
 from reflect.components.actor import Actor
 from reflect.components.trainers.reward.reward_trainer import RewardGradTrainer
+from reflect.components.trainers.value.value_trainer import ValueGradTrainer
+from reflect.components.trainers.value.critic import ValueCritic
 
 import torch
 from torchvision.transforms import Resize, Compose
@@ -131,6 +133,20 @@ def reward_grad_trainer(actor):
     return RewardGradTrainer(
         actor=actor,
         lr=0.001,
+        grad_clip=1.0
+    )
+
+@pytest.fixture
+def value_model():
+    return ValueCritic(230, 4, 400)
+
+@pytest.fixture
+def value_grad_trainer(actor, value_model):
+    return ValueGradTrainer(
+        actor=actor,
+        actor_lr=0.001,
+        critic=value_model,
+        critic_lr=0.001,
         grad_clip=1.0
     )
 
