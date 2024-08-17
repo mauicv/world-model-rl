@@ -1,6 +1,6 @@
 from reflect.data.simple_rl_env import SimpleRLEnvironment
 from reflect.data.loader import EnvDataLoader
-from reflect.models.world_model import WorldModel
+from reflect.models.transformer_world_model import WorldModel
 import matplotlib.pyplot as plt
 import click
 from reflect.utils import create_z_dist

@@ -1,7 +1,7 @@
 from reflect.data.simple_rl_env import SimpleRLEnvironment
 from reflect.data.loader import EnvDataLoader
-from reflect.models.world_model.environment import Environment
-from reflect.models.world_model import WorldModel
+from reflect.models.transformer_world_model.environment import Environment
+from reflect.models.transformer_world_model import WorldModel
 import torch
 import click
 import pygame

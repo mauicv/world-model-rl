@@ -1,5 +1,5 @@
 from reflect.data.loader import EnvDataLoader
-from reflect.models.world_model import WorldModel
+from reflect.models.transformer_world_model import WorldModel
 import torch
 
 

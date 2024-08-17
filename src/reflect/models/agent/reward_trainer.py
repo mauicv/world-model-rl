@@ -1,37 +1,43 @@
-from reflect.models.rl.actor import Actor
+from reflect.models.agent.actor import Actor
 from reflect.utils import AdamOptim
+from dataclasses import dataclass
 import torch
+
+@dataclass
+class RewardGradTrainerLosses:
+    actor_loss: float
+    grad_norm: float
 
 
 class RewardGradTrainer:
     def __init__(self,
             actor: Actor,
-            actor_lr: float=0.001,
+            lr: float=8e-05,
             grad_clip: float=1,
-            weight_decay: float=1e-4
         ):
 
-        self.actor_lr = actor_lr
+        self.lr = lr
+        self.grad_clip = grad_clip
         self.actor = actor
         self.actor_optim = AdamOptim(
             self.actor.parameters(),
-            lr=self.actor_lr,
-            grad_clip=grad_clip,
-            weight_decay=weight_decay
+            grad_clip=self.grad_clip,
+            lr=self.lr
         )
 
     def update(
         self,
         reward_samples,
         done_samples
-    ):
+    ) -> RewardGradTrainerLosses:
         batch_size = reward_samples.shape[0]
         loss = - ((1 - done_samples.detach()) * reward_samples).sum()/batch_size
-        self.actor_optim.backward(loss)
+        grad_norm = self.actor_optim.backward(loss)
         self.actor_optim.update_parameters()
-        return {
-            'actor_loss': loss.item()
-        }
+        return RewardGradTrainerLosses(
+            actor_loss=loss.item(),
+            grad_norm=grad_norm.item()
+        )
 
     def to(self, device):
         self.actor.to(device)

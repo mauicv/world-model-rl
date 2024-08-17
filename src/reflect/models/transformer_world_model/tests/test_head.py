@@ -1,4 +1,4 @@
-from reflect.models.world_model.head import Head
+from reflect.models.transformer_world_model.head import Head
 import torch
 
 

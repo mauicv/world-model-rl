@@ -1,12 +1,13 @@
-from reflect.models.world_model.observation_model import ObservationalModel, LatentSpace
+from reflect.models.observation_model import ObservationalModel
+from reflect.models.observation_model.latent_spaces import DiscreteLatentSpace
 from pytfex.convolutional.decoder import DecoderLayer, Decoder
 from pytfex.convolutional.encoder import EncoderLayer, Encoder
 from pytfex.transformer.gpt import GPT
 from pytfex.transformer.layer import TransformerLayer
 from pytfex.transformer.mlp import MLP
 from pytfex.transformer.attention import RelativeAttention
-from reflect.models.world_model.head import Head
-from reflect.models.world_model.embedder import Embedder
+from reflect.models.transformer_world_model.head import Head
+from reflect.models.transformer_world_model.embedder import Embedder
 import torch
 
 hdn_dim=256
@@ -81,7 +82,7 @@ def make_models():
         output_activation=torch.nn.Sigmoid(),
     )
 
-    latent_space = LatentSpace(
+    latent_space = DiscreteLatentSpace(
         num_latent=latent_dim,
         num_classes=num_cat,
         input_shape=(128, 2, 2),

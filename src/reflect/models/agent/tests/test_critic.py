@@ -1,5 +1,5 @@
 import pytest
-from reflect.models.rl.critic import Critic
+from reflect.models.agent.critic import Critic
 import gymnasium as gym
 import torch
 

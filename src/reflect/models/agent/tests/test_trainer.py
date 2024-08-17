@@ -1,5 +1,5 @@
 import gymnasium as gym
-from reflect.models.rl.td3_trainer import TD3Agent
+from reflect.models.agent.td3_trainer import TD3Agent
 import torch
 import pytest
 
