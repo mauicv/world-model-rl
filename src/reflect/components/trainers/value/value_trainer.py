@@ -76,7 +76,7 @@ class ValueGradTrainer:
         )
         final_values = (
             self.gamma_rollout[h]
-            * target_state_values[:, [h]].detach()
+            * target_state_values[:, [h]]
             * (1 - dones[:, [h]])
         )
         return R.sum(1) + final_values[:, 0, :]
@@ -108,11 +108,6 @@ class ValueGradTrainer:
         )
         return (1 - self.lam) * val_sum + self.lam**(big_h - 1) * final_val
 
-    def policy_loss(self, state_samples):
-        b, h, *l = state_samples.shape
-        state_samples = state_samples.reshape(b*h, *l)
-        return - self.critic(state_samples).mean()
-
     def value_loss(
             self,
             state_samples,
@@ -121,8 +116,14 @@ class ValueGradTrainer:
         ):
         b, h, *l = state_samples.shape
         state_sample_values = self.critic(state_samples)
-        with torch.no_grad():
-            target_state_values = self.target_critic(state_samples).detach()
+        with FreezeParameters([self.target_critic]):
+            target_state_values = self.target_critic(state_samples)
+            print(
+                target_state_values.requires_grad,
+                state_samples.requires_grad,
+                reward_samples.requires_grad,
+                done_samples.requires_grad,
+            )
             targets = []
             for i in range(h):
                 rollout_targets = self.compute_value_target(
@@ -134,7 +135,7 @@ class ValueGradTrainer:
                 targets.append(rollout_targets)
             target_values = torch.stack(targets, dim=1)
         loss = 0.5 * (target_values.detach() - state_sample_values)**2
-        return loss.mean()
+        return loss.mean(), target_values
 
     def update(
             self,
@@ -142,17 +143,20 @@ class ValueGradTrainer:
             reward_samples,
             done_samples,
         ):
-        actor_loss = self.policy_loss(state_samples=state_samples)
+        value_loss, target_values = self.value_loss(
+            state_samples=state_samples,
+            reward_samples=reward_samples,
+            done_samples=done_samples
+        )
+        value_gn = self.critic_optim.backward(
+            value_loss, 
+            retain_graph=True
+        )
+        self.critic_optim.update_parameters()
+
+        actor_loss = - target_values.mean()
         actor_gn = self.actor_optim.backward(actor_loss)
         self.actor_optim.update_parameters()
-
-        value_loss = self.value_loss(
-            state_samples=state_samples.detach(),
-            reward_samples=reward_samples.detach(),
-            done_samples=done_samples.detach()
-        )
-        value_gn = self.critic_optim.backward(value_loss)
-        self.critic_optim.update_parameters()
 
         update_target_network(self.target_critic, self.critic)
         return ValueGradTrainerLosses(
