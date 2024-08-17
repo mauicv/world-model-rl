@@ -1,8 +1,8 @@
 import copy
 import torch
-from reflect.models.rl import TAU, GAMMA
-from reflect.models.rl.actor import Actor
-from reflect.models.rl.critic import Critic
+from reflect.models.agent import TAU, GAMMA
+from reflect.models.agent.actor import Actor
+from reflect.models.agent.critic import Critic
 from reflect.utils import AdamOptim
 
 
@@ -88,8 +88,7 @@ class TD3Agent:
         self.actor_optim = AdamOptim(
             self.actor.parameters(),
             lr=self.actor_lr,
-            grad_clip=grad_clip,
-            weight_decay=weight_decay
+            grad_clip=grad_clip
         )
 
         # Init Critic 1
@@ -99,8 +98,7 @@ class TD3Agent:
         self.critic_1_optim = AdamOptim(
             self.critic_1.parameters(),
             lr=self.critic_lr,
-            grad_clip=grad_clip,
-            weight_decay=weight_decay
+            grad_clip=grad_clip
         )
 
         # Init Critic 2
@@ -110,8 +108,7 @@ class TD3Agent:
         self.critic_2_optim = AdamOptim(
             self.critic_2.parameters(),
             lr=self.critic_lr,
-            grad_clip=grad_clip,
-            weight_decay=weight_decay
+            grad_clip=grad_clip
         )
 
     def update(

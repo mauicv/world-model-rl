@@ -24,14 +24,17 @@ class EnvDataLoader:
             transforms=None,
             img_shape=(256, 256),
             policy=None,
-            observation_model=None,
             env=gym.make(
                 "InvertedPendulum-v4",
                 render_mode="rgb_array"
             ),
-            noise_generator=None
+            noise_generator=None,
+            seed=None,
+            noise_size=0.05
         ):
         self.env = env
+        self.seed = seed
+        self.noise_size = noise_size
         _ = self.env.reset()
         self.action_dim = self.env.action_space.shape[0]
         self.bounds = (
@@ -49,7 +52,6 @@ class EnvDataLoader:
         self.num_runs = num_runs
         self.rollout_length = rollout_length
         self.img_shape = img_shape
-        self.observation_model = observation_model
         self.policy = policy
         self.noise_generator = noise_generator
 
@@ -95,7 +97,7 @@ class EnvDataLoader:
         the time step. So a_t is the action taken at time step t not the action
         that generated s_t.
         """
-        _ = self.env.reset()
+        _ = self.env.reset(seed=self.seed)
         if self.policy is not None:
             self.policy.reset()
         img = self.env.render()
@@ -123,21 +125,16 @@ class EnvDataLoader:
         self.rollout_ind += 1
 
     def compute_action(self, observation):
-        with FreezeParameters([self.observation_model, self.policy]):
-            if self.policy:
-                device = next(self.observation_model.parameters()).device
-                observation = observation.to(device)
-                z = self.observation_model.encode(observation)
-                z = z.view(1, -1)
-                action = self.policy.compute_action(z, deterministic=True)
-                action = action + torch.normal(torch.zeros_like(action), 0.3)
-                action = action.squeeze(0)
-            else:
-                action = self.noise_generator()
-                action = torch.tensor(action, device=observation.device)
-            l, u = self.bounds
-            l, u = l.to(action.device), u.to(action.device)
-            action = torch.clamp(action, l, u)
+        if self.policy:
+            action = self.policy(observation)
+            action = action + torch.normal(torch.zeros_like(action), self.noise_size)
+            action = action.squeeze(0)
+        else:
+            action = self.noise_generator()
+            action = torch.tensor(action, device=observation.device)
+        l, u = self.bounds
+        l, u = l.to(action.device), u.to(action.device)
+        action = torch.clamp(action, l, u)
         return action
 
     def close(self):

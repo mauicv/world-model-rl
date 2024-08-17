@@ -1,6 +1,6 @@
 from reflect.data.loader import EnvDataLoader
-from reflect.models.world_model.environment import Environment
-from reflect.models.world_model import WorldModel
+from reflect.models.transformer_world_model.environment import Environment
+from reflect.models.transformer_world_model import WorldModel
 from torchvision.transforms import Resize, Compose
 from reflect.models.world_model.observation_model import ObservationalModel, LatentSpace
 from pytfex.convolutional.decoder import DecoderLayer, Decoder
@@ -9,8 +9,8 @@ from pytfex.transformer.gpt import GPT
 from pytfex.transformer.layer import TransformerLayer
 from pytfex.transformer.mlp import MLP
 from pytfex.transformer.attention import RelativeAttention
-from reflect.models.world_model.head import Head
-from reflect.models.world_model.embedder import Embedder
+from reflect.models.transformer_world_model.head import Head
+from reflect.models.transformer_world_model.embedder import Embedder
 
 import gymnasium as gym
 import torch

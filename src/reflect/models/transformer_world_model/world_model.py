@@ -1,10 +1,10 @@
 from typing import Optional
 from dataclasses import dataclass
 
-from reflect.models.world_model.observation_model import ObservationalModel
+from reflect.models.observation_model import ObservationalModel
 from pytfex.transformer.gpt import GPT
 import torch
-from reflect.models.rl import EPS
+from reflect.models.agent import EPS
 from reflect.utils import (
     recon_loss_fn,
     reg_loss_fn,
@@ -58,14 +58,12 @@ class WorldModel(torch.nn.Module):
             self.observation_model.parameters(),
             lr=0.0001,
             eps=1e-5,
-            weight_decay=1e-6,
             grad_clip=100
         )
         self.dynamic_model_opt = AdamOptim(
             self.dynamic_model.parameters(),
             lr=0.0001,
             eps=1e-5,
-            weight_decay=1e-6,
             grad_clip=100
         )
 

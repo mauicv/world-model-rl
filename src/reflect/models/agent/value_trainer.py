@@ -1,6 +1,6 @@
-from reflect.models.rl.actor import Actor
-from reflect.models.rl.critic import Critic
-from reflect.models.world_model.environment import Environment
+from reflect.models.agent.actor import Actor
+from reflect.models.agent.critic import Critic
+from reflect.models.transformer_world_model.environment import Environment
 from reflect.utils import FreezeParameters
 from reflect.utils import AdamOptim
 import torch
@@ -26,7 +26,6 @@ class ValueGradTrainer:
             actor_lr: float=0.001,
             critic_lr: float=0.001,
             grad_clip: float=0.5,
-            weight_decay: float=1e-4,
             gamma: float=0.99,
             lam: float=0.95,
             entropy_weight: float=1e-4,
@@ -38,8 +37,7 @@ class ValueGradTrainer:
         self.actor_optim = AdamOptim(
             self.actor.parameters(),
             lr=self.actor_lr,
-            grad_clip=grad_clip,
-            weight_decay=weight_decay
+            grad_clip=grad_clip
         )
 
         self.critic_lr = critic_lr
@@ -48,8 +46,7 @@ class ValueGradTrainer:
         self.critic_optim = AdamOptim(
             self.critic.parameters(),
             lr=self.critic_lr,
-            grad_clip=grad_clip,
-            weight_decay=weight_decay
+            grad_clip=grad_clip
         )
         self.lam = lam
         self.gamma_rollout = None
