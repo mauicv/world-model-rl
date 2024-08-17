@@ -118,12 +118,6 @@ class ValueGradTrainer:
         state_sample_values = self.critic(state_samples)
         with FreezeParameters([self.target_critic]):
             target_state_values = self.target_critic(state_samples)
-            print(
-                target_state_values.requires_grad,
-                state_samples.requires_grad,
-                reward_samples.requires_grad,
-                done_samples.requires_grad,
-            )
             targets = []
             for i in range(h):
                 rollout_targets = self.compute_value_target(
