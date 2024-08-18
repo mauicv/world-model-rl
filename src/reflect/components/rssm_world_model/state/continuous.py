@@ -2,42 +2,25 @@ from typing import Tuple
 import torch
 from dataclasses import dataclass
 import torch.distributions as D
+from reflect.components.rssm_world_model.state.base import Base
 
 
 @dataclass
-class InternalStateContinuous:
+class InternalStateContinuous(Base):
     deter_state: torch.Tensor
     stoch_state: torch.Tensor
     mean: torch.Tensor
     std: torch.Tensor
 
-    def detach(self) -> 'InternalStateContinuous':
-        return InternalStateContinuous(
-            deter_state=self.deter_state.detach(),
-            stoch_state=self.stoch_state.detach(),
-            mean=self.mean.detach(),
-            std=self.std.detach()
-        )
-
-    @property
-    def shapes(self) -> Tuple[int, int]:
-        return self.deter_state.shape, self.stoch_state.shape
-    
     def get_features(self):
         return torch.cat([
             self.deter_state,
             self.stoch_state
         ], dim=-1)
 
-    def to(self, device: torch.device):
-        self.deter_state=self.deter_state.to(device)
-        self.stoch_state=self.stoch_state.to(device)
-        self.mean=self.mean.to(device)
-        self.std=self.std.to(device)
-
 
 @dataclass
-class InternalStateContinuousSequence:
+class InternalStateContinuousSequence(Base):
     deter_states: torch.Tensor
     stoch_states: torch.Tensor
     means: torch.Tensor
@@ -51,10 +34,6 @@ class InternalStateContinuousSequence:
             means=init_state.mean.unsqueeze(1),
             stds=init_state.std.unsqueeze(1)
         )
-
-    @property
-    def shapes(self) -> Tuple[int, int]:
-        return self.deter_states.shape, self.stoch_states.shape
 
     def append_(self, other: InternalStateContinuous):
         self.deter_states = torch.cat([self.deter_states, other.deter_state.unsqueeze(1)], dim=1)
@@ -97,9 +76,3 @@ class InternalStateContinuousSequence:
             mean=means.reshape(-1, *means.shape[2:]),
             std=stds.reshape(-1, *stds.shape[2:])
         )
-
-    def to(self, device):
-        self.deter_states = self.deter_states.to(device)
-        self.stoch_states = self.stoch_states.to(device)
-        self.means = self.means.to(device)
-        self.stds = self.stds.to(device)
