@@ -1,23 +1,25 @@
 import pytest
 import gymnasium as gym
-from reflect.models.observation_model.observation_model import ObservationalModel
-from reflect.models.observation_model.latent_spaces import DiscreteLatentSpace
+from reflect.components.observation_model.observation_model import ObservationalModel
+from reflect.components.observation_model.latent_spaces import DiscreteLatentSpace
 from pytfex.transformer.gpt import GPT
 from pytfex.transformer.layer import TransformerLayer
 from pytfex.transformer.mlp import MLP
 from pytfex.transformer.attention import RelativeAttention
-from reflect.models.transformer_world_model.head import Head
-from reflect.models.transformer_world_model.embedder import Embedder
+from reflect.components.transformer_world_model.head import Head
+from reflect.components.transformer_world_model.embedder import Embedder
 from reflect.data.loader import EnvDataLoader
 
-from reflect.models.observation_model.encoder import ConvEncoder
-from reflect.models.observation_model.decoder import ConvDecoder
-from reflect.models.rssm_world_model.models import DenseModel
-from reflect.models.rssm_world_model.rssm import RSSM
-from reflect.models.rssm_world_model.world_model import WorldModel
-from reflect.models.rssm_world_model.memory_actor import WorldModelActor
-from reflect.models.agent.actor import Actor
-from reflect.models.agent.reward_trainer import RewardGradTrainer
+from reflect.components.observation_model.encoder import ConvEncoder
+from reflect.components.observation_model.decoder import ConvDecoder
+from reflect.components.rssm_world_model.models import DenseModel
+from reflect.components.rssm_world_model.rssm import RSSM
+from reflect.components.rssm_world_model.world_model import WorldModel
+from reflect.components.rssm_world_model.memory_actor import WorldModelActor
+from reflect.components.actor import Actor
+from reflect.components.trainers.reward.reward_trainer import RewardGradTrainer
+from reflect.components.trainers.value.value_trainer import ValueGradTrainer
+from reflect.components.trainers.value.critic import ValueCritic
 
 import torch
 from torchvision.transforms import Resize, Compose
@@ -131,6 +133,20 @@ def reward_grad_trainer(actor):
     return RewardGradTrainer(
         actor=actor,
         lr=0.001,
+        grad_clip=1.0
+    )
+
+@pytest.fixture
+def value_model():
+    return ValueCritic(230, 4, 400)
+
+@pytest.fixture
+def value_grad_trainer(actor, value_model):
+    return ValueGradTrainer(
+        actor=actor,
+        actor_lr=0.001,
+        critic=value_model,
+        critic_lr=0.001,
         grad_clip=1.0
     )
 
