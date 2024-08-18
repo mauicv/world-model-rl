@@ -1,7 +1,7 @@
 from typing import Optional
 from dataclasses import dataclass
 from reflect.components.rssm_world_model.rssm import (
-    RSSM,
+    ContinuousRSSM,
     InternalStateContinuous,
     InternalStateContinuousSequence
 )
@@ -82,7 +82,7 @@ class WorldModel(torch.nn.Module):
             decoder: ConvDecoder,
             done_model: DenseModel,
             reward_model: DenseModel,
-            dynamic_model: RSSM,
+            dynamic_model: ContinuousRSSM,
             params: Optional[WorldModelTrainingParams] = None,
         ):
         super().__init__()

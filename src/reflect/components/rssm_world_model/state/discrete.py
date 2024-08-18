@@ -36,6 +36,9 @@ class InternalStateDiscrete(Base):
             logits=logits,
         )
 
+    def to_sequence(self):
+        return InternalStateDiscreteSequence.from_init(self)
+
 @dataclass
 class InternalStateDiscreteSequence(Base):
     deter_states: torch.Tensor
