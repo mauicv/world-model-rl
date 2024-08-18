@@ -13,7 +13,7 @@ from reflect.data.loader import EnvDataLoader
 from reflect.components.observation_model.encoder import ConvEncoder
 from reflect.components.observation_model.decoder import ConvDecoder
 from reflect.components.rssm_world_model.models import DenseModel
-from reflect.components.rssm_world_model.rssm import RSSM
+from reflect.components.rssm_world_model.rssm import ContinuousRSSM, DiscreteRSSM
 from reflect.components.rssm_world_model.world_model import WorldModel
 from reflect.components.rssm_world_model.memory_actor import WorldModelActor
 from reflect.components.actor import Actor
@@ -71,11 +71,32 @@ def decoder():
     )
 
 @pytest.fixture
-def rssm():
-    return RSSM(
+def discrete_decoder():
+    return ConvDecoder(
+        output_shape=(3, 64, 64),
+        input_size=32*32+200,
+        activation=torch.nn.ReLU(),
+        depth=32
+    )
+
+
+@pytest.fixture
+def continuous_rssm():
+    return ContinuousRSSM(
         hidden_size=200,
         deter_size=200,
         stoch_size=30,
+        obs_embed_size=1024,
+        action_size=1,
+    )
+
+@pytest.fixture
+def discrete_rssm():
+    return DiscreteRSSM(
+        hidden_size=200,
+        deter_size=200,
+        stoch_size=32,
+        num_categories=32,
         obs_embed_size=1024,
         action_size=1,
     )
@@ -91,11 +112,21 @@ def actor():
     )
 
 @pytest.fixture
-def world_model(rssm, encoder, decoder, done_model, reward_model):
+def discrete_actor():
+    return Actor(
+        input_dim=32*32+200,
+        output_dim=1,
+        bound=1,
+        num_layers=3,
+        hidden_dim=512,
+    )
+
+@pytest.fixture
+def world_model(continuous_rssm, encoder, decoder, done_model, reward_model):
     return WorldModel(
         encoder=encoder,
         decoder=decoder,
-        dynamic_model=rssm,
+        dynamic_model=continuous_rssm,
         done_model=done_model,
         reward_model=reward_model
     )

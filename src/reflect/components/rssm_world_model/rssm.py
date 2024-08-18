@@ -1,16 +1,24 @@
 from typing import Tuple
 import torch
-from reflect.components.rssm_world_model.state.continuous import InternalStateContinuous, InternalStateContinuousSequence
+from reflect.components.rssm_world_model.state.continuous import (
+    InternalStateContinuous,
+    InternalStateContinuousSequence
+)
+from reflect.components.rssm_world_model.state.discrete import (
+    InternalStateDiscrete,
+    InternalStateDiscreteSequence
+)
 
 
-class RSSM(torch.nn.Module):
+class RSSMBase(torch.nn.Module):
     def __init__(
             self,
             hidden_size: int,
             deter_size: int,
             stoch_size: int,
             obs_embed_size: int,
-            action_size: int,
+            parameterized_stoch_size: int,
+            state_action_embed_input_size: int,
         ):
         super().__init__()
         self.hidden_size = hidden_size
@@ -19,46 +27,28 @@ class RSSM(torch.nn.Module):
         self.act = torch.nn.ELU()
         self.rnn = torch.nn.GRUCell(deter_size, deter_size)
         self.fc_state_action_embed = torch.nn.Linear(
-            stoch_size+action_size,
+            state_action_embed_input_size,
             deter_size
         )
         self.state_prior = torch.nn.Sequential(
             torch.nn.Linear(deter_size, hidden_size),
             torch.nn.ELU(),
-            torch.nn.Linear(hidden_size, 2 * stoch_size)
+            torch.nn.Linear(hidden_size, parameterized_stoch_size)
         )
         self.state_posterior = torch.nn.Sequential(
             torch.nn.Linear(deter_size+obs_embed_size, hidden_size),
             torch.nn.ELU(),
-            torch.nn.Linear(hidden_size, 2 * stoch_size)
+            torch.nn.Linear(hidden_size, parameterized_stoch_size)
         )
 
-    # TODO: refactor into ContinuousRSSM/DiscreteRSSM class
     def initial_state_sequence(self, batch_size):
-        return InternalStateContinuousSequence.from_init(
-            init_state=self.initial_state(batch_size)
-        )
+        raise NotImplementedError
 
-    # TODO: refactor into ContinuousRSSM/DiscreteRSSM class
     def initial_state(self, batch_size):
-        return InternalStateContinuous(
-            deter_state=torch.zeros(batch_size, self.deter_size),
-            stoch_state=torch.zeros(batch_size, self.stoch_size),
-            mean=torch.zeros(batch_size, self.stoch_size),
-            std=torch.zeros(batch_size, self.stoch_size)
-        )
+        raise NotImplementedError
 
-    # TODO: refactor into ContinuousRSSM/DiscreteRSSM class
     def generate_stoch_state(self, deter_state, dist: torch.Tensor):
-        mean, std = torch.split(dist, self.stoch_size, dim=-1)
-        std = torch.nn.functional.softplus(std) + 0.1
-        stoch_state = mean + std * torch.randn_like(mean)
-        return InternalStateContinuous(
-            deter_state=deter_state,
-            stoch_state=stoch_state,
-            mean=mean,
-            std=std
-        )
+        raise NotImplementedError
 
     def prior(self, action_emb: torch.Tensor, state: InternalStateContinuous):
         """Computes the prior distribution of the next state given the current
@@ -121,15 +111,99 @@ class RSSM(torch.nn.Module):
             actor: torch.nn.Module,
             n_steps: int,
         ) -> InternalStateContinuousSequence:
-        prior_state_sequence = InternalStateContinuousSequence.from_init(initial_states)
+        prior_state_sequence = initial_states.to_sequence()
         device = next(actor.parameters()).device
         prior_state_sequence.to(device)
         state = prior_state_sequence.get_last()
         for i in range(n_steps):
             # TODO: do we detach action input here?
             action_input = state.get_features().detach()
+            print(action_input.shape)
             action_emb = actor(action_input, deterministic=True)
             prior = self.prior(action_emb, state)
             prior_state_sequence.append_(prior)
             state = prior
         return prior_state_sequence
+
+
+class ContinuousRSSM(RSSMBase):
+    def __init__(
+            self,
+            hidden_size: int,
+            deter_size: int,
+            stoch_size: int,
+            obs_embed_size: int,
+            action_size: int,
+        ):
+        super().__init__(
+            hidden_size=hidden_size,
+            deter_size=deter_size,
+            stoch_size=stoch_size,
+            obs_embed_size=obs_embed_size,
+            parameterized_stoch_size=2*stoch_size,
+            state_action_embed_input_size=stoch_size+action_size,
+        )
+
+    def initial_state_sequence(self, batch_size):
+        return InternalStateContinuousSequence.from_init(
+            init_state=self.initial_state(batch_size)
+        )
+
+    def initial_state(self, batch_size):
+        return InternalStateContinuous(
+            deter_state=torch.zeros(batch_size, self.deter_size),
+            stoch_state=torch.zeros(batch_size, self.stoch_size),
+            mean=torch.zeros(batch_size, self.stoch_size),
+            std=torch.zeros(batch_size, self.stoch_size)
+        )
+
+    def generate_stoch_state(self, deter_state, dist: torch.Tensor):
+        mean, std = torch.split(dist, self.stoch_size, dim=-1)
+        std = torch.nn.functional.softplus(std) + 0.1
+        stoch_state = mean + std * torch.randn_like(mean)
+        return InternalStateContinuous(
+            deter_state=deter_state,
+            stoch_state=stoch_state,
+            mean=mean,
+            std=std
+        )
+
+
+class DiscreteRSSM(RSSMBase):
+    def __init__(
+            self,
+            hidden_size: int,
+            deter_size: int,
+            stoch_size: int,
+            num_categories: int,
+            obs_embed_size: int,
+            action_size: int,
+        ):
+        super().__init__(
+            hidden_size=hidden_size,
+            deter_size=deter_size,
+            stoch_size=stoch_size,
+            obs_embed_size=obs_embed_size,
+            parameterized_stoch_size=num_categories*stoch_size,
+            state_action_embed_input_size=num_categories*stoch_size+action_size,
+        )
+        self.num_categories = num_categories
+
+    def initial_state_sequence(self, batch_size):
+        return InternalStateDiscreteSequence.from_init(
+            init_state=self.initial_state(batch_size)
+        )
+
+    def initial_state(self, batch_size):
+        return InternalStateDiscrete(
+            deter_state=torch.zeros(batch_size, self.deter_size),
+            stoch_state=torch.zeros(batch_size, self.stoch_size*self.num_categories),
+            logits=torch.randn(batch_size, self.stoch_size, self.num_categories),
+        )
+
+    def generate_stoch_state(self, deter_state, dist: torch.Tensor):
+        logits = dist.reshape(-1, self.num_categories, self.stoch_size)
+        return InternalStateDiscrete.from_logits(
+            deter_state=deter_state,
+            logits=logits
+        )

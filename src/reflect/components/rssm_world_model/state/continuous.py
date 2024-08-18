@@ -32,7 +32,10 @@ class InternalStateContinuous(Base):
             stoch_state=stoch_state,
             mean=mean,
             std=std,
-        ) 
+        )
+
+    def to_sequence(self):
+        return InternalStateContinuousSequence.from_init(self)
 
 @dataclass
 class InternalStateContinuousSequence(Base):
