@@ -69,3 +69,13 @@ def test_discrete_state_sequence_from_init():
     assert state_sequence.stoch_states.shape == (32, 1, 30)
     assert state_sequence.get_features().shape == (32, 0, 230)
     assert state_sequence.shapes == ((32, 1, 200), (32, 1, 30), (32, 1, 30, 30))
+
+
+def test_sample_continuous():
+    state_sequence = InternalStateDiscreteSequence(
+        deter_states=torch.zeros(32, 10, 200),
+        stoch_states=torch.zeros(32, 10, 30),
+        logits=torch.randn(32, 10, 30, 30),
+    )
+    dist = state_sequence.get_dist()
+    assert dist.rsample().shape == (32, 9, 30, 30)

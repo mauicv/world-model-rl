@@ -33,17 +33,31 @@ class RSSM(torch.nn.Module):
             torch.nn.Linear(hidden_size, 2 * stoch_size)
         )
 
+    # TODO: refactor into ContinuousRSSM/DiscreteRSSM class
     def initial_state_sequence(self, batch_size):
         return InternalStateContinuousSequence.from_init(
             init_state=self.initial_state(batch_size)
         )
 
+    # TODO: refactor into ContinuousRSSM/DiscreteRSSM class
     def initial_state(self, batch_size):
         return InternalStateContinuous(
             deter_state=torch.zeros(batch_size, self.deter_size),
             stoch_state=torch.zeros(batch_size, self.stoch_size),
             mean=torch.zeros(batch_size, self.stoch_size),
             std=torch.zeros(batch_size, self.stoch_size)
+        )
+
+    # TODO: refactor into ContinuousRSSM/DiscreteRSSM class
+    def generate_stoch_state(self, deter_state, dist: torch.Tensor):
+        mean, std = torch.split(dist, self.stoch_size, dim=-1)
+        std = torch.nn.functional.softplus(std) + 0.1
+        stoch_state = mean + std * torch.randn_like(mean)
+        return InternalStateContinuous(
+            deter_state=deter_state,
+            stoch_state=stoch_state,
+            mean=mean,
+            std=std
         )
 
     def prior(self, action_emb: torch.Tensor, state: InternalStateContinuous):
@@ -57,15 +71,7 @@ class RSSM(torch.nn.Module):
         embedded_state_action = self.act(self.fc_state_action_embed(state_action))
         prior_deter_state = self.rnn(embedded_state_action, state.deter_state)
         stoch_mean_std = self.state_prior(prior_deter_state)
-        mean, std = torch.split(stoch_mean_std, self.stoch_size, dim=-1)
-        std = torch.nn.functional.softplus(std) + 0.1
-        stoch_state = mean + std * torch.randn_like(mean)
-        return InternalStateContinuous(
-            deter_state=prior_deter_state,
-            stoch_state=stoch_state,
-            mean=mean,
-            std=std
-        )
+        return self.generate_stoch_state(prior_deter_state, stoch_mean_std)
 
     def posterior(self, obs_embed: torch.Tensor, state: InternalStateContinuous):
         """Computes the posterior distribution given the current hidden state
@@ -75,15 +81,7 @@ class RSSM(torch.nn.Module):
         """
         hidden = torch.cat([state.deter_state, obs_embed], dim=-1)
         posterior_mean_std = self.state_posterior(hidden)
-        mean, std = torch.split(posterior_mean_std, self.stoch_size, dim=-1)
-        std = torch.nn.functional.softplus(std) + 0.1
-        stoch_state = mean + std * torch.randn_like(mean)
-        return InternalStateContinuous(
-            deter_state=state.deter_state,
-            stoch_state=stoch_state,
-            mean=mean,
-            std=std
-        )
+        return self.generate_stoch_state(state.deter_state, posterior_mean_std)
 
     def observe_step(self, obs_embed, action_emb, state: InternalStateContinuous):
         prior_state = self.prior(action_emb, state)

@@ -84,3 +84,15 @@ def test_continuous_state_sequence_from_init():
     assert state_sequence.stds.shape == (32, 1, 30)
     assert state_sequence.get_features().shape == (32, 0, 230)
     assert state_sequence.shapes == ((32, 1, 200), (32, 1, 30), (32, 1, 30), (32, 1, 30))
+
+
+def test_sample_continuous():
+    state_sequence = InternalStateContinuousSequence(
+        deter_states=torch.zeros(32, 10, 200),
+        stoch_states=torch.zeros(32, 10, 30),
+        means=torch.zeros(32, 10, 30),
+        stds=torch.ones(32, 10, 30),
+    )
+    dist = state_sequence.get_dist()
+    sample = dist.sample()
+    assert sample.shape == (32, 9, 30)
