@@ -1,5 +1,5 @@
 import torch
-from reflect.components.rssm_world_model.rssm import RSSM, InternalState
+from reflect.components.rssm_world_model.rssm import RSSM, InternalStateContinuous
 from reflect.components.observation_model import ConvEncoder, ConvDecoder
 from reflect.components.actor import Actor
 
@@ -35,7 +35,7 @@ def test_rssm_imagine_rollout(
 
     obs_batch = torch.randn(32, 1, 3, 64, 64)
     obs_embed = encoder(obs_batch)
-    initial_states = InternalState(
+    initial_states = InternalStateContinuous(
         deter_state=torch.randn(32, 200),
         stoch_state=torch.randn(32, 30),
         mean=torch.randn(32, 30),

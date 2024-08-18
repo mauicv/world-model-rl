@@ -1,6 +1,6 @@
 from typing import Tuple
 import torch
-from reflect.components.rssm_world_model.state.continuous import InternalState, InternalStateSequence
+from reflect.components.rssm_world_model.state.continuous import InternalStateContinuous, InternalStateContinuousSequence
 
 
 class RSSM(torch.nn.Module):
@@ -34,19 +34,19 @@ class RSSM(torch.nn.Module):
         )
 
     def initial_state_sequence(self, batch_size):
-        return InternalStateSequence.from_init(
+        return InternalStateContinuousSequence.from_init(
             init_state=self.initial_state(batch_size)
         )
 
     def initial_state(self, batch_size):
-        return InternalState(
+        return InternalStateContinuous(
             deter_state=torch.zeros(batch_size, self.deter_size),
             stoch_state=torch.zeros(batch_size, self.stoch_size),
             mean=torch.zeros(batch_size, self.stoch_size),
             std=torch.zeros(batch_size, self.stoch_size)
         )
 
-    def prior(self, action_emb: torch.Tensor, state: InternalState):
+    def prior(self, action_emb: torch.Tensor, state: InternalStateContinuous):
         """Computes the prior distribution of the next state given the current
         state and action
 
@@ -60,14 +60,14 @@ class RSSM(torch.nn.Module):
         mean, std = torch.split(stoch_mean_std, self.stoch_size, dim=-1)
         std = torch.nn.functional.softplus(std) + 0.1
         stoch_state = mean + std * torch.randn_like(mean)
-        return InternalState(
+        return InternalStateContinuous(
             deter_state=prior_deter_state,
             stoch_state=stoch_state,
             mean=mean,
             std=std
         )
 
-    def posterior(self, obs_embed: torch.Tensor, state: InternalState):
+    def posterior(self, obs_embed: torch.Tensor, state: InternalStateContinuous):
         """Computes the posterior distribution given the current hidden state
         and the embedding observation.
 
@@ -78,14 +78,14 @@ class RSSM(torch.nn.Module):
         mean, std = torch.split(posterior_mean_std, self.stoch_size, dim=-1)
         std = torch.nn.functional.softplus(std) + 0.1
         stoch_state = mean + std * torch.randn_like(mean)
-        return InternalState(
+        return InternalStateContinuous(
             deter_state=state.deter_state,
             stoch_state=stoch_state,
             mean=mean,
             std=std
         )
 
-    def observe_step(self, obs_embed, action_emb, state: InternalState):
+    def observe_step(self, obs_embed, action_emb, state: InternalStateContinuous):
         prior_state = self.prior(action_emb, state)
         posterior_state = self.posterior(obs_embed, prior_state)
         return prior_state, posterior_state
@@ -94,7 +94,7 @@ class RSSM(torch.nn.Module):
             self,
             obs_embeds,
             action_embs,
-        ) -> Tuple[InternalStateSequence, InternalStateSequence]:
+        ) -> Tuple[InternalStateContinuousSequence, InternalStateContinuousSequence]:
         batch, n_steps, *_ = obs_embeds.shape
         prior_state_sequence = self.initial_state_sequence(batch)
         prior_state_sequence.to(obs_embeds.device)
@@ -119,11 +119,11 @@ class RSSM(torch.nn.Module):
 
     def imagine_rollout(
             self,
-            initial_states: InternalState,
+            initial_states: InternalStateContinuous,
             actor: torch.nn.Module,
             n_steps: int,
-        ) -> InternalStateSequence:
-        prior_state_sequence = InternalStateSequence.from_init(initial_states)
+        ) -> InternalStateContinuousSequence:
+        prior_state_sequence = InternalStateContinuousSequence.from_init(initial_states)
         device = next(actor.parameters()).device
         prior_state_sequence.to(device)
         state = prior_state_sequence.get_last()
