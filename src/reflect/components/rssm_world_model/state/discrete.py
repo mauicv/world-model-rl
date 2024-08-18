@@ -17,6 +17,25 @@ class InternalStateDiscrete(Base):
             self.stoch_state
         ], dim=-1)
 
+    @classmethod
+    def from_logits(
+            cls,
+            deter_state: torch.Tensor,
+            logits: torch.Tensor,
+            temperature: float = 1.0,
+        ):
+        dist = D.Independent(D.OneHotCategoricalStraightThrough(
+            logits=logits / temperature
+        ), 1)
+        stoch_state: torch.Tensor = dist.rsample()
+        b, c, p = stoch_state.shape
+        stoch_state = stoch_state.reshape(b, c * p)
+        return cls(
+            deter_state=deter_state,
+            stoch_state=stoch_state,
+            logits=logits,
+        )
+
 @dataclass
 class InternalStateDiscreteSequence(Base):
     deter_states: torch.Tensor
@@ -29,7 +48,7 @@ class InternalStateDiscreteSequence(Base):
             deter_states=init_state.deter_state.unsqueeze(1),
             stoch_states=init_state.stoch_state.unsqueeze(1),
             logits=init_state.logits.unsqueeze(1),
-        )
+        ) 
 
     def append_(self, other: InternalStateDiscrete):
         self.deter_states = torch.cat([self.deter_states, other.deter_state.unsqueeze(1)], dim=1)

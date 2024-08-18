@@ -18,6 +18,21 @@ class InternalStateContinuous(Base):
             self.stoch_state
         ], dim=-1)
 
+    @classmethod
+    def from_mean_std(
+            cls,
+            deter_state: torch.Tensor,
+            mean: torch.Tensor,
+            std: torch.Tensor,
+        ):
+        dist = D.Independent(D.Normal(mean, std), 1)
+        stoch_state: torch.Tensor = dist.rsample()
+        return cls(
+            deter_state=deter_state,
+            stoch_state=stoch_state,
+            mean=mean,
+            std=std,
+        ) 
 
 @dataclass
 class InternalStateContinuousSequence(Base):
