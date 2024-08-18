@@ -216,7 +216,7 @@ class DiscreteRSSM(RSSMBase):
         return InternalStateDiscrete(
             deter_state=torch.zeros(batch_size, self.deter_size),
             stoch_state=torch.zeros(batch_size, self.stoch_size*self.num_categories),
-            logits=torch.randn(batch_size, self.stoch_size, self.num_categories),
+            logits=torch.randn(batch_size, self.num_categories, self.stoch_size),
         )
 
     def generate_stoch_state(self, deter_state, dist: torch.Tensor):
