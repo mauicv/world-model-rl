@@ -96,3 +96,15 @@ def test_sample_continuous():
     dist = state_sequence.get_dist()
     sample = dist.sample()
     assert sample.shape == (32, 9, 30)
+
+
+def test_from_mean_std():
+    mean = torch.zeros(32, 30)
+    std = torch.ones(32, 30)
+    deter_state = torch.zeros(32, 200)
+    state = InternalStateContinuous.from_mean_std(deter_state=deter_state, mean=mean, std=std)
+    assert state.deter_state.shape == (32, 200)
+    assert state.stoch_state.shape == (32, 30)
+    assert state.mean.shape == (32, 30)
+    assert state.std.shape == (32, 30)
+    assert state.shapes == ((32, 200), (32, 30), (32, 30), (32, 30))
