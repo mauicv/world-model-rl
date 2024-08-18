@@ -13,7 +13,7 @@ def test_continuous_state():
     assert state.mean.shape == (32, 30)
     assert state.std.shape == (32, 30)
     assert state.get_features().shape == (32, 230)
-    assert state.shapes == ((32, 200), (32, 30))
+    assert state.shapes == ((32, 200), (32, 30), (32, 30), (32, 30))
 
 
 def test_continuous_state_sequence():
@@ -28,7 +28,7 @@ def test_continuous_state_sequence():
     assert state_sequence.means.shape == (32, 10, 30)
     assert state_sequence.stds.shape == (32, 10, 30)
     assert state_sequence.get_features().shape == (32, 9, 230)
-    assert state_sequence.shapes == ((32, 10, 200), (32, 10, 30))
+    assert state_sequence.shapes == ((32, 10, 200), (32, 10, 30), (32, 10, 30), (32, 10, 30))
     
 
 def test_continuous_state_sequence_append():
@@ -50,7 +50,7 @@ def test_continuous_state_sequence_append():
     assert state_sequence.means.shape == (32, 11, 30)
     assert state_sequence.stds.shape == (32, 11, 30)
     assert state_sequence.get_features().shape == (32, 10, 230)
-    assert state_sequence.shapes == ((32, 11, 200), (32, 11, 30))
+    assert state_sequence.shapes == ((32, 11, 200), (32, 11, 30), (32, 11, 30), (32, 11, 30))
 
 
 def test_continuous_state_sequence_getitem():
@@ -67,7 +67,7 @@ def test_continuous_state_sequence_getitem():
     assert item.mean.shape == (32, 30)
     assert item.std.shape == (32, 30)
     assert item.get_features().shape == (32, 230)
-    assert item.shapes == ((32, 200), (32, 30))
+    assert item.shapes == ((32, 200), (32, 30), (32, 30), (32, 30))
 
 
 def test_continuous_state_sequence_from_init():
@@ -83,4 +83,4 @@ def test_continuous_state_sequence_from_init():
     assert state_sequence.means.shape == (32, 1, 30)
     assert state_sequence.stds.shape == (32, 1, 30)
     assert state_sequence.get_features().shape == (32, 0, 230)
-    assert state_sequence.shapes == ((32, 1, 200), (32, 1, 30))
+    assert state_sequence.shapes == ((32, 1, 200), (32, 1, 30), (32, 1, 30), (32, 1, 30))
