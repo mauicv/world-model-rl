@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Tuple, Union
 import torch
 from reflect.components.rssm_world_model.state.continuous import (
     InternalStateContinuous,
@@ -50,7 +50,11 @@ class RSSMBase(torch.nn.Module):
     def generate_stoch_state(self, deter_state, dist: torch.Tensor):
         raise NotImplementedError
 
-    def prior(self, action_emb: torch.Tensor, state: InternalStateContinuous):
+    def prior(
+            self,
+            action_emb: torch.Tensor,
+            state: Union[InternalStateContinuous, InternalStateDiscrete]
+        ):
         """Computes the prior distribution of the next state given the current
         state and action
 
@@ -63,7 +67,11 @@ class RSSMBase(torch.nn.Module):
         stoch_mean_std = self.state_prior(prior_deter_state)
         return self.generate_stoch_state(prior_deter_state, stoch_mean_std)
 
-    def posterior(self, obs_embed: torch.Tensor, state: InternalStateContinuous):
+    def posterior(
+            self,
+            obs_embed: torch.Tensor,
+            state: Union[InternalStateContinuous, InternalStateDiscrete]
+        ):
         """Computes the posterior distribution given the current hidden state
         and the embedding observation.
 
@@ -73,16 +81,23 @@ class RSSMBase(torch.nn.Module):
         posterior_mean_std = self.state_posterior(hidden)
         return self.generate_stoch_state(state.deter_state, posterior_mean_std)
 
-    def observe_step(self, obs_embed, action_emb, state: InternalStateContinuous):
+    def observe_step(self,
+            obs_embed: torch.Tensor,
+            action_emb: torch.Tensor,
+            state: Union[InternalStateContinuous, InternalStateDiscrete]
+        ):
         prior_state = self.prior(action_emb, state)
         posterior_state = self.posterior(obs_embed, prior_state)
         return prior_state, posterior_state
 
     def observe_rollout(
             self,
-            obs_embeds,
-            action_embs,
-        ) -> Tuple[InternalStateContinuousSequence, InternalStateContinuousSequence]:
+            obs_embeds: torch.Tensor,
+            action_embs: torch.Tensor,
+        ) -> Union[
+            Tuple[InternalStateContinuousSequence, InternalStateContinuousSequence],
+            Tuple[InternalStateDiscreteSequence, InternalStateDiscreteSequence],
+        ]:
         batch, n_steps, *_ = obs_embeds.shape
         prior_state_sequence = self.initial_state_sequence(batch)
         prior_state_sequence.to(obs_embeds.device)
@@ -107,10 +122,10 @@ class RSSMBase(torch.nn.Module):
 
     def imagine_rollout(
             self,
-            initial_states: InternalStateContinuous,
+            initial_states: Union[InternalStateContinuous, InternalStateDiscrete],
             actor: torch.nn.Module,
             n_steps: int,
-        ) -> InternalStateContinuousSequence:
+        ) -> Union[InternalStateContinuousSequence, InternalStateDiscreteSequence]:
         prior_state_sequence = initial_states.to_sequence()
         device = next(actor.parameters()).device
         prior_state_sequence.to(device)
@@ -118,7 +133,6 @@ class RSSMBase(torch.nn.Module):
         for i in range(n_steps):
             # TODO: do we detach action input here?
             action_input = state.get_features().detach()
-            print(action_input.shape)
             action_emb = actor(action_input, deterministic=True)
             prior = self.prior(action_emb, state)
             prior_state_sequence.append_(prior)
@@ -157,7 +171,11 @@ class ContinuousRSSM(RSSMBase):
             std=torch.zeros(batch_size, self.stoch_size)
         )
 
-    def generate_stoch_state(self, deter_state, dist: torch.Tensor):
+    def generate_stoch_state(
+            self,
+            deter_state: torch.Tensor,
+            dist: torch.Tensor
+        ):
         mean, std = torch.split(dist, self.stoch_size, dim=-1)
         std = torch.nn.functional.softplus(std) + 0.1
         stoch_state = mean + std * torch.randn_like(mean)
