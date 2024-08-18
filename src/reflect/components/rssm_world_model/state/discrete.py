@@ -52,10 +52,9 @@ class InternalStateDiscreteSequence(Base):
             self.stoch_states[:, 1:]
         ], dim=-1)
 
-    def get_dist(self):
-        return D.Independent(D.Categorical(
-            self.logits[:, 1:],
-        ), 1)
+    def get_dist(self, temperature=1.0):
+        dist = D.OneHotCategoricalStraightThrough(logits=self.logits[:, 1:] / temperature)
+        return D.Independent(dist, 1)
 
     def flatten_batch_time(self) -> InternalStateDiscrete:
         deter_states = self.deter_states[:, 1:]
