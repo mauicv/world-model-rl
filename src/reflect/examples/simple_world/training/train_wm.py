@@ -1,6 +1,6 @@
 from reflect.data.simple_rl_env import SimpleRLEnvironment
 from reflect.data.loader import EnvDataLoader
-from reflect.models.transformer_world_model import WorldModel, WorldModelTrainingParams
+from reflect.components.transformer_world_model import WorldModel, WorldModelTrainingParams
 from reflect.utils import CSVLogger
 import os
 import click
