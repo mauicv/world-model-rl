@@ -13,7 +13,7 @@ from reflect.data.loader import EnvDataLoader
 from reflect.components.observation_model.encoder import ConvEncoder
 from reflect.components.observation_model.decoder import ConvDecoder
 from reflect.components.rssm_world_model.models import DenseModel
-from reflect.components.rssm_world_model.rssm import RSSM
+from reflect.components.rssm_world_model.rssm import ContinuousRSSM, DiscreteRSSM
 from reflect.components.rssm_world_model.world_model import WorldModel
 from reflect.components.rssm_world_model.memory_actor import WorldModelActor
 from reflect.components.actor import Actor
@@ -65,17 +65,29 @@ def encoder():
 def decoder():
     return ConvDecoder(
         output_shape=(3, 64, 64),
-        input_size=230,
+        input_size=64,
         activation=torch.nn.ReLU(),
         depth=32
     )
 
+
 @pytest.fixture
-def rssm():
-    return RSSM(
-        hidden_size=200,
-        deter_size=200,
-        stoch_size=30,
+def continuous_rssm():
+    return ContinuousRSSM(
+        hidden_size=32,
+        deter_size=32,
+        stoch_size=32,
+        obs_embed_size=1024,
+        action_size=1,
+    )
+
+@pytest.fixture
+def discrete_rssm():
+    return DiscreteRSSM(
+        hidden_size=32,
+        deter_size=32,
+        stoch_size=8,
+        num_categories=4,
         obs_embed_size=1024,
         action_size=1,
     )
@@ -83,7 +95,7 @@ def rssm():
 @pytest.fixture
 def actor():
     return Actor(
-        input_dim=230,
+        input_dim=64,
         output_dim=1,
         bound=1,
         num_layers=3,
@@ -91,11 +103,21 @@ def actor():
     )
 
 @pytest.fixture
-def world_model(rssm, encoder, decoder, done_model, reward_model):
+def world_model(continuous_rssm, encoder, decoder, done_model, reward_model):
     return WorldModel(
         encoder=encoder,
         decoder=decoder,
-        dynamic_model=rssm,
+        dynamic_model=continuous_rssm,
+        done_model=done_model,
+        reward_model=reward_model
+    )
+
+@pytest.fixture
+def discrete_world_model(discrete_rssm, encoder, decoder, done_model, reward_model):
+    return WorldModel(
+        encoder=encoder,
+        decoder=decoder,
+        dynamic_model=discrete_rssm,
         done_model=done_model,
         reward_model=reward_model
     )
@@ -114,7 +136,7 @@ def env_data_loader(world_model_actor):
 @pytest.fixture
 def reward_model():
     return DenseModel(
-        input_dim=230,
+        input_dim=64,
         hidden_dim=256,
         output_dim=1,
     )
@@ -122,7 +144,7 @@ def reward_model():
 @pytest.fixture
 def done_model():
     return DenseModel(
-        input_dim=230,
+        input_dim=64,
         hidden_dim=256,
         output_dim=1,
         output_act=torch.nn.Sigmoid
@@ -138,7 +160,7 @@ def reward_grad_trainer(actor):
 
 @pytest.fixture
 def value_model():
-    return ValueCritic(230, 4, 400)
+    return ValueCritic(64, 4, 400)
 
 @pytest.fixture
 def value_grad_trainer(actor, value_model):

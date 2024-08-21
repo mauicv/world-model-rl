@@ -1,6 +1,13 @@
-from typing import Optional
+from typing import Optional, Union
 from dataclasses import dataclass
-from reflect.components.rssm_world_model.rssm import RSSM, InternalState, InternalStateSequence
+from reflect.components.rssm_world_model.rssm import (
+    ContinuousRSSM,
+    DiscreteRSSM,
+    InternalStateContinuous,
+    InternalStateContinuousSequence,
+    InternalStateDiscrete,
+    InternalStateDiscreteSequence
+)
 from reflect.components.rssm_world_model.models import DenseModel
 from reflect.components.actor import Actor
 from reflect.components.observation_model import ConvEncoder, ConvDecoder
@@ -78,7 +85,7 @@ class WorldModel(torch.nn.Module):
             decoder: ConvDecoder,
             done_model: DenseModel,
             reward_model: DenseModel,
-            dynamic_model: RSSM,
+            dynamic_model: Union[ContinuousRSSM, DiscreteRSSM],
             params: Optional[WorldModelTrainingParams] = None,
         ):
         super().__init__()
@@ -111,8 +118,8 @@ class WorldModel(torch.nn.Module):
 
     def update(
             self,
-            prior_state_sequence: InternalStateSequence,
-            posterior_state_sequence: InternalStateSequence,
+            prior_state_sequence: Union[InternalStateContinuousSequence, InternalStateDiscreteSequence],
+            posterior_state_sequence: Union[InternalStateContinuousSequence, InternalStateDiscreteSequence],
             obs: torch.Tensor,
             reward: torch.Tensor,
             done: torch.Tensor,
@@ -156,7 +163,7 @@ class WorldModel(torch.nn.Module):
 
     def imagine_rollout(
             self,
-            initial_states: InternalState,
+            initial_states: Union[InternalStateContinuous, InternalStateDiscrete],
             actor: Actor,
             n_steps: int,
             with_observations: bool = False
