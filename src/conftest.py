@@ -163,7 +163,7 @@ def transformer(reward_model, done_model, predictor):
         num_heads=8,
         latent_dim=8,
         num_cat=8,
-        num_ts=16,
+        num_ts=9,
         input_dim=64,
         layers=2,
         dropout=0.05,
@@ -185,5 +185,4 @@ def transformer_world_model(transformer, transformer_encoder, decoder):
         encoder=transformer_encoder,
         dynamic_model=transformer,
         decoder=decoder,
-        num_ts=16
     )

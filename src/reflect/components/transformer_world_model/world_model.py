@@ -48,7 +48,6 @@ class TransformerWorldModel(Base):
             encoder: ConvEncoder,
             decoder: ConvDecoder,
             dynamic_model: Transformer,
-            num_ts: int,
             params: Optional[WorldModelTrainingParams] = None,
         ):
         super().__init__()
@@ -58,7 +57,6 @@ class TransformerWorldModel(Base):
         self.encoder = encoder
         self.decoder = decoder
         self.dynamic_model = dynamic_model
-        self.num_ts = num_ts
         self.opt = AdamOptim(
             self.parameters(),
             lr=params.lr,
@@ -72,13 +70,18 @@ class TransformerWorldModel(Base):
             reward: torch.Tensor,
             done: torch.Tensor
         ):
-        assert self.num_ts + 1 == observation.shape[1], (
+        num_ts = self.dynamic_model.num_ts
+        latent_dim = self.dynamic_model.latent_dim
+        num_cat = self.dynamic_model.num_cat
+        assert num_ts + 1 == observation.shape[1], (
             "Observation sequence length must be num_ts + 1"
+            f" currently num_ts + 1 = {num_ts + 1}"
+            f" observation.shape[1] = {observation.shape[1]}"
         )
         b, t, *_ = observation.shape
         state = (
             self.encoder(observation)
-            .reshape(b, t, self.dynamic_model.latent_dim, self.dynamic_model.num_cat)
+            .reshape(b, t, latent_dim, num_cat)
         )
         sequence = Sequence.from_sard(
             state=state,
@@ -86,8 +89,9 @@ class TransformerWorldModel(Base):
             reward=reward,
             done=done
         )
-        target = sequence.last(ts=self.num_ts)
-        output = self.dynamic_model(sequence.first(ts=self.num_ts))
+        num_ts = self.dynamic_model.num_ts
+        target = sequence.last(ts=num_ts)
+        output = self.dynamic_model(sequence.first(ts=num_ts))
         return target, output
 
     def update(

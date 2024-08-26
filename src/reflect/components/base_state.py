@@ -13,10 +13,22 @@ def get_shape(v):
             return v.base_dist.logits.shape
 
 
+def detach(v):
+    if isinstance(v, torch.Tensor):
+        return v.detach()
+    if isinstance(v, D.Independent):
+        if isinstance(v.base_dist, D.Normal):
+            return D.Independent(D.Normal(v.base_dist.loc.detach(), v.base_dist.scale.detach()), 1)
+        if isinstance(v.base_dist, D.OneHotCategoricalStraightThrough):
+            return D.Independent(D.OneHotCategoricalStraightThrough(v.base_dist.logits.detach()), 1)
+    else:
+        return v
+
+
 @dataclass
 class BaseState:
     def detach(self) -> 'BaseState':
-        cls_args = {k: v.detach() for k, v in self.__dict__.items()}
+        cls_args = {k: detach(v) for k, v in self.__dict__.items()}
         return self.__class__(**cls_args)
 
     @property

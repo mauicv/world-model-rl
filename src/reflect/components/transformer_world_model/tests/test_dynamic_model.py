@@ -7,10 +7,10 @@ import pytest
 
 
 def test_dynamic_model(transformer: Transformer):
-    state = torch.zeros((2, 16, 64))
-    action = torch.zeros((2, 16, 1))
-    reward = torch.zeros((2, 16, 1))
-    done = torch.zeros((2, 16, 1))
+    state = torch.zeros((2, 9, 64))
+    action = torch.zeros((2, 9, 1))
+    reward = torch.zeros((2, 9, 1))
+    done = torch.zeros((2, 9, 1))
     transformer_input = Sequence.from_sard(
         state=state,
         action=action,
@@ -18,10 +18,10 @@ def test_dynamic_model(transformer: Transformer):
         done=done
     )
     transformer_output: Sequence = transformer(transformer_input)
-    assert transformer_output.state_dist.base_dist.probs.shape == (2, 16, 8, 8)
-    assert transformer_output.state_sample.shape == (2, 16, 64)
-    assert transformer_output.reward.base_dist.mean.shape == (2, 16, 1)
-    assert transformer_output.done.base_dist.mean.shape == (2, 16, 1)
+    assert transformer_output.state_dist.base_dist.probs.shape == (2, 9, 8, 8)
+    assert transformer_output.state_sample.shape == (2, 9, 64)
+    assert transformer_output.reward.base_dist.mean.shape == (2, 9, 1)
+    assert transformer_output.done.base_dist.mean.shape == (2, 9, 1)
 
 
 def test_dynamic_model_step(transformer: Transformer):
