@@ -3,15 +3,17 @@ import torch
 import pytest
 
 
-@pytest.mark.skip(reason="Breaking changes, need to update tests")
-def test_observation_model():
+def test_head_model(reward_model, done_model, predictor):
     head = Head(
+        predictor=predictor,
+        reward_model=reward_model,
+        done_model=done_model,
         latent_dim=32,
         num_cat=32,
-        hidden_dim=256,
+        hidden_dim=64,
     )
-    z = torch.zeros((2, 48, 256))
-    z_dist, r, d = head(z)
-    assert z_dist.base_dist.probs.shape == (2, 16, 32, 32)
-    assert r.shape == (2, 16, 1)
-    assert d.shape == (2, 16, 1)
+    z = torch.zeros((2, 48, 64))
+    s_logits, r_mean, d_mean = head(z)
+    assert s_logits.shape == (2, 16, 32, 32)
+    assert r_mean.shape == (2, 16, 1)
+    assert d_mean.shape == (2, 16, 1)

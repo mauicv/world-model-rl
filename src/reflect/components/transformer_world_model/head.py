@@ -9,9 +9,9 @@ class Head(torch.nn.Module):
             predictor: DenseModel,
             reward_model: DenseModel,
             done_model: DenseModel,
-            latent_dim: int=None,
-            num_cat: int=None,
-            hidden_dim: int=None,
+            latent_dim: int,
+            num_cat: int,
+            hidden_dim: int,
         ):
         super(Head, self).__init__()
         self.hidden_dim = hidden_dim
