@@ -2,6 +2,7 @@ import pytest
 import gymnasium as gym
 from reflect.components.transformer_world_model.transformer import Transformer
 from reflect.components.transformer_world_model.world_model import TransformerWorldModel
+from reflect.components.transformer_world_model.memory_actor import TransformerWorldModelActor
 from reflect.data.loader import EnvDataLoader
 
 from reflect.components.observation_model.encoder import ConvEncoder
@@ -185,4 +186,12 @@ def transformer_world_model(transformer, transformer_encoder, decoder):
         encoder=transformer_encoder,
         dynamic_model=transformer,
         decoder=decoder,
+    )
+
+
+@pytest.fixture
+def transformer_world_model_actor(transformer_world_model, actor):
+    return TransformerWorldModelActor(
+        world_model=transformer_world_model,
+        actor=actor
     )
