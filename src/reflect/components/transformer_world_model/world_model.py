@@ -144,7 +144,7 @@ class TransformerWorldModel(Base):
             reward_loss=reward_loss.detach().cpu().item(),
             done_loss=done_loss.detach().cpu().item(),
             loss=loss.detach().cpu().item(),
-            grad_norm=grad_norm
+            grad_norm=grad_norm.detach().cpu().item()
         )
 
     def imagine_rollout(

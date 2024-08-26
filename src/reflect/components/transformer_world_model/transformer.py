@@ -84,6 +84,10 @@ class Transformer(torch.nn.Module):
             ]
         )
 
+    def to(self, device):
+        self.mask = self.mask.to(device)
+        return self.model.to(device)
+
     def forward(self, input: Sequence) -> Sequence:
         state_logits, reward, done = self.model(
             input.first(ts=self.num_ts).to_sar(),
