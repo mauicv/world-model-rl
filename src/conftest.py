@@ -22,7 +22,7 @@ from torchvision.transforms import Resize, Compose
 def encoder():
     return ConvEncoder(
         input_shape=(3, 64, 64),
-        embed_size=1024,
+        embed_size=None,
         activation=torch.nn.ReLU(),
         depth=32
     )
@@ -150,7 +150,7 @@ def predictor():
     return DenseModel(
         input_dim=64,
         hidden_dim=256,
-        output_dim=32*32,
+        output_dim=64,
     )
 
 @pytest.fixture
@@ -161,29 +161,29 @@ def transformer(reward_model, done_model, predictor):
         predictor=predictor,
         hdn_dim=64,
         num_heads=8,
-        latent_dim=32,
-        num_cat=32,
+        latent_dim=8,
+        num_cat=8,
         num_ts=16,
-        input_dim=1024,
+        input_dim=64,
         layers=2,
         dropout=0.05,
-        action_size=8,
+        action_size=1,
     )
 
 @pytest.fixture
-def transformer_decoder():
-    return ConvDecoder(
-        output_shape=(3, 64, 64),
-        input_size=1024,
+def transformer_encoder():
+    return ConvEncoder(
+        input_shape=(3, 64, 64),
+        embed_size=64,
         activation=torch.nn.ReLU(),
         depth=32
     )
 
 @pytest.fixture
-def transformer_world_model(transformer, encoder, transformer_decoder):
+def transformer_world_model(transformer, transformer_encoder, decoder):
     return TransformerWorldModel(
-        encoder=encoder,
-        decoder=transformer_decoder,
+        encoder=transformer_encoder,
         dynamic_model=transformer,
+        decoder=decoder,
         num_ts=16
     )

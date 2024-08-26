@@ -3,7 +3,7 @@ from reflect.components.trainers.reward.reward_trainer import RewardGradTrainer
 from reflect.components.actor import Actor
 from reflect.data.loader import EnvDataLoader
 from reflect.components.transformer_world_model.environment import Environment
-from reflect.components.transformer_world_model import WorldModel, WorldModelTrainingParams
+from reflect.components.transformer_world_model import TransformerWorldModel, WorldModelTrainingParams
 from reflect.utils import CSVLogger
 import torch
 import os

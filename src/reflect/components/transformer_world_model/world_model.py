@@ -1,18 +1,12 @@
 from typing import Optional
 from dataclasses import dataclass
 from reflect.components.observation_model import ConvEncoder, ConvDecoder
+from reflect.components.actor import Actor
 import torch
-from reflect.utils import (
-    recon_loss_fn,
-    reg_loss_fn,
-    cross_entropy_loss_fn,
-    reward_loss_fn,
-    AdamOptim,
-    create_z_dist
-)
+from reflect.utils import AdamOptim, FreezeParameters
 import torch.distributions as D
 from reflect.components.base import Base
-from reflect.components.transformer_world_model.transformer import Sequence, Transformer
+from reflect.components.transformer_world_model.transformer import Sequence, Transformer, ImaginedRollout
 
 done_loss_fn = torch.nn.BCELoss()
 
@@ -55,8 +49,6 @@ class TransformerWorldModel(Base):
             decoder: ConvDecoder,
             dynamic_model: Transformer,
             num_ts: int,
-            num_cat: int=32,
-            num_latent: int=32,
             params: Optional[WorldModelTrainingParams] = None,
         ):
         super().__init__()
@@ -67,8 +59,6 @@ class TransformerWorldModel(Base):
         self.decoder = decoder
         self.dynamic_model = dynamic_model
         self.num_ts = num_ts
-        self.num_cat = num_cat
-        self.num_latent = num_latent
         self.opt = AdamOptim(
             self.parameters(),
             lr=params.lr,
@@ -88,7 +78,7 @@ class TransformerWorldModel(Base):
         b, t, *_ = observation.shape
         state = (
             self.encoder(observation)
-            .reshape(b, t, self.num_cat, self.num_cat)
+            .reshape(b, t, self.dynamic_model.latent_dim, self.dynamic_model.num_cat)
         )
         sequence = Sequence.from_sard(
             state=state,
@@ -152,3 +142,22 @@ class TransformerWorldModel(Base):
             loss=loss.detach().cpu().item(),
             grad_norm=grad_norm
         )
+
+    def imagine_rollout(
+            self,
+            initial_state: ImaginedRollout,
+            actor: Actor,
+            n_steps: int,
+            with_observations: bool = False
+        ):
+        with FreezeParameters([self]):
+            state_sequence = self.dynamic_model.imagine_rollout(
+                initial_state=initial_state,
+                actor=actor,
+                n_steps=n_steps
+            )
+            obs = None
+            if with_observations:
+                obs = self.decoder(state_sequence.state)
+                state_sequence.observations = obs
+        return state_sequence
