@@ -1,3 +1,2 @@
-from reflect.components.observation_model.observation_model import ObservationalModel
 from reflect.components.observation_model.encoder import ConvEncoder
 from reflect.components.observation_model.decoder import ConvDecoder

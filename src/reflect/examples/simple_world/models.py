@@ -1,5 +1,3 @@
-from reflect.components.observation_model import ObservationalModel
-from reflect.components.observation_model.latent_spaces import DiscreteLatentSpace
 from pytfex.convolutional.decoder import DecoderLayer, Decoder
 from pytfex.convolutional.encoder import EncoderLayer, Encoder
 from pytfex.transformer.gpt import GPT
