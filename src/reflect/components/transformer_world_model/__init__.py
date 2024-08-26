@@ -1,1 +1,1 @@
-from reflect.components.transformer_world_model.world_model import WorldModel, WorldModelTrainingParams
+from reflect.components.transformer_world_model.world_model import TransformerWorldModel, WorldModelTrainingParams

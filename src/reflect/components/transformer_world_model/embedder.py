@@ -1,8 +1,6 @@
-from pytfex.transformer.make_model import TransformerObjectRegistry
 import torch
 
 
-@TransformerObjectRegistry.register('Embedder')
 class Embedder(torch.nn.Module):
     def __init__(
             self,

@@ -8,13 +8,14 @@ from reflect.components.rssm_world_model.rssm import (
     InternalStateDiscrete,
     InternalStateDiscreteSequence
 )
-from reflect.components.rssm_world_model.models import DenseModel
+from reflect.components.general import DenseModel
 from reflect.components.actor import Actor
 from reflect.components.observation_model import ConvEncoder, ConvDecoder
 import torch.distributions as D
 import torch.nn.functional as F
 import torch
 from reflect.utils import AdamOptim, FreezeParameters
+from reflect.components.base import Base
 
 
 @dataclass
@@ -69,7 +70,7 @@ def observation_loss(obs, decoded_obs):
     return -normal.log_prob(obs).mean()
 
 
-class WorldModel(torch.nn.Module):
+class WorldModel(Base):
     model_list = [
         'encoder',
         'decoder',
@@ -186,36 +187,3 @@ class WorldModel(torch.nn.Module):
             features=features,
             observations=obs
         )
-
-    def load(
-            self,
-            path,
-            name="world-model-checkpoint.pth",
-            targets=None
-        ):
-        device = next(self.parameters()).device
-        checkpoint = torch.load(
-            f'{path}/{name}',
-            map_location=torch.device(device)
-        )
-        if targets is None: targets = self.model_list
-        
-        for target in targets:
-            print(f'Loading {target}...')
-            getattr(self, target).load_state_dict(
-                checkpoint[target]
-            )
-
-    def save(
-            self,
-            path,
-            name="world-model-checkpoint.pth",
-            targets=None
-        ):
-        if targets is None: targets = self.model_list
-        
-        checkpoint = {
-            target: getattr(self, target).state_dict()
-            for target in targets
-        }
-        torch.save(checkpoint, f'{path}/{name}')

@@ -1,12 +1,12 @@
 from reflect.data.loader import EnvDataLoader
-from reflect.components.transformer_world_model import WorldModel
+from reflect.components.transformer_world_model.world_model import TransformerWorldModel
 import torch
 
 
 class Environment():
     def __init__(
             self,
-            world_model: WorldModel,
+            world_model: TransformerWorldModel,
             data_loader: EnvDataLoader,
             batch_size: int,
             ignore_done: bool=False

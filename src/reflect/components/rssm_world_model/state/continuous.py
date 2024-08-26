@@ -2,11 +2,11 @@ from typing import Tuple
 import torch
 from dataclasses import dataclass
 import torch.distributions as D
-from reflect.components.rssm_world_model.state.base import Base
+from reflect.components.base_state import BaseState
 
 
 @dataclass
-class InternalStateContinuous(Base):
+class InternalStateContinuous(BaseState):
     deter_state: torch.Tensor
     stoch_state: torch.Tensor
     mean: torch.Tensor
@@ -38,7 +38,7 @@ class InternalStateContinuous(Base):
         return InternalStateContinuousSequence.from_init(self)
 
 @dataclass
-class InternalStateContinuousSequence(Base):
+class InternalStateContinuousSequence(BaseState):
     deter_states: torch.Tensor
     stoch_states: torch.Tensor
     means: torch.Tensor

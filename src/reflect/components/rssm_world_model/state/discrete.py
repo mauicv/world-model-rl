@@ -2,11 +2,11 @@ from typing import Tuple
 import torch
 from dataclasses import dataclass
 import torch.distributions as D
-from reflect.components.rssm_world_model.state.base import Base
+from reflect.components.base_state import BaseState
 
 
 @dataclass
-class InternalStateDiscrete(Base):
+class InternalStateDiscrete(BaseState):
     deter_state: torch.Tensor
     stoch_state: torch.Tensor
     logits: torch.Tensor
@@ -40,7 +40,7 @@ class InternalStateDiscrete(Base):
         return InternalStateDiscreteSequence.from_init(self)
 
 @dataclass
-class InternalStateDiscreteSequence(Base):
+class InternalStateDiscreteSequence(BaseState):
     deter_states: torch.Tensor
     stoch_states: torch.Tensor
     logits: torch.Tensor
