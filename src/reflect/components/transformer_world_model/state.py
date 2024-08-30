@@ -1,25 +1,9 @@
 from typing import Optional
-from pytfex.transformer.gpt import GPT
-from pytfex.transformer.layer import TransformerLayer
-from pytfex.transformer.mlp import MLP
-from pytfex.transformer.attention import RelativeAttention
-from reflect.components.transformer_world_model.head import Head
-from reflect.components.transformer_world_model.embedder import Embedder
-from reflect.components.general import DenseModel
 from reflect.components.base_state import BaseState
-import torch.distributions as D
 from dataclasses import dataclass
+import torch.distributions as D
 import torch
-
-
-def create_z_dist(logits, temperature=1):
-    assert temperature > 0
-    dist = D.OneHotCategoricalStraightThrough(logits=logits / temperature)
-    return D.Independent(dist, 1)
-
-
-def create_norm_dist(mean):
-    return D.Independent(D.Normal(mean, torch.ones_like(mean)), 1)
+from reflect.components.transformer_world_model.distribution import create_z_dist, create_norm_dist
 
 
 @dataclass
@@ -37,20 +21,13 @@ class ImaginedRollout(BaseState):
             self.reward[:, -ts:]
         )
 
-    def append(self, state_logits, done_mean, reward_mean):
-        b, *_ = state_logits.shape
-        state = (
-            create_z_dist(state_logits[:, [-1]])
-            .rsample()
-            .reshape(b, 1, -1)
-        )
-        reward = create_norm_dist(reward_mean[:, [-1]]).rsample()
-        done = create_norm_dist(done_mean[:, [-1]]).rsample()
+    def append(self, state_distribution: 'StateDistribution'):
+        sample = state_distribution.rsample()
         return ImaginedRollout(
-            state=torch.cat([self.state, state], dim=1),
+            state=torch.cat([self.state, sample.features], dim=1),
             action=self.action,
-            reward=torch.cat([self.reward, reward], dim=1),
-            done=torch.cat([self.done, done], dim=1)
+            reward=torch.cat([self.reward, sample.reward], dim=1),
+            done=torch.cat([self.done, sample.done], dim=1)
         )
 
     def append_action(self, action):
@@ -63,45 +40,128 @@ class ImaginedRollout(BaseState):
 
 
 @dataclass
+class StateSample:
+    continuous_state: torch.Tensor
+    discrete_state: torch.Tensor
+    reward: torch.Tensor
+    done: torch.Tensor
+
+    @classmethod
+    def from_sard(cls, continuous_state, discrete_state, reward, done):
+        return cls(
+            continuous_state=continuous_state,
+            discrete_state=discrete_state,
+            reward=reward,
+            done=done
+        )
+
+    def range(self, start, end):
+        return StateSample(
+            continuous_state=self.continuous_state[:, start:end],
+            discrete_state=self.discrete_state[:, start:end],
+            reward=self.reward[:, start:end],
+            done=self.done[:, start:end]
+        )
+
+    @property
+    def features(self):
+        return torch.cat([
+            self.continuous_state,
+            self.discrete_state,
+        ], dim=-1)
+
+
+
+@dataclass
+class StateDistribution:
+    continuous_state: D.Distribution
+    discrete_state: D.Distribution
+    reward_dist: D.Distribution
+    done_dist: D.Distribution
+
+    @classmethod
+    def from_sard(cls, continuous_mean, continuous_std, discrete, reward, done):
+        return cls(
+            continuous_state=create_norm_dist(continuous_mean, continuous_std),
+            discrete_state=create_z_dist(logits=discrete),
+            reward_dist=create_norm_dist(reward),
+            done_dist=create_norm_dist(done) 
+        )
+
+    def range(self, start, end):
+        continuous_mean = self.continuous_state.base_dist.loc[:, start:end]
+        continuous_std = self.continuous_state.base_dist.scale[:, start:end]
+        discrete = self.discrete_state.base_dist.logits[:, start:end]
+        reward = self.reward_dist.base_dist.loc[:, start:end]
+        done = self.done_dist.base_dist.loc[:, start:end]
+        return StateDistribution(
+            continuous_state=create_norm_dist(continuous_mean, continuous_std),
+            discrete_state=create_z_dist(discrete),
+            reward_dist=create_norm_dist(reward),
+            done_dist=create_norm_dist(done)
+        )
+
+    def rsample(self):
+        b, t, _ = self.continuous_state.mean.shape
+        continuous_sample = self.continuous_state.rsample()
+        discrete_sample = self.discrete_state.rsample().reshape(b, t, -1)
+        reward = self.reward_dist.rsample()
+        done = self.done_dist.rsample()
+        return StateSample(
+            continuous_state=continuous_sample,
+            discrete_state=discrete_sample,
+            reward=reward,
+            done=done
+        )
+
+    def last(self, ts):
+        return self.range(-ts, None)
+
+    def first(self, ts):
+        return self.range(0, ts)
+
+
+@dataclass
 class Sequence(BaseState):
-    state_dist: D.Distribution
-    reward: D.Distribution
-    done: D.Distribution
-    state_sample: Optional[torch.Tensor]=None
+    state_distribution: Optional[StateDistribution]=None
+    state_sample: Optional[StateSample]=None
     action: Optional[torch.Tensor]=None
 
     @classmethod
-    def from_sard(cls, state, reward, done, action=None):
-        b, t, *_ = state.shape
-        state_dist = create_z_dist(state)
-        state_sample = state_dist.rsample().reshape(b, t, -1)
+    def from_sard(cls, continuous_state, discrete_state, reward, done, action=None):
+        state = StateSample.from_sard(
+            continuous_state,
+            discrete_state,
+            reward,
+            done
+        )
         return cls(
-            state_dist=state_dist,
-            state_sample=state_sample,
-            reward=D.Independent(D.Normal(reward, torch.ones_like(reward)), 1),
-            done=D.Independent(D.Normal(done, torch.ones_like(done)), 1),
+            state_sample=state,
             action=action
         )
 
+    @classmethod
+    def from_distribution(cls, state: StateDistribution):
+        return cls(
+            state_distribution=state,
+            state_sample=state.rsample()
+        )
+
     def range(self, ts_start, ts_end):
-        z = self.state_dist.base_dist.logits[:, ts_start:ts_end]
-        s = self.state_sample[:, ts_start:ts_end]
-        r = self.reward.base_dist.mean[:, ts_start:ts_end]
-        d = self.done.base_dist.mean[:, ts_start:ts_end]
+        state_dist = self.state_distribution.range(ts_start, ts_end) if self.state_distribution is not None else None
+        state_sample = self.state_sample.range(ts_start, ts_end) if self.state_sample is not None else None
         a = self.action[:, ts_start:ts_end]
         return Sequence(
-            state_dist=create_z_dist(z),
-            state_sample=s,
-            reward=D.Independent(D.Normal(r, torch.ones_like(r)), 1),
-            done=D.Independent(D.Normal(d, torch.ones_like(d)), 1),
+            state_distribution=state_dist,
+            state_sample=state_sample,
             action=a
         )
 
     def to_sar(self):
         return (
-            self.state_sample,
+            self.state_sample.features,
             self.action,
-            self.reward.base_dist.mean
+            self.state_sample.reward,
         )
 
     def first(self, ts):

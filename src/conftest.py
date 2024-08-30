@@ -151,7 +151,7 @@ def predictor():
     return DenseModel(
         input_dim=64,
         hidden_dim=256,
-        output_dim=64,
+        output_dim=6*8+16*2,
     )
 
 @pytest.fixture
@@ -162,10 +162,10 @@ def transformer(reward_model, done_model, predictor):
         predictor=predictor,
         hdn_dim=64,
         num_heads=8,
-        latent_dim=8,
-        num_cat=8,
+        discrete_latent_dim=8,
+        continuous_latent_dim=16,
+        num_cat=6,
         num_ts=9,
-        input_dim=64,
         layers=2,
         dropout=0.05,
         action_size=1,

@@ -1,4 +1,3 @@
-from typing import Optional
 from pytfex.transformer.gpt import GPT
 from pytfex.transformer.layer import TransformerLayer
 from pytfex.transformer.mlp import MLP
@@ -8,9 +7,7 @@ from reflect.components.transformer_world_model.head import Head
 from reflect.components.transformer_world_model.state import ImaginedRollout, Sequence
 from reflect.components.transformer_world_model.embedder import Embedder
 from reflect.components.general import DenseModel
-from reflect.components.base_state import BaseState
 import torch.distributions as D
-from dataclasses import dataclass
 import torch
 
 
@@ -25,10 +22,10 @@ class Transformer(torch.nn.Module):
             self,
             hdn_dim: int,
             num_heads: int,
-            latent_dim: int,
+            discrete_latent_dim: int,
+            continuous_latent_dim: int,
             num_cat: int,
             num_ts: int,
-            input_dim: int,
             layers: int,
             dropout: float,
             action_size: int,
@@ -40,10 +37,11 @@ class Transformer(torch.nn.Module):
 
         self.hdn_dim=hdn_dim
         self.num_heads=num_heads
-        self.latent_dim=latent_dim
+        self.discrete_latent_dim=discrete_latent_dim
+        self.continuous_latent_dim=continuous_latent_dim
         self.num_cat=num_cat
         self.num_ts=num_ts
-        self.input_dim=input_dim
+        self.input_dim=self.discrete_latent_dim * self.num_cat + self.continuous_latent_dim
         self.layers=layers
         self.dropout=dropout
         self.action_size=action_size
@@ -60,7 +58,8 @@ class Transformer(torch.nn.Module):
                 hidden_dim=self.hdn_dim
             ),
             head=Head(
-                latent_dim=self.latent_dim,
+                discrete_latent_dim=self.discrete_latent_dim,
+                continuous_latent_dim=self.continuous_latent_dim,
                 num_cat=self.num_cat,
                 hidden_dim=self.hdn_dim,
                 predictor=predictor,
@@ -89,28 +88,18 @@ class Transformer(torch.nn.Module):
         return self.model.to(device)
 
     def forward(self, input: Sequence) -> Sequence:
-        state_logits, reward, done = self.model(
+        state_dist = self.model(
             input.first(ts=self.num_ts).to_sar(),
             mask=self.mask
         )
-        return Sequence.from_sard(
-            state=state_logits,
-            reward=reward,
-            done=done
-        )
+        return Sequence.from_distribution(state=state_dist)
 
     def step(
             self,
             input: ImaginedRollout
         ) -> ImaginedRollout:
-        next_state_logits, next_reward, next_done = self.model(
-            input.to_ts_tuple(ts=self.num_ts)
-        )
-        return input.append(
-            state_logits=next_state_logits,
-            reward_mean=next_reward,
-            done_mean=next_done
-        )
+        state = self.model(input.to_ts_tuple(ts=self.num_ts))
+        return input.append(state_distribution=state.last(ts=1))
 
     def imagine_rollout(
             self,
