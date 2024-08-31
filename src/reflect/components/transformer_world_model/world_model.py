@@ -64,26 +64,12 @@ class TransformerWorldModel(Base):
             grad_clip=params.grad_clip
         )
 
-    def observe_rollout(
-            self,
-            observation: torch.Tensor,
-            action: torch.Tensor,
-            reward: torch.Tensor,
-            done: torch.Tensor
-        ):
-        num_ts = self.dynamic_model.num_ts
+    def embed_observation(self, observation: torch.Tensor):
         discrete_latent_dim = self.dynamic_model.discrete_latent_dim
         continuous_latent_dim = self.dynamic_model.continuous_latent_dim
         num_cat = self.dynamic_model.num_cat
-
-        assert num_ts + 1 == observation.shape[1], (
-            "Observation sequence length must be num_ts + 1"
-            f" currently num_ts + 1 = {num_ts + 1}"
-            f" observation.shape[1] = {observation.shape[1]}"
-        )
         b, t, *_ = observation.shape
         state = self.encoder(observation)
-
         sizes = (
             discrete_latent_dim*num_cat,
             continuous_latent_dim,
@@ -93,6 +79,23 @@ class TransformerWorldModel(Base):
             torch.split(state, sizes, dim=-1)
         discrete_state_logits = discrete_state_logits \
             .reshape(b, -1,  discrete_latent_dim, num_cat)
+        return discrete_state_logits, continuous_state_mean, continuous_state_std
+
+    def observe_rollout(
+            self,
+            observation: torch.Tensor,
+            action: torch.Tensor,
+            reward: torch.Tensor,
+            done: torch.Tensor
+        ):
+        num_ts = self.dynamic_model.num_ts
+        assert num_ts + 1 == observation.shape[1], (
+            "Observation sequence length must be num_ts + 1"
+            f" currently num_ts + 1 = {num_ts + 1}"
+            f" observation.shape[1] = {observation.shape[1]}"
+        )
+        discrete_state_logits, continuous_state_mean, continuous_state_std \
+            = self.embed_observation(observation=observation)
 
         state = StateDistribution.from_sard(
             continuous_mean=continuous_state_mean,

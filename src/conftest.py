@@ -175,7 +175,7 @@ def transformer(reward_model, done_model, predictor):
 def transformer_encoder():
     return ConvEncoder(
         input_shape=(3, 64, 64),
-        embed_size=64+16,
+        embed_size=80,
         activation=torch.nn.ReLU(),
         depth=32
     )
@@ -188,10 +188,19 @@ def transformer_world_model(transformer, transformer_encoder, decoder):
         decoder=decoder,
     )
 
+@pytest.fixture
+def mixed_state_actor():
+    return Actor(
+        input_dim=80,
+        output_dim=1,
+        bound=1,
+        num_layers=3,
+        hidden_dim=512,
+    )
 
 @pytest.fixture
-def transformer_world_model_actor(transformer_world_model, actor):
+def transformer_world_model_actor(transformer_world_model, mixed_state_actor):
     return TransformerWorldModelActor(
         world_model=transformer_world_model,
-        actor=actor
+        actor=mixed_state_actor
     )

@@ -1,5 +1,5 @@
 from reflect.components.actor import Actor
-from reflect.components.rssm_world_model.world_model import WorldModel
+from reflect.components.transformer_world_model.world_model import TransformerWorldModel
 from reflect.utils import FreezeParameters
 import torch
 
@@ -7,7 +7,7 @@ import torch
 class TransformerWorldModelActor:
     def __init__(
             self,
-            world_model: WorldModel,
+            world_model: TransformerWorldModel,
             actor: Actor
         ):
         self.world_model = world_model
@@ -27,6 +27,8 @@ class TransformerWorldModelActor:
         obs = obs.to(device)
         with FreezeParameters([self.world_model, self.actor]):    
             embed_obs = self.world_model.encoder(obs)
+            print(embed_obs.shape)
+
             action = self.actor(embed_obs[:, 0], deterministic=True)
             return action
 
