@@ -27,8 +27,6 @@ class TransformerWorldModelActor:
         obs = obs.to(device)
         with FreezeParameters([self.world_model, self.actor]):    
             embed_obs = self.world_model.encoder(obs)
-            print(embed_obs.shape)
-
             action = self.actor(embed_obs[:, 0], deterministic=True)
             return action
 
