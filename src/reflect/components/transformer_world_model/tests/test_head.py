@@ -8,12 +8,14 @@ def test_head_model(reward_model, done_model, predictor):
         predictor=predictor,
         reward_model=reward_model,
         done_model=done_model,
-        latent_dim=8,
-        num_cat=8,
+        continuous_latent_dim=16,
+        discrete_latent_dim=8,
+        num_cat=6,
         hidden_dim=64,
     )
     z = torch.zeros((2, 48, 64))
-    s_logits, r_mean, d_mean = head(z)
-    assert s_logits.shape == (2, 16, 8, 8)
-    assert r_mean.shape == (2, 16, 1)
-    assert d_mean.shape == (2, 16, 1)
+    state = head(z)
+    assert state.continuous_state.mean.shape == (2, 16, 16)
+    assert state.discrete_state.base_dist.probs.shape == (2, 16, 8, 6)
+    assert state.reward_dist.base_dist.mean.shape == (2, 16, 1)
+    assert state.done_dist.base_dist.mean.shape == (2, 16, 1)

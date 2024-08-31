@@ -170,15 +170,21 @@ class Sequence(BaseState):
     def last(self, ts):
         return self.range(-ts, None)
 
+    def rsample(self):
+        assert self.state_distribution, "No state distribution to sample from"
+        self.state_sample = self.state_distribution.rsample()
+
     def to_initial_state(self):
-        b, t, *_ = self.state_sample.shape
-        state = self.state_sample.reshape(b * t, 1, *self.state_sample.shape[2:])
+        features = self.state_sample.features
+        done_state = self.state_sample.done
+        reward_state = self.state_sample.reward
+        b, t, *_ = features.shape
+        features = features.reshape(b * t, 1, *features.shape[2:])
         action = self.action.reshape(b * t, 1, *self.action.shape[2:])
-        done = self.done.base_dist.mean.reshape(b * t, 1, *self.done.base_dist.mean.shape[2:])
-        reward = self.reward.base_dist.mean.reshape(b * t, 1, *self.reward.base_dist.mean.shape[2:])
-        
+        done = done_state.reshape(b * t, 1, *done_state.shape[2:])
+        reward = reward_state.reshape(b * t, 1, *reward_state.shape[2:])
         return ImaginedRollout(
-            state=state,
+            state=features,
             action=action,
             done=done,
             reward=reward
