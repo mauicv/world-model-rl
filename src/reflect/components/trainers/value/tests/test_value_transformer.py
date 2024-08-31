@@ -12,7 +12,7 @@ def test_world_model_reward_trainer(
     ):
     env_data_loader.perform_rollout()
     o, a, r, d = env_data_loader.sample(batch_size=32)
-
+    d = d.float()
     target, output \
         = transformer_world_model.observe_rollout(o, a, r, d)
 
