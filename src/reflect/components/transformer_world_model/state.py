@@ -81,6 +81,7 @@ class StateDistribution:
 
     @classmethod
     def from_sard(cls, continuous_mean, continuous_std, discrete, reward, done):
+        continuous_std = torch.nn.functional.softplus(continuous_std) + 0.1
         return cls(
             continuous_state=create_norm_dist(continuous_mean, continuous_std),
             discrete_state=create_z_dist(logits=discrete),
@@ -141,10 +142,11 @@ class Sequence(BaseState):
         )
 
     @classmethod
-    def from_distribution(cls, state: StateDistribution):
+    def from_distribution(cls, state: StateDistribution, action: Optional[torch.Tensor]=None):
         return cls(
             state_distribution=state,
-            state_sample=state.rsample()
+            state_sample=state.rsample(),
+            action=action
         )
 
     def range(self, ts_start, ts_end):

@@ -175,7 +175,7 @@ def transformer(reward_model, done_model, predictor):
 def transformer_encoder():
     return ConvEncoder(
         input_shape=(3, 64, 64),
-        embed_size=64,
+        embed_size=64+16,
         activation=torch.nn.ReLU(),
         depth=32
     )

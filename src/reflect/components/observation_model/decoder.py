@@ -25,7 +25,6 @@ class ConvDecoder(nn.Module):
         
         self.dense = nn.Linear(input_size, 32*self.depth)
 
-
         layers = []
         for i, kernel_size in enumerate(self.kernels):
             in_ch = 32*self.depth if i==0 else self.depth * (2 ** (len(self.kernels)-1-i))

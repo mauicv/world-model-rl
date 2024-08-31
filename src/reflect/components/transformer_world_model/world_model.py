@@ -7,6 +7,7 @@ from reflect.utils import AdamOptim, FreezeParameters
 import torch.distributions as D
 from reflect.components.base import Base
 from reflect.components.transformer_world_model.transformer import Sequence, Transformer, ImaginedRollout
+from reflect.components.transformer_world_model.state import StateSample, StateDistribution
 
 done_loss_fn = torch.nn.BCELoss()
 
@@ -71,23 +72,39 @@ class TransformerWorldModel(Base):
             done: torch.Tensor
         ):
         num_ts = self.dynamic_model.num_ts
-        latent_dim = self.dynamic_model.latent_dim
+        discrete_latent_dim = self.dynamic_model.discrete_latent_dim
+        continuous_latent_dim = self.dynamic_model.continuous_latent_dim
         num_cat = self.dynamic_model.num_cat
+
         assert num_ts + 1 == observation.shape[1], (
             "Observation sequence length must be num_ts + 1"
             f" currently num_ts + 1 = {num_ts + 1}"
             f" observation.shape[1] = {observation.shape[1]}"
         )
         b, t, *_ = observation.shape
-        state = (
-            self.encoder(observation)
-            .reshape(b, t, latent_dim, num_cat)
+        state = self.encoder(observation)
+
+        sizes = (
+            discrete_latent_dim*num_cat,
+            continuous_latent_dim,
+            continuous_latent_dim,
         )
-        sequence = Sequence.from_sard(
-            state=state,
-            action=action,
+        discrete_state_logits, continuous_state_mean, continuous_state_std = \
+            torch.split(state, sizes, dim=-1)
+        discrete_state_logits = discrete_state_logits \
+            .reshape(b, -1,  discrete_latent_dim, num_cat)
+
+        state = StateDistribution.from_sard(
+            continuous_mean=continuous_state_mean,
+            continuous_std=continuous_state_std,
+            discrete=discrete_state_logits,
             reward=reward,
             done=done
+        )
+
+        sequence = Sequence.from_distribution(
+            state=state,
+            action=action
         )
         num_ts = self.dynamic_model.num_ts
         target = sequence.last(ts=num_ts)
@@ -105,21 +122,36 @@ class TransformerWorldModel(Base):
             params = self.params
 
         # dynamic loss
-        dynamic_model_loss = D.kl_divergence(
-            target.state_dist,
-            output.state_dist
+        dynamic_model_loss_continuous = D.kl_divergence(
+            target.state_distribution.continuous_state,
+            output.state_distribution.continuous_state
         )
+
+        dynamic_model_loss_discrete = D.kl_divergence(
+            target.state_distribution.discrete_state,
+            output.state_distribution.discrete_state
+        )
+
+        dynamic_model_loss = dynamic_model_loss_continuous + dynamic_model_loss_discrete
         dynamic_model_loss_clamped = torch.max(
             dynamic_model_loss,
             torch.ones_like(dynamic_model_loss) * self.params.rho
         ).mean()
 
         # reward and done loss
-        reward_loss = - output.reward.log_prob(target.reward.base_dist.mean).mean()
-        done_loss = - output.done.log_prob(target.done.base_dist.mean).mean()
+        reward_loss = (
+            - output.state_distribution.reward_dist
+            .log_prob(target.state_distribution.reward_dist.base_dist.mean)
+            .mean()
+        )
+        done_loss = (
+            - output.state_distribution.done_dist
+            .log_prob(target.state_distribution.done_dist.base_dist.mean)
+            .mean()
+        )
 
         # reconstruction loss
-        recon_observations = self.decoder(target.state_sample)
+        recon_observations = self.decoder(target.state_sample.features)
         recon_dist = D.Normal(
             recon_observations,
             torch.ones_like(recon_observations)

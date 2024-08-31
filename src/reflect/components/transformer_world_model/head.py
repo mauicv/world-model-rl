@@ -42,13 +42,11 @@ class Head(torch.nn.Module):
         discrete_state_logits = discrete_state_logits \
             .reshape(b, -1,  self.discrete_latent_dim, self.num_cat)
 
-        dist = StateDistribution(
-            continuous_state=create_norm_dist(
-                continuous_state_mean,
-                torch.nn.functional.softplus(continuous_state_std) + 0.1
-            ),
-            discrete_state=create_z_dist(discrete_state_logits),
-            reward_dist=create_norm_dist(r_mean),
-            done_dist=create_norm_dist(d_mean)
+        dist = StateDistribution.from_sard(
+            continuous_mean=continuous_state_mean,
+            continuous_std=continuous_state_std,
+            discrete=discrete_state_logits,
+            reward=r_mean,
+            done=d_mean
         )
         return dist

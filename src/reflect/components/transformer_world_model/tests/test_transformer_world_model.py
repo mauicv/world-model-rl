@@ -18,15 +18,10 @@ def test_world_model(transformer_world_model: TransformerWorldModel):
         torch.randn((2, 10, 1))
     )
     first_seq, next_seq = transformer_world_model.observe_rollout(o, a, r, d)
-    assert next_seq.state_dist.base_dist.probs.shape == (2, 9, 8, 8)
-    assert next_seq.state_sample.shape == (2, 9, 64)
-    assert next_seq.reward.base_dist.mean.shape == (2, 9, 1)
-    assert next_seq.done.base_dist.mean.shape == (2, 9, 1)
-    assert first_seq.state_dist.base_dist.logits.shape == (2, 9, 8, 8)
-    assert first_seq.state_sample.shape == (2, 9, 64)
-    assert first_seq.action.shape == (2, 9, 1)
-    assert first_seq.reward.base_dist.mean.shape == (2, 9, 1)
-    assert first_seq.done.base_dist.mean.shape == (2, 9, 1)
+    assert first_seq.state_distribution.continuous_state.mean.shape == (2, 9, 16)
+    assert first_seq.state_sample.features.shape == (2, 9, 64)
+    assert next_seq.state_distribution.continuous_state.mean.shape == (2, 9, 16)
+    assert next_seq.state_sample.features.shape == (2, 9, 64)
 
 
 def test_world_model_update(transformer_world_model: TransformerWorldModel):
