@@ -197,6 +197,6 @@ class TransformerWorldModel(Base):
             )
             obs = None
             if with_observations:
-                obs = self.decoder(state_sequence.state)
+                obs = self.decoder(state_sequence.state_features)
                 state_sequence.observations = obs
         return state_sequence

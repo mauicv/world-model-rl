@@ -39,7 +39,7 @@ def test_world_model_update(transformer_world_model: TransformerWorldModel):
     assert losses.recon_loss > 0
 
 
-def test_imagine_rollout(transformer_world_model: TransformerWorldModel, actor: Actor):
+def test_imagine_rollout(transformer_world_model: TransformerWorldModel, mixed_state_actor: Actor):
     observation, action, reward, done = (
         torch.randn((2, 10, 3, 64, 64)) * 255,
         torch.randn((2, 10, 1)),
@@ -55,11 +55,12 @@ def test_imagine_rollout(transformer_world_model: TransformerWorldModel, actor: 
     initial_state = target.to_initial_state()
     imagined_rollout = transformer_world_model.imagine_rollout(
         initial_state=initial_state,
-        actor=actor,
+        actor=mixed_state_actor,
         n_steps=10,
         with_observations=True
     )
-    assert imagined_rollout.state.shape == (18, 11, 64)
+    assert imagined_rollout.state_features.shape == (18, 11, 64)
+    assert imagined_rollout.dist_features.shape == (18, 11, 80)
     assert imagined_rollout.reward.shape == (18, 11, 1)
     assert imagined_rollout.done.shape == (18, 11, 1)
     assert imagined_rollout.observations.shape == (18, 11, 3, 64, 64)

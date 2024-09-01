@@ -111,7 +111,7 @@ class Transformer(torch.nn.Module):
         rollout = initial_state
         for _ in range(n_steps):
             rollout = self.step(rollout)
-            last_state = rollout.state[:, -1].detach()
+            last_state = rollout.dist_features[:, -1].detach()
             action = actor(last_state, deterministic=True)
             rollout = rollout.append_action(action=action)
         return rollout

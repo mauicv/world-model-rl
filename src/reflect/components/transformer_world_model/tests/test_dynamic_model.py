@@ -36,16 +36,22 @@ def test_StateDistribution():
     assert sample.done.shape == (2, 9, 1)
 
 def test_dynamic_model(transformer: Transformer):
-    continuous_state = torch.zeros((2, 9, 16))
-    discrete_state = torch.zeros((2, 9, 8 * 6))
+    continuous_mean = torch.zeros((2, 9, 16))
+    continuous_std = torch.zeros((2, 9, 16))
+    discrete_state = torch.zeros((2, 9, 8, 6))
     reward = torch.zeros((2, 9, 1))
     done = torch.zeros((2, 9, 1))
     action = torch.zeros((2, 9, 1))
-    transformer_input = Sequence.from_sard(
-        continuous_state=continuous_state,
-        discrete_state=discrete_state,
+    state = StateDistribution.from_sard(
+        continuous_mean=continuous_mean,
+        continuous_std=continuous_std,
+        discrete=discrete_state,
         reward=reward,
-        done=done,
+        done=done
+    )
+
+    transformer_input = Sequence.from_distribution(
+        state=state,
         action=action
     )
     transformer_output: Sequence = transformer(transformer_input)
@@ -59,40 +65,46 @@ def test_dynamic_model(transformer: Transformer):
 
 
 def test_dynamic_model_step(transformer: Transformer):
-    state = torch.zeros((2, 3, 64))
+    state_features = torch.zeros((2, 3, 64))
+    dist_features = torch.zeros((2, 3, 80))
     action = torch.zeros((2, 3, 1))
     reward = torch.zeros((2, 3, 1))
     done = torch.zeros((2, 3, 1))
     transformer_input = ImaginedRollout(
-        state=state,
+        state_features=state_features,
+        dist_features=dist_features,
         action=action,
         reward=reward,
         done=done
     )
     transformer_output: ImaginedRollout = transformer.step(transformer_input)
-    assert transformer_output.state.shape == (2, 4, 64)
+    assert transformer_output.state_features.shape == (2, 4, 64)
+    assert transformer_output.dist_features.shape == (2, 4, 80)
     assert transformer_output.action.shape == (2, 3, 1)
     assert transformer_output.reward.shape == (2, 4, 1)
     assert transformer_output.done.shape == (2, 4, 1)
 
 
-def test_trasnformer_imagine_rollout(transformer: Transformer, actor: Actor):
-    state = torch.zeros((2, 1, 64))
+def test_trasnformer_imagine_rollout(transformer: Transformer, mixed_state_actor: Actor):
+    state_features = torch.zeros((2, 1, 64))
+    dist_features = torch.zeros((2, 1, 80))
     action = torch.zeros((2, 1, 1))
     reward = torch.zeros((2, 1, 1))
     done = torch.zeros((2, 1, 1))
     transformer_input = ImaginedRollout(
-        state=state,
+        state_features=state_features,
+        dist_features=dist_features,
         action=action,
         reward=reward,
         done=done
     )
     transformer_output: ImaginedRollout = transformer.imagine_rollout(
         initial_state=transformer_input,
-        actor=actor,
+        actor=mixed_state_actor,
         n_steps=5,
     )
-    assert transformer_output.state.shape == (2, 6, 64)
+    assert transformer_output.state_features.shape == (2, 6, 64)
+    assert transformer_output.dist_features.shape == (2, 6, 80)
     assert transformer_output.action.shape == (2, 6, 1)
     assert transformer_output.reward.shape == (2, 6, 1)
     assert transformer_output.done.shape == (2, 6, 1)

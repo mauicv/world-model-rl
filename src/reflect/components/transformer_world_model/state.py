@@ -8,7 +8,8 @@ from reflect.components.transformer_world_model.distribution import create_z_dis
 
 @dataclass
 class ImaginedRollout(BaseState):
-    state: torch.Tensor
+    state_features: torch.Tensor
+    dist_features: torch.Tensor
     action: torch.Tensor
     reward: torch.Tensor
     done: torch.Tensor
@@ -16,7 +17,7 @@ class ImaginedRollout(BaseState):
 
     def to_ts_tuple(self, ts):
         return (
-            self.state[:, -ts:],
+            self.state_features[:, -ts:],
             self.action[:, -ts:],
             self.reward[:, -ts:]
         )
@@ -24,7 +25,8 @@ class ImaginedRollout(BaseState):
     def append(self, state_distribution: 'StateDistribution'):
         sample = state_distribution.rsample()
         return ImaginedRollout(
-            state=torch.cat([self.state, sample.features], dim=1),
+            dist_features=torch.cat([self.dist_features, state_distribution.features], dim=1),
+            state_features=torch.cat([self.state_features, sample.features], dim=1),
             action=self.action,
             reward=torch.cat([self.reward, sample.reward], dim=1),
             done=torch.cat([self.done, sample.done], dim=1)
@@ -32,7 +34,8 @@ class ImaginedRollout(BaseState):
 
     def append_action(self, action):
         return ImaginedRollout(
-            state=self.state,
+            dist_features=self.dist_features,
+            state_features=self.state_features,
             action=torch.cat([self.action, action[:, None, :]], dim=1),
             reward=self.reward,
             done=self.done
@@ -76,8 +79,8 @@ class StateSample:
 class StateDistribution:
     continuous_state: D.Distribution
     discrete_state: D.Distribution
-    reward_dist: D.Distribution
-    done_dist: D.Distribution
+    reward_dist: Optional[D.Distribution]=None
+    done_dist: Optional[D.Distribution]=None
 
     @classmethod
     def from_sard(cls, continuous_mean, continuous_std, discrete, reward, done):
@@ -88,6 +91,23 @@ class StateDistribution:
             reward_dist=create_norm_dist(reward),
             done_dist=create_norm_dist(done) 
         )
+
+    @classmethod
+    def from_dist(cls, continuous_mean, continuous_std, discrete):
+        continuous_std = torch.nn.functional.softplus(continuous_std) + 0.1
+        return cls(
+            continuous_state=create_norm_dist(continuous_mean, continuous_std),
+            discrete_state=create_z_dist(logits=discrete),
+        )
+
+    @property
+    def features(self):
+        b, t, _ = self.continuous_state.base_dist.loc.shape
+        return torch.cat([
+            self.discrete_state.base_dist.logits.reshape(b, t, -1),
+            self.continuous_state.base_dist.mean,
+            self.continuous_state.base_dist.scale,
+        ], dim=-1)
 
     def range(self, start, end):
         continuous_mean = self.continuous_state.base_dist.loc[:, start:end]
@@ -177,16 +197,19 @@ class Sequence(BaseState):
         self.state_sample = self.state_distribution.rsample()
 
     def to_initial_state(self):
-        features = self.state_sample.features
+        state_features = self.state_sample.features
+        dist_features = self.state_distribution.features
         done_state = self.state_sample.done
         reward_state = self.state_sample.reward
-        b, t, *_ = features.shape
-        features = features.reshape(b * t, 1, *features.shape[2:])
+        b, t, *_ = state_features.shape
+        state_features = state_features.reshape(b * t, 1, *state_features.shape[2:])
+        dist_features = dist_features.reshape(b * t, 1, *dist_features.shape[2:])
         action = self.action.reshape(b * t, 1, *self.action.shape[2:])
         done = done_state.reshape(b * t, 1, *done_state.shape[2:])
         reward = reward_state.reshape(b * t, 1, *reward_state.shape[2:])
         return ImaginedRollout(
-            state=features,
+            dist_features=dist_features,
+            state_features=state_features,
             action=action,
             done=done,
             reward=reward
