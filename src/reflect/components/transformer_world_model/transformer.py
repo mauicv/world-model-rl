@@ -119,10 +119,10 @@ class Transformer(torch.nn.Module):
             n_steps: int,
         ):
         # TODO: Not using KV cache here. Would be better to use it.
-        rollout = initial_state
+        rollout: ImaginedRollout = initial_state
         for _ in range(n_steps):
             rollout = self.step(rollout)
-            last_state = rollout.state[:, -1].detach()
+            last_state = rollout.state_logits[:, -1].detach()
             action = actor(last_state, deterministic=True)
             rollout = rollout.append_action(action=action)
         return rollout

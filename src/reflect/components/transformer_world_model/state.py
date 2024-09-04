@@ -25,6 +25,7 @@ def create_norm_dist(mean):
 @dataclass
 class ImaginedRollout(BaseState):
     state: torch.Tensor
+    state_logits: torch.Tensor
     action: torch.Tensor
     reward: torch.Tensor
     done: torch.Tensor
@@ -39,15 +40,18 @@ class ImaginedRollout(BaseState):
 
     def append(self, state_logits, done_mean, reward_mean):
         b, *_ = state_logits.shape
+        prev_state_logits = state_logits[:, [-1]]
         state = (
-            create_z_dist(state_logits[:, [-1]])
+            create_z_dist(prev_state_logits)
             .rsample()
             .reshape(b, 1, -1)
         )
         reward = create_norm_dist(reward_mean[:, [-1]]).rsample()
         done = create_norm_dist(done_mean[:, [-1]]).rsample()
+        prev_state_logits = prev_state_logits.reshape(b, 1, -1)
         return ImaginedRollout(
             state=torch.cat([self.state, state], dim=1),
+            state_logits=torch.cat([self.state_logits, prev_state_logits], dim=1),
             action=self.action,
             reward=torch.cat([self.reward, reward], dim=1),
             done=torch.cat([self.done, done], dim=1)
@@ -58,7 +62,8 @@ class ImaginedRollout(BaseState):
             state=self.state,
             action=torch.cat([self.action, action[:, None, :]], dim=1),
             reward=self.reward,
-            done=self.done
+            done=self.done,
+            state_logits=self.state_logits
         )
 
 
@@ -112,12 +117,13 @@ class Sequence(BaseState):
 
     def to_initial_state(self):
         b, t, *_ = self.state_sample.shape
+        state_logits = self.state_dist.base_dist.logits.reshape(b * t, 1, -1)
         state = self.state_sample.reshape(b * t, 1, *self.state_sample.shape[2:])
         action = self.action.reshape(b * t, 1, *self.action.shape[2:])
         done = self.done.base_dist.mean.reshape(b * t, 1, *self.done.base_dist.mean.shape[2:])
         reward = self.reward.base_dist.mean.reshape(b * t, 1, *self.reward.base_dist.mean.shape[2:])
-        
         return ImaginedRollout(
+            state_logits=state_logits,
             state=state,
             action=action,
             done=done,

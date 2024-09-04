@@ -26,10 +26,12 @@ def test_dynamic_model(transformer: Transformer):
 
 def test_dynamic_model_step(transformer: Transformer):
     state = torch.zeros((2, 1, 64))
+    state_logits = torch.zeros((2, 1, 64))
     action = torch.zeros((2, 1, 1))
     reward = torch.zeros((2, 1, 1))
     done = torch.zeros((2, 1, 1))
     transformer_input = ImaginedRollout(
+        state_logits=state_logits,
         state=state,
         action=action,
         reward=reward,
@@ -43,11 +45,13 @@ def test_dynamic_model_step(transformer: Transformer):
 
 
 def test_trasnformer_imagine_rollout(transformer: Transformer, actor: Actor):
+    state_logits = torch.randn((2, 1, 64))
     state = torch.zeros((2, 1, 64))
     action = torch.zeros((2, 1, 1))
     reward = torch.zeros((2, 1, 1))
     done = torch.zeros((2, 1, 1))
     transformer_input = ImaginedRollout(
+        state_logits=state_logits,
         state=state,
         action=action,
         reward=reward,
