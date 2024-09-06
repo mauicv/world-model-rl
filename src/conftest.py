@@ -181,11 +181,20 @@ def transformer_encoder():
     )
 
 @pytest.fixture
-def transformer_world_model(transformer, transformer_encoder, decoder):
+def transformer_decoder():
+    return ConvDecoder(
+        output_shape=(3, 64, 64),
+        input_size=128,
+        activation=torch.nn.ReLU(),
+        depth=32
+    )
+
+@pytest.fixture
+def transformer_world_model(transformer, transformer_encoder, transformer_decoder):
     return TransformerWorldModel(
         encoder=transformer_encoder,
         dynamic_model=transformer,
-        decoder=decoder,
+        decoder=transformer_decoder,
     )
 
 

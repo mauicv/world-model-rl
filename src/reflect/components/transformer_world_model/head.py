@@ -29,4 +29,4 @@ class Head(torch.nn.Module):
         r_mean = self.reward_model(r_emb)
         s = self.predictor(a_emb)
         s_logits = s.reshape(b, int(t/3), self.latent_dim, self.num_cat)
-        return s_logits, r_mean, d_mean
+        return s_logits, r_mean, d_mean, a_emb

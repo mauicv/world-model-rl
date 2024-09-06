@@ -87,7 +87,7 @@ class TransformerWorldModel(Base):
             state=state,
             action=action,
             reward=reward,
-            done=done
+            done=done,
         )
         num_ts = self.dynamic_model.num_ts
         target = sequence.last(ts=num_ts)
@@ -119,7 +119,7 @@ class TransformerWorldModel(Base):
         done_loss = - output.done.log_prob(target.done.base_dist.mean).mean()
 
         # reconstruction loss
-        recon_observations = self.decoder(target.state_sample)
+        recon_observations = self.decoder(output.to_decoder_input())
         recon_dist = D.Normal(
             recon_observations,
             torch.ones_like(recon_observations)
@@ -162,6 +162,6 @@ class TransformerWorldModel(Base):
             )
             obs = None
             if with_observations:
-                obs = self.decoder(state_sequence.state)
+                obs = self.decoder(state_sequence.to_decoder_input())
                 state_sequence.observations = obs
         return state_sequence

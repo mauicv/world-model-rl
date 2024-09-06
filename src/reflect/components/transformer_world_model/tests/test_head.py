@@ -13,7 +13,8 @@ def test_head_model(reward_model, done_model, predictor):
         hidden_dim=64,
     )
     z = torch.zeros((2, 48, 64))
-    s_logits, r_mean, d_mean = head(z)
+    s_logits, r_mean, d_mean, hdn_state = head(z)
     assert s_logits.shape == (2, 16, 8, 8)
     assert r_mean.shape == (2, 16, 1)
     assert d_mean.shape == (2, 16, 1)
+    assert hdn_state.shape == (2, 16, 64)
