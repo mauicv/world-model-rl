@@ -23,10 +23,8 @@ class Head(torch.nn.Module):
 
     def forward(self, x):
         b, t, _ = x.shape
-        reshaped_x = x.view(b, -1, 3, self.hidden_dim)
-        s_emb, a_emb, r_emb = reshaped_x.unbind(dim=2)
-        d_mean = self.done_model(s_emb)
-        r_mean = self.reward_model(r_emb)
-        s = self.predictor(a_emb)
-        s_logits = s.reshape(b, int(t/3), self.latent_dim, self.num_cat)
-        return s_logits, r_mean, d_mean, a_emb
+        d_mean = self.done_model(x)
+        r_mean = self.reward_model(x)
+        s = self.predictor(x)
+        s_logits = s.reshape(b, t, self.latent_dim, self.num_cat)
+        return s_logits, r_mean, d_mean, x

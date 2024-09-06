@@ -30,7 +30,4 @@ class Embedder(torch.nn.Module):
         a_emb = self.a_emb(a)
         r_emb = self.r_emb(r.type(torch.float))
         s_emb = self.z_emb(s)
-        return (
-            torch.stack([s_emb, a_emb, r_emb], dim=2)
-            .view(b, -1, self.hidden_dim)
-        )
+        return s_emb + a_emb + r_emb
