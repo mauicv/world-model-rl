@@ -6,10 +6,42 @@ import math
 import torch.nn.functional as F
 import torch.distributions as D
 import csv
+from dataclasses import dataclass
+
+
+@dataclass
+class AnnealingParams:
+    warmup_iter: int = 4e3 * 16
+    decay_step: int = 1e5 * 16
+    base_lr: int = 2e-4
+    end_lr: int = 1e-4
+    exp_rate: float = 0.5
+
+
+def anneal_learning_rate(global_step, params: AnnealingParams):
+    if global_step < params.warmup_iter:
+        lr = params.base_lr / params.warmup_iter * (global_step)
+    else:
+        lr = params.base_lr
+
+    lr = lr * params.exp_rate ** (global_step/ params.decay_step)
+    if global_step > params.decay_step:
+        lr = max(lr, params.end_lr)
+
+    return lr
 
 
 class AdamOptim:
-    def __init__(self, parameters, lr, betas=(0.9, 0.999), eps=1e-8, grad_clip=torch.inf):
+    def __init__(
+            self,
+            parameters,
+            lr,
+            betas=(0.9, 0.999),
+            eps=1e-8,
+            grad_clip=torch.inf,
+            annealing_params=None
+        ):
+        self.annealing_params = annealing_params
         self.parameters = list(parameters)
         self.grad_clip = grad_clip
         self.optimizer = Adam(self.parameters, lr=lr, betas=betas, eps=eps)
@@ -20,7 +52,11 @@ class AdamOptim:
         grad_norm = torch.nn.utils.clip_grad_norm_(self.parameters, self.grad_clip)
         return grad_norm
 
-    def update_parameters(self):
+    def update_parameters(self, global_step=None):
+        if global_step is not None and self.annealing_params is not None:
+            lr = anneal_learning_rate(global_step, self.annealing_params)
+            for param_group in self.optimizer.param_groups:
+                param_group['lr'] = lr
         self.optimizer.step()
 
     def load_state_dict(self, state_dict):

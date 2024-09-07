@@ -3,10 +3,11 @@ from dataclasses import dataclass
 from reflect.components.observation_model import ConvEncoder, ConvDecoder
 from reflect.components.actor import Actor
 import torch
-from reflect.utils import AdamOptim, FreezeParameters
+from reflect.utils import AdamOptim, AnnealingParams, FreezeParameters
 import torch.distributions as D
 from reflect.components.base import Base
 from reflect.components.transformer_world_model.transformer import Sequence, Transformer, ImaginedRollout
+
 
 done_loss_fn = torch.nn.BCELoss()
 
@@ -30,9 +31,10 @@ class WorldModelTrainingParams:
     consistency_coeff: float = 0.0
     reward_coeff: float = 10.0
     done_coeff: float = 1.0
-    lr: float = 6e-4
-    grad_clip: float = 1.0
+    lr: float = 2e-4
+    grad_clip: float = 100.0
     rho: float = 3.0
+    annealing_params: Optional[AnnealingParams] = AnnealingParams()
 
 
 class TransformerWorldModel(Base):
@@ -60,8 +62,10 @@ class TransformerWorldModel(Base):
         self.opt = AdamOptim(
             self.parameters(),
             lr=params.lr,
-            grad_clip=params.grad_clip
+            grad_clip=params.grad_clip,
+            annealing_params=params.annealing_params
         )
+
 
     def observe_rollout(
             self,
@@ -100,6 +104,7 @@ class TransformerWorldModel(Base):
             output: Sequence,
             observations: torch.Tensor,
             params: Optional[WorldModelTrainingParams] = None,
+            global_step: Optional[int] = None
         ):
         if params is None:
             params = self.params
@@ -139,7 +144,7 @@ class TransformerWorldModel(Base):
         )
 
         grad_norm = self.opt.backward(loss, retain_graph=False)
-        self.opt.update_parameters()
+        self.opt.update_parameters(global_step=global_step)
 
         return WorldModelLosses(
             recon_loss=recon_loss.detach().cpu().item(),

@@ -37,7 +37,12 @@ def test_world_model_update(transformer_world_model: TransformerWorldModel):
         torch.randn((2, 10, 1))
     )
     target, output = transformer_world_model.observe_rollout(o, a, r, d)
-    losses = transformer_world_model.update(target=target, output=output, observations=o)
+    losses = transformer_world_model.update(
+        target=target,
+        output=output,
+        observations=o,
+        global_step=2301
+    )
     assert output.to_decoder_input().shape == (2, 9, 128)
     assert losses.dynamic_model_loss > 0
     assert losses.reward_loss > 0
