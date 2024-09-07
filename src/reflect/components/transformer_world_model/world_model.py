@@ -119,7 +119,11 @@ class TransformerWorldModel(Base):
         done_loss = - output.done.log_prob(target.done.base_dist.mean).mean()
 
         # reconstruction loss
-        recon_observations = self.decoder(output.to_decoder_input())
+        decoder_input = torch.cat(
+            [output.hdn_state, target.state_sample],
+            dim=-1
+        )
+        recon_observations = self.decoder(decoder_input)
         recon_dist = D.Normal(
             recon_observations,
             torch.ones_like(recon_observations)
