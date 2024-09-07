@@ -1,6 +1,6 @@
 from typing import Iterable
 from torch.nn import Module
-from torch.optim import Adam
+import torch.optim as optim
 import torch
 import math
 import torch.nn.functional as F
@@ -39,12 +39,19 @@ class AdamOptim:
             betas=(0.9, 0.999),
             eps=1e-8,
             grad_clip=torch.inf,
-            annealing_params=None
+            annealing_params=None,
+            optimizer='Adam'
         ):
         self.annealing_params = annealing_params
         self.parameters = list(parameters)
         self.grad_clip = grad_clip
-        self.optimizer = Adam(self.parameters, lr=lr, betas=betas, eps=eps)
+        optimizer_cls = getattr(optim, optimizer)
+        self.optimizer = optimizer_cls(
+            self.parameters,
+            lr=lr,
+            betas=betas,
+            eps=eps
+        )
 
     def backward(self, loss, retain_graph=False):
         self.optimizer.zero_grad()

@@ -63,7 +63,8 @@ class TransformerWorldModel(Base):
             self.parameters(),
             lr=params.lr,
             grad_clip=params.grad_clip,
-            annealing_params=params.annealing_params
+            annealing_params=params.annealing_params,
+            optimizer='AdamW'
         )
 
 
