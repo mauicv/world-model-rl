@@ -4,7 +4,7 @@ See also: https://colab.research.google.com/drive/10-QQlnSFZeWBC7JCm0mPraGBPLVU2
 """
 
 import gymnasium as gym
-from reflect.data.noise import NoNoise
+from reflect.data.noise import NormalNoise
 from reflect.utils import FreezeParameters
 import torch
 
@@ -85,9 +85,9 @@ class EnvDataLoader:
         self.transforms = transforms
 
         if noise_generator is None:
-            self.noise_generator = NoNoise(dim=self.action_dim)
+            self.noise_generator = NormalNoise(dim=self.action_dim)
 
-    def perform_rollout(self):
+    def perform_rollout(self, use_policy=True):
         """Performs a rollout of the environment.
 
         Iterate rollouts and store the images, actions, rewards, and done
@@ -106,7 +106,10 @@ class EnvDataLoader:
         reward = 0
         run_index = self.rollout_ind % self.num_runs
         for index in range(self.rollout_length):
-            action = self.compute_action(img[None, :])
+            action = self.compute_action(
+                img[None, :],
+                use_policy=use_policy
+            )
             self.img_buffer[run_index, index] = img
             self.action_buffer[run_index, index] = to_tensor(action)
             # weird issue with pendulum environment always returns 1 reward
@@ -124,8 +127,8 @@ class EnvDataLoader:
         self.end_index[run_index] = index
         self.rollout_ind += 1
 
-    def compute_action(self, observation):
-        if self.policy:
+    def compute_action(self, observation, use_policy=True):
+        if self.policy and use_policy:
             action = self.policy(observation)
             action = action + torch.normal(torch.zeros_like(action), self.noise_size)
             action = action.squeeze(0)
