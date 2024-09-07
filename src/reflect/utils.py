@@ -60,11 +60,13 @@ class AdamOptim:
         return grad_norm
 
     def update_parameters(self, global_step=None):
+        lr = None
         if global_step is not None and self.annealing_params is not None:
             lr = anneal_learning_rate(global_step, self.annealing_params)
             for param_group in self.optimizer.param_groups:
                 param_group['lr'] = lr
         self.optimizer.step()
+        return lr
 
     def load_state_dict(self, state_dict):
         self.optimizer.load_state_dict(state_dict)

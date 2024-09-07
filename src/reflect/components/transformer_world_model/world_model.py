@@ -21,6 +21,7 @@ class WorldModelLosses:
     done_loss: float
     loss: float
     grad_norm: float
+    lr: float
 
 
 @dataclass
@@ -145,7 +146,7 @@ class TransformerWorldModel(Base):
         )
 
         grad_norm = self.opt.backward(loss, retain_graph=False)
-        self.opt.update_parameters(global_step=global_step)
+        lr = self.opt.update_parameters(global_step=global_step)
 
         return WorldModelLosses(
             recon_loss=recon_loss.detach().cpu().item(),
@@ -154,7 +155,8 @@ class TransformerWorldModel(Base):
             reward_loss=reward_loss.detach().cpu().item(),
             done_loss=done_loss.detach().cpu().item(),
             loss=loss.detach().cpu().item(),
-            grad_norm=grad_norm.detach().cpu().item()
+            grad_norm=grad_norm.detach().cpu().item(),
+            lr=lr
         )
 
     def imagine_rollout(
