@@ -104,6 +104,7 @@ class Transformer(torch.nn.Module):
             self,
             input: ImaginedRollout
         ) -> ImaginedRollout:
+        # TODO: add mask just in cae
         next_state_logits, next_reward, next_done, hdn_state = self.model(
             input.to_ts_tuple(ts=self.num_ts)
         )
