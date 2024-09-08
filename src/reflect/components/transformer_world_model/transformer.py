@@ -33,8 +33,8 @@ class Transformer(torch.nn.Module):
             dropout: float,
             action_size: int,
             predictor: DenseModel,
-            reward_model: DenseModel,
-            done_model: DenseModel,
+            # reward_model: DenseModel,
+            # done_model: DenseModel,
         ) -> None:
         super().__init__()
 
@@ -64,8 +64,8 @@ class Transformer(torch.nn.Module):
                 num_cat=self.num_cat,
                 hidden_dim=self.hdn_dim,
                 predictor=predictor,
-                reward_model=reward_model,
-                done_model=done_model,
+                # reward_model=reward_model,
+                # done_model=done_model,
             ),
             layers=[
                 TransformerLayer(
@@ -89,14 +89,14 @@ class Transformer(torch.nn.Module):
         return self.model.to(device)
 
     def forward(self, input: Sequence) -> Sequence:
-        state_logits, reward, done, hdn_state = self.model(
+        state_logits, hdn_state = self.model(
             input.first(ts=self.num_ts).to_sar(),
             mask=self.mask
         )
         return Sequence.from_sard(
             state=state_logits,
-            reward=reward,
-            done=done,
+            # reward=reward,
+            # done=done,
             hdn_state=hdn_state
         )
 
@@ -105,13 +105,13 @@ class Transformer(torch.nn.Module):
             input: ImaginedRollout
         ) -> ImaginedRollout:
         # TODO: add mask just in cae
-        next_state_logits, next_reward, next_done, hdn_state = self.model(
+        next_state_logits, hdn_state = self.model(
             input.to_ts_tuple(ts=self.num_ts)
         )
         return input.append(
             state_logits=next_state_logits,
-            reward_mean=next_reward,
-            done_mean=next_done,
+            # reward_mean=next_reward,
+            # done_mean=next_done,
             hdn_state=hdn_state
         )
 

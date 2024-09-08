@@ -10,6 +10,5 @@ def test_embedder():
     )
     z = torch.zeros((2, 16, 1024))
     a = torch.zeros((2, 16, 18))
-    r = torch.zeros((2, 16, 1))
-    z_r = om((z, a, r))
+    z_r = om((z, a))
     assert z_r.shape == (2, 16, 256)

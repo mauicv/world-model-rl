@@ -1,6 +1,7 @@
 from typing import Optional
 from dataclasses import dataclass
 from reflect.components.observation_model import ConvEncoder, ConvDecoder
+from reflect.components.general import DenseModel
 from reflect.components.actor import Actor
 import torch
 from reflect.utils import AdamOptim, AnnealingParams, FreezeParameters
@@ -51,6 +52,8 @@ class TransformerWorldModel(Base):
             encoder: ConvEncoder,
             decoder: ConvDecoder,
             dynamic_model: Transformer,
+            reward_model: DenseModel,
+            done_model: DenseModel,
             params: Optional[WorldModelTrainingParams] = None,
         ):
         super().__init__()
@@ -60,6 +63,8 @@ class TransformerWorldModel(Base):
         self.encoder = encoder
         self.decoder = decoder
         self.dynamic_model = dynamic_model
+        self.reward_model = reward_model
+        self.done_model = done_model
         self.opt = AdamOptim(
             self.parameters(),
             lr=params.lr,
@@ -73,8 +78,6 @@ class TransformerWorldModel(Base):
             self,
             observation: torch.Tensor,
             action: torch.Tensor,
-            reward: torch.Tensor,
-            done: torch.Tensor
         ):
         num_ts = self.dynamic_model.num_ts
         latent_dim = self.dynamic_model.latent_dim
@@ -92,8 +95,6 @@ class TransformerWorldModel(Base):
         sequence = Sequence.from_sard(
             state=state,
             action=action,
-            reward=reward,
-            done=done,
         )
         num_ts = self.dynamic_model.num_ts
         target = sequence.last(ts=num_ts)
@@ -105,6 +106,8 @@ class TransformerWorldModel(Base):
             target: Sequence,
             output: Sequence,
             observations: torch.Tensor,
+            reward: torch.Tensor,
+            done: torch.Tensor,
             params: Optional[WorldModelTrainingParams] = None,
             global_step: Optional[int] = None
         ):
@@ -121,15 +124,30 @@ class TransformerWorldModel(Base):
             torch.ones_like(dynamic_model_loss) * self.params.rho
         ).mean()
 
-        # reward and done loss
-        reward_loss = - output.reward.log_prob(target.reward.base_dist.mean).mean()
-        done_loss = - output.done.log_prob(target.done.base_dist.mean).mean()
-
         # reconstruction loss
         decoder_input = torch.cat(
             [output.hdn_state, target.state_sample],
             dim=-1
         )
+        # reward loss
+        pred_reward = self.reward_model(decoder_input)
+        pred_reward_dist = D.Normal(
+            pred_reward,
+            torch.ones_like(pred_reward)
+        )
+        pred_reward_dist = D.Independent(pred_reward_dist, 1)
+        reward_loss = - pred_reward_dist.log_prob(reward[:, 1:]).mean()
+
+        # done loss
+        pred_done = self.done_model(decoder_input)
+        pred_done_dist = D.Normal(
+            pred_done,
+            torch.ones_like(pred_done)
+        )
+        pred_done_dist = D.Independent(pred_done_dist, 1)
+        done_loss = - pred_done_dist.log_prob(done[:, 1:]).mean()
+
+        # recon loss
         recon_observations = self.decoder(decoder_input)
         recon_dist = D.Normal(
             recon_observations,
@@ -137,6 +155,7 @@ class TransformerWorldModel(Base):
         )
         recon_dist = D.Independent(recon_dist, 3)
         recon_loss = - recon_dist.log_prob(observations[:, 1:]).mean()
+
 
         loss = (
             params.dynamic_coeff * dynamic_model_loss_clamped 
@@ -173,7 +192,10 @@ class TransformerWorldModel(Base):
                 n_steps=n_steps
             )
             obs = None
+            decoder_inputs = state_sequence.to_decoder_input()
+            rewards = self.reward_model(decoder_inputs)
+            dones = self.done_model(decoder_inputs)
             if with_observations:
-                obs = self.decoder(state_sequence.to_decoder_input())
+                obs = self.decoder(decoder_inputs)
                 state_sequence.observations = obs
-        return state_sequence
+        return state_sequence, rewards, dones

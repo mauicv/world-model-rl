@@ -155,10 +155,8 @@ def predictor():
     )
 
 @pytest.fixture
-def transformer(reward_model, done_model, predictor):
+def transformer(predictor):
     return Transformer(
-        reward_model=reward_model,
-        done_model=done_model,
         predictor=predictor,
         hdn_dim=64,
         num_heads=8,
@@ -190,11 +188,30 @@ def transformer_decoder():
     )
 
 @pytest.fixture
-def transformer_world_model(transformer, transformer_encoder, transformer_decoder):
+def transformer_reward_model():
+    return DenseModel(
+        input_dim=128,
+        hidden_dim=256,
+        output_dim=1,
+    )
+
+@pytest.fixture
+def transformer_done_model():
+    return DenseModel(
+        input_dim=128,
+        hidden_dim=256,
+        output_dim=1,
+        output_act=torch.nn.Sigmoid
+    )
+
+@pytest.fixture
+def transformer_world_model(transformer, transformer_reward_model, transformer_done_model, transformer_encoder, transformer_decoder):
     return TransformerWorldModel(
         encoder=transformer_encoder,
         dynamic_model=transformer,
         decoder=transformer_decoder,
+        reward_model=transformer_reward_model,
+        done_model=transformer_done_model
     )
 
 

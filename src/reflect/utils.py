@@ -8,11 +8,10 @@ import torch.distributions as D
 import csv
 from dataclasses import dataclass
 
-
 @dataclass
 class AnnealingParams:
-    warmup_iter: int = 4e3 * 16
-    decay_step: int = 1e5 * 16
+    warmup_iter: int = 6400
+    decay_step: int = 16000
     base_lr: int = 2e-4
     end_lr: int = 1e-4
     exp_rate: float = 0.5

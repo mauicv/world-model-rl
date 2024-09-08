@@ -18,6 +18,6 @@ class Embedder(torch.nn.Module):
         )
 
     def forward(self, x):
-        s, a, _ = x
+        s, a = x
         s_emb = self.mlp(torch.cat([s, a], dim=-1))
         return s_emb
