@@ -100,6 +100,7 @@ class Transformer(torch.nn.Module):
         ) -> ImaginedRollout:
         length = min(input.state_logits.size(1), self.num_ts)
         mask = get_causal_mask(length)
+        mask = mask.to(input.state_logits.device)
         next_state_logits, hdn_state = self.model(
             input.to_ts_tuple(ts=self.num_ts),
             mask=mask
