@@ -12,12 +12,12 @@ class Embedder(torch.nn.Module):
         self.hidden_dim = hidden_dim
 
         self.mlp = torch.nn.Sequential(
-            torch.nn.Linear(z_dim + a_size + 1, hidden_dim),
+            torch.nn.Linear(z_dim + a_size, hidden_dim),
             torch.nn.ELU(),
             torch.nn.Linear(hidden_dim, hidden_dim),
         )
 
     def forward(self, x):
-        s, a, r = x
-        s_emb = self.mlp(torch.cat([s, a, r], dim=-1))
+        s, a, _ = x
+        s_emb = self.mlp(torch.cat([s, a], dim=-1))
         return s_emb
