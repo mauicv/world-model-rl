@@ -74,7 +74,7 @@ class ImaginedRollout(BaseState):
         )
 
     def to_decoder_input(self):
-        return torch.cat([self.state, self.hdn_state], dim=-1)
+        return torch.cat([self.hdn_state, self.state], dim=-1)
 
 
 @dataclass
@@ -143,6 +143,3 @@ class Sequence(BaseState):
             done=done,
             reward=reward
         )
-
-    def to_decoder_input(self):
-        return torch.cat([self.state_sample, self.hdn_state], dim=-1)

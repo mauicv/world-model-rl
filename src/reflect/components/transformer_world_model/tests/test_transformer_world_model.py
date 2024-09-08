@@ -43,7 +43,6 @@ def test_world_model_update(transformer_world_model: TransformerWorldModel):
         observations=o,
         global_step=2301
     )
-    assert output.to_decoder_input().shape == (2, 9, 128)
     assert losses.dynamic_model_loss > 0
     assert losses.reward_loss > 0
     assert losses.done_loss > 0
