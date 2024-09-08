@@ -74,7 +74,7 @@ class Actor(torch.nn.Module):
         if deterministic:
             return mu
 
-        min_std=0.5
+        min_std=0.3
         max_std=3.0
         std = self.stddev(x)
         std = max_std * torch.sigmoid(std) + min_std
