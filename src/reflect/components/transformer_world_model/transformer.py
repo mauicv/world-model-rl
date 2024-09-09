@@ -48,7 +48,7 @@ class Transformer(torch.nn.Module):
         self.dropout=dropout
         self.action_size=action_size
 
-        self.mask = get_causal_mask(self.num_ts * 3)
+        self.mask = get_causal_mask(self.num_ts)
 
         self.model = GPT(
             dropout=self.dropout,
@@ -73,7 +73,7 @@ class Transformer(torch.nn.Module):
                     attn=RelativeAttention(
                         hidden_dim=self.hdn_dim,
                         num_heads=self.num_heads,
-                        num_positions=self.num_ts * 3,
+                        num_positions=self.num_ts,
                         dropout=self.dropout
                     ),
                     mlp=MLP(
