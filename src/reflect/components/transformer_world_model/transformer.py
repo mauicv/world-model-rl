@@ -103,8 +103,10 @@ class Transformer(torch.nn.Module):
             self,
             input: ImaginedRollout
         ) -> ImaginedRollout:
+        state, action, rewards = input.to_ts_tuple(ts=self.num_ts)
+        # all gradient should flow through the state
         next_state_logits, next_reward, next_done = self.model(
-            input.to_ts_tuple(ts=self.num_ts)
+            (state, action, rewards.detach())
         )
         return input.append(
             state_logits=next_state_logits,
