@@ -93,7 +93,7 @@ class TransformerWorldModel(Base):
         targets = sequence.last(ts=num_ts)
         inputs = sequence.first(ts=num_ts)
         outputs = self.dynamic_model(inputs.detach())
-        return targets, outputs
+        return targets.detach(), outputs
 
     def update(
             self,
