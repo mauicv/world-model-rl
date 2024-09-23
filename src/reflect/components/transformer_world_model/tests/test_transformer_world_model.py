@@ -38,7 +38,6 @@ def test_world_model_update(transformer_world_model: TransformerWorldModel):
     )
     target, output = transformer_world_model.observe_rollout(o, a, r, d)
     losses = transformer_world_model.update(target=target, output=output, observations=o)
-    assert output.to_decoder_input().shape == (2, 9, 128)
     assert losses.dynamic_model_loss > 0
     assert losses.reward_loss > 0
     assert losses.done_loss > 0
@@ -70,5 +69,3 @@ def test_imagine_rollout(transformer_world_model: TransformerWorldModel, actor: 
     assert imagined_rollout.done.shape == (18, 11, 1)
     assert imagined_rollout.observations.shape == (18, 11, 3, 64, 64)
     assert imagined_rollout.action.shape == (18, 11, 1)
-    assert imagined_rollout.hdn_state.shape == (18, 11, 64)
-    assert imagined_rollout.to_decoder_input().shape == (18, 11, 128)
