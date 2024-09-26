@@ -79,27 +79,29 @@ class TransformerWorldModel(Base):
             f" observation.shape[1] = {observation.shape[1]}"
         )
         b, t, *_ = observation.shape
-        state = (
+        enc_observations = (
             self.encoder(observation)
             .reshape(b, t, latent_dim, num_cat)
         )
         sequence = Sequence.from_sard(
-            state=state,
+            state=enc_observations,
             action=action,
             reward=reward,
             done=done
         )
+        recon_observations = self.decoder(sequence.state_sample)
         num_ts = self.dynamic_model.num_ts
         targets = sequence.last(ts=num_ts)
         inputs = sequence.first(ts=num_ts)
         outputs = self.dynamic_model(inputs.detach())
-        return targets, outputs
+        return targets, outputs, recon_observations
 
     def update(
             self,
             target: Sequence,
             output: Sequence,
             observations: torch.Tensor,
+            recon_observations: torch.Tensor,
             params: Optional[WorldModelTrainingParams] = None,
         ):
         if params is None:
@@ -130,13 +132,12 @@ class TransformerWorldModel(Base):
         # reconstruction loss
         # TODO: check this logic? Currently decodes the targets 
         # could also be the model outputs?
-        recon_observations = self.decoder(target.state_sample)
         recon_dist = D.Normal(
             recon_observations,
             torch.ones_like(recon_observations)
         )
         recon_dist = D.Independent(recon_dist, 3)
-        recon_loss = - recon_dist.log_prob(observations[:, 1:]).mean()
+        recon_loss = - recon_dist.log_prob(observations).mean()
 
         loss = (
             params.dynamic_coeff * dynamic_model_loss_clamped 

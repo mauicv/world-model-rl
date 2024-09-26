@@ -17,7 +17,7 @@ def test_world_model(transformer_world_model: TransformerWorldModel):
         torch.randn((2, 10, 1)),
         torch.randn((2, 10, 1))
     )
-    first_seq, next_seq = transformer_world_model.observe_rollout(o, a, r, d)
+    first_seq, next_seq, _ = transformer_world_model.observe_rollout(o, a, r, d)
     assert next_seq.state_dist.base_dist.probs.shape == (2, 9, 8, 8)
     assert next_seq.state_sample.shape == (2, 9, 64)
     assert next_seq.reward.base_dist.mean.shape == (2, 9, 1)
@@ -36,8 +36,13 @@ def test_world_model_update(transformer_world_model: TransformerWorldModel):
         torch.randn((2, 10, 1)),
         torch.randn((2, 10, 1))
     )
-    target, output = transformer_world_model.observe_rollout(o, a, r, d)
-    losses = transformer_world_model.update(target=target, output=output, observations=o)
+    target, output, recon_observations = transformer_world_model.observe_rollout(o, a, r, d)
+    losses = transformer_world_model.update(
+        target=target,
+        output=output,
+        observations=o,
+        recon_observations=recon_observations
+    )
     assert losses.dynamic_model_loss > 0
     assert losses.reward_loss > 0
     assert losses.done_loss > 0
@@ -51,7 +56,7 @@ def test_imagine_rollout(transformer_world_model: TransformerWorldModel, actor: 
         torch.randn((2, 10, 1)),
         torch.randn((2, 10, 1))
     )
-    target, _ = transformer_world_model.observe_rollout(
+    target, *_ = transformer_world_model.observe_rollout(
         observation=observation,
         action=action,
         reward=reward,

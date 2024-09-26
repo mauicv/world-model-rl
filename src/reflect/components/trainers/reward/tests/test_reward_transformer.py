@@ -13,13 +13,14 @@ def test_world_model_reward_trainer(
     env_data_loader.perform_rollout()
     o, a, r, d = env_data_loader.sample(batch_size=32)
 
-    target, output \
+    target, output, recon_observations \
         = transformer_world_model.observe_rollout(o, a, r, d)
 
     losses = transformer_world_model.update(
         target=target,
         output=output,
         observations=o,
+        recon_observations=recon_observations
     )
     assert losses
 
