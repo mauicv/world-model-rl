@@ -93,7 +93,7 @@ class TransformerWorldModel(Base):
         targets = sequence.last(ts=num_ts)
         inputs = sequence.first(ts=num_ts)
         outputs = self.dynamic_model(inputs.detach())
-        return targets.detach(), outputs
+        return targets, outputs
 
     def update(
             self,
@@ -112,7 +112,7 @@ class TransformerWorldModel(Base):
         # ) # TODO: <- this doesn't work for some reason?
         dynamic_model_loss = cross_entropy_loss_fn(
             output.state_dist,
-            target.state_dist,
+            target.detach().state_dist,
         )
         dynamic_model_loss_clamped = torch.max(
             dynamic_model_loss,
@@ -120,10 +120,16 @@ class TransformerWorldModel(Base):
         ).mean()
 
         # reward and done loss
-        reward_loss = - output.reward.log_prob(target.reward.base_dist.mean).mean()
-        done_loss = - output.done.log_prob(target.done.base_dist.mean).mean()
+        reward_loss = - output.reward.log_prob(
+            target.detach().reward.base_dist.mean
+        ).mean()
+        done_loss = - output.done.log_prob(
+            target.detach().done.base_dist.mean
+        ).mean()
 
         # reconstruction loss
+        # TODO: check this logic? Currently decodes the targets 
+        # could also be the model outputs?
         recon_observations = self.decoder(target.state_sample)
         recon_dist = D.Normal(
             recon_observations,
