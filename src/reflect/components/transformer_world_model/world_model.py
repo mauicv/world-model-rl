@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from reflect.components.observation_model import ConvEncoder, ConvDecoder
 from reflect.components.actor import Actor
 import torch
-from reflect.utils import AdamOptim, FreezeParameters
+from reflect.utils import AdamOptim, FreezeParameters, cross_entropy_loss_fn
 import torch.distributions as D
 from reflect.components.base import Base
 from reflect.components.transformer_world_model.transformer import Sequence, Transformer, ImaginedRollout
@@ -106,9 +106,13 @@ class TransformerWorldModel(Base):
             params = self.params
 
         # dynamic loss
-        dynamic_model_loss = D.kl_divergence(
+        # dynamic_model_loss = D.kl_divergence(
+        #     target.state_dist,
+        #     output.state_dist
+        # ) # TODO: <- this doesn't work for some reason?
+        dynamic_model_loss = cross_entropy_loss_fn(
+            output.state_dist,
             target.state_dist,
-            output.state_dist
         )
         dynamic_model_loss_clamped = torch.max(
             dynamic_model_loss,
