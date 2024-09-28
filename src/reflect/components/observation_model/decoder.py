@@ -36,11 +36,23 @@ class ConvDecoder(nn.Module):
 
         self.convtranspose = nn.Sequential(*layers)
 
+    # TODO: This is for the RSSM world model, once testing is done
+    # Need to refactor to have a single forward method
+
+    # def forward(self, features):
+    #     b, t, *_ = features.shape
+    #     features = features.reshape(-1, self.input_size)
+    #     out = self.dense(features)
+    #     out = torch.reshape(out, [-1, 32*self.depth, 1, 1])
+    #     out = self.convtranspose(out)
+    #     out = torch.reshape(out, (b, t, *self.output_shape))
+    #     return self.ouput_act(out) * 0.5
+
     def forward(self, features):
-        b, t, *_ = features.shape
+        b, *_ = features.shape
         features = features.reshape(-1, self.input_size)
         out = self.dense(features)
         out = torch.reshape(out, [-1, 32*self.depth, 1, 1])
         out = self.convtranspose(out)
-        out = torch.reshape(out, (b, t, *self.output_shape))
+        out = torch.reshape(out, (b, *self.output_shape))
         return self.ouput_act(out) * 0.5
