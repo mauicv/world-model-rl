@@ -35,8 +35,10 @@ class Environment():
         )
         device = next(self.world_model.parameters()).device
         o, r, d = o.to(device), r.to(device), d.to(device)
+        b, t, *_ = o.shape
         self.world_model.eval()
-        self.states = self.world_model.encode(o)
+        z_sample, _ = self.world_model.encode(o)
+        self.states = z_sample.detach().reshape(b, t, -1)
         self.world_model.train()
         self.actions = torch.zeros(batch_size, 0, a.shape[-1], device=device)
         self.rewards = r

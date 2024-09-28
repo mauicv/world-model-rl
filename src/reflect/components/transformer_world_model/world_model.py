@@ -1,7 +1,11 @@
 from typing import Optional
 from dataclasses import dataclass
-
 from reflect.components.observation_model import ObservationalModel
+from reflect.components.observation_model.encoder import ConvEncoder
+from reflect.components.observation_model.decoder import ConvDecoder
+from itertools import chain
+from reflect.components.base import Base
+
 from pytfex.transformer.gpt import GPT
 import torch
 from reflect.utils import (
@@ -33,10 +37,19 @@ class WorldModelTrainingParams:
     done_coeff: float = 1.0
 
 
-class WorldModel(torch.nn.Module):
+class WorldModel(Base):
+    model_list = [
+        'encoder',
+        'decoder',
+        'dynamic_model',
+        'observation_model_opt',
+        'dynamic_model_opt'
+    ]
     def __init__(
             self,
-            observation_model: ObservationalModel,
+            # observation_model: ObservationalModel,
+            encoder: ConvEncoder,
+            decoder: ConvDecoder,
             dynamic_model: GPT,
             num_ts: int,
             num_cat: int=32,
@@ -47,14 +60,16 @@ class WorldModel(torch.nn.Module):
         if params is None:
             params = WorldModelTrainingParams()
         self.params = params
-        self.observation_model = observation_model
+        self.encoder = encoder
+        self.decoder = decoder
         self.dynamic_model = dynamic_model
         self.num_ts = num_ts
         self.num_cat = num_cat
         self.num_latent = num_latent
         self.mask = get_causal_mask(self.num_ts * 3)
+        observation_parameters = chain(encoder.parameters(), decoder.parameters())
         self.observation_model_opt = AdamOptim(
-            self.observation_model.parameters(),
+            observation_parameters,
             lr=0.0001,
             eps=1e-5,
             grad_clip=100
@@ -66,17 +81,6 @@ class WorldModel(torch.nn.Module):
             grad_clip=100
         )
 
-    def encode(self, image):
-        b, t, c, h, w = image.shape
-        image = image.reshape(b * t, c, h, w)
-        z = self.observation_model.encode(image)
-        return z.reshape(b, t, -1)
-
-    def decode(self, z):
-        b, t, _ = z.shape
-        z = z.reshape(b * t, -1)
-        image = self.observation_model.decode(z)
-        return image.reshape(b, t, *image.shape[1:])
 
     def _step(
             self,
@@ -125,6 +129,18 @@ class WorldModel(torch.nn.Module):
         new_z = torch.cat([z, new_z], dim=1)
         return new_z, new_r, new_d
 
+    def encode(self, image):
+        b, t, c, h, w = image.shape
+        image = image.reshape(b * t, c, h, w)
+        z = self.encoder(image)
+        z_logits = z.reshape(-1, self.num_latent, self.num_cat)
+        z_dist = create_z_dist(z_logits)
+        z_sample = z_dist.rsample()
+        return z_sample, z_logits
+
+    def decode(self, z_sample):
+        return self.decoder(z_sample)
+
     def update_observation_model(
             self,
             o: torch.Tensor,
@@ -134,9 +150,9 @@ class WorldModel(torch.nn.Module):
             params = self.params
 
         self.mask = self.mask.to(o.device)
-        b, t, c, h, w  = o.shape
-        o = o.reshape(b * t, c, h, w)
-        r_o, _, z_logits = self.observation_model(o)
+        z_sample, z_logits = self.encode(o)
+        r_o = self.decode(z_sample)
+
         recon_loss = recon_loss_fn(o, r_o)
         reg_loss = reg_loss_fn(z_logits)
         loss = params.recon_coeff * recon_loss + params.reg_coeff * reg_loss
@@ -158,18 +174,18 @@ class WorldModel(torch.nn.Module):
         ):
         if params is None:
             params = self.params
+        b, t, *_  = o.shape
 
         self.mask = self.mask.to(o.device)
-        b, t, c, h, w  = o.shape
-        o = o.reshape(b * t, c, h, w)
+        z, z_logits = self.encode(o)
+        r_o = self.decode(z)
+        t_o = o.reshape(-1, *o.shape[2:])
 
         # Observational Model
-        r_o, z, z_logits = self.observation_model(o)
-        recon_loss = recon_loss_fn(o, r_o)
+        recon_loss = recon_loss_fn(t_o, r_o)
         reg_loss = reg_loss_fn(z_logits)
 
         # Dynamic Models
-        z = z.detach()
         _, num_z, num_c = z_logits.shape
         z = z.detach().reshape(b, t, -1)
         _, num_z, num_c = z_logits.shape
@@ -222,48 +238,3 @@ class WorldModel(torch.nn.Module):
             'reward_loss': reward_loss.detach().cpu().item(),
             'done_loss': done_loss.detach().cpu().item(),
         }
-
-    def load(
-            self,
-            path,
-            name="world-model-checkpoint.pth",
-            targets=None
-        ):
-        device = next(self.parameters()).device
-        checkpoint = torch.load(
-            f'{path}/{name}',
-            map_location=torch.device(device)
-        )
-        if targets is None:
-            targets = [
-                'observation_model',
-                'dynamic_model',
-                'observation_model_opt',
-                'dynamic_model_opt'
-            ]
-        
-        for target in targets:
-            print(f'Loading {target}...')
-            getattr(self, target).load_state_dict(
-                checkpoint[target]
-            )
-
-    def save(
-            self,
-            path,
-            name="world-model-checkpoint.pth",
-            targets=None
-        ):
-        if targets is None:
-            targets = [
-                'observation_model',
-                'dynamic_model',
-                'observation_model_opt',
-                'dynamic_model_opt'
-            ]
-        
-        checkpoint = {
-            target: getattr(self, target).state_dict()
-            for target in targets
-        }
-        torch.save(checkpoint, f'{path}/{name}')
