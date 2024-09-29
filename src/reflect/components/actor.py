@@ -29,11 +29,13 @@ class Actor(torch.nn.Module):
             torch.nn.Linear(
                 self.input_dim, hidden_dim
             ),
+            torch.nn.LayerNorm(hidden_dim),
             torch.nn.ELU()
         ])
         for _ in range(num_layers - 1):
             layers.extend([
                 torch.nn.Linear(hidden_dim, hidden_dim),
+                torch.nn.LayerNorm(hidden_dim),
                 torch.nn.ELU()
             ])
 
