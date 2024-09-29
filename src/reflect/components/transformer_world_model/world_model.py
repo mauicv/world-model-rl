@@ -1,12 +1,11 @@
 from typing import Optional
 from dataclasses import dataclass
-from reflect.components.observation_model import ObservationalModel
 from reflect.components.observation_model.encoder import ConvEncoder
 from reflect.components.observation_model.decoder import ConvDecoder
+from reflect.components.transformer_world_model.backend.pytfex import PytfexTransformer
 from itertools import chain
 from reflect.components.base import Base
 
-from pytfex.transformer.gpt import GPT
 import torch
 from reflect.utils import (
     recon_loss_fn,
@@ -16,15 +15,8 @@ from reflect.utils import (
     AdamOptim,
     create_z_dist
 )
-import torch.distributions as D
 
 done_loss_fn = torch.nn.BCELoss()
-
-
-def get_causal_mask(l):
-    mask = torch.tril(torch.ones(l, l))
-    masked_indices = mask[None, None, :l, :l] == 0
-    return masked_indices
 
 
 @dataclass
@@ -47,10 +39,9 @@ class WorldModel(Base):
     ]
     def __init__(
             self,
-            # observation_model: ObservationalModel,
             encoder: ConvEncoder,
             decoder: ConvDecoder,
-            dynamic_model: GPT,
+            dynamic_model: PytfexTransformer,
             num_ts: int,
             num_cat: int=32,
             num_latent: int=32,
@@ -66,7 +57,6 @@ class WorldModel(Base):
         self.num_ts = num_ts
         self.num_cat = num_cat
         self.num_latent = num_latent
-        self.mask = get_causal_mask(self.num_ts * 3)
         observation_parameters = chain(encoder.parameters(), decoder.parameters())
         self.observation_model_opt = AdamOptim(
             observation_parameters,
@@ -81,54 +71,6 @@ class WorldModel(Base):
             grad_clip=100
         )
 
-
-    def _step(
-            self,
-            z: torch.Tensor,
-            a: torch.Tensor,
-            r: torch.Tensor,
-            d: torch.Tensor,
-        ):
-        z_dist, new_r, new_d = self.dynamic_model((
-            z[:, -self.num_ts:],
-            a[:, -self.num_ts:],
-            r[:, -self.num_ts:]
-        ))
-
-        new_r = new_r[:, -1].reshape(-1, 1, 1)
-        r = torch.cat([r, new_r], dim=1)
-
-        new_d = new_d[:, -1].reshape(-1, 1, 1)
-        d = torch.cat([d, new_d], dim=1)
-
-        return z_dist, r, d
-
-    def step(
-            self,
-            z: torch.Tensor,
-            a: torch.Tensor,
-            r: torch.Tensor,
-            d: torch.Tensor,
-        ):
-        z_dist, new_r, new_d = self._step(z, a, r, d)
-        new_z = z_dist.sample()
-        new_z = new_z[:, -1].reshape(-1, 1, self.num_cat * self.num_latent)
-        new_z = torch.cat([z, new_z], dim=1)
-        return new_z, new_r, new_d
-
-    def rstep(
-            self,
-            z: torch.Tensor,
-            a: torch.Tensor,
-            r: torch.Tensor,
-            d: torch.Tensor,
-        ):
-        z_dist, new_r, new_d = self._step(z, a, r, d)
-        new_z = z_dist.rsample()
-        new_z = new_z[:, -1].reshape(-1, 1, self.num_cat * self.num_latent)
-        new_z = torch.cat([z, new_z], dim=1)
-        return new_z, new_r, new_d
-
     def encode(self, image):
         b, t, c, h, w = image.shape
         image = image.reshape(b * t, c, h, w)
@@ -140,29 +82,6 @@ class WorldModel(Base):
 
     def decode(self, z_sample):
         return self.decoder(z_sample)
-
-    def update_observation_model(
-            self,
-            o: torch.Tensor,
-            params: Optional[WorldModelTrainingParams] = None,
-        ):
-        if params is None:
-            params = self.params
-
-        self.mask = self.mask.to(o.device)
-        z_sample, z_logits = self.encode(o)
-        r_o = self.decode(z_sample)
-
-        recon_loss = recon_loss_fn(o, r_o)
-        reg_loss = reg_loss_fn(z_logits)
-        loss = params.recon_coeff * recon_loss + params.reg_coeff * reg_loss
-        self.observation_model_opt.backward(loss, retain_graph=False)
-        self.observation_model_opt.update_parameters()
-
-        return {
-            'recon_loss': recon_loss.detach().cpu().item(),
-            'reg_loss': reg_loss.detach().cpu().item(),
-        }
 
     def update(
             self,
@@ -176,7 +95,6 @@ class WorldModel(Base):
             params = self.params
         b, t, *_  = o.shape
 
-        self.mask = self.mask.to(o.device)
         z, z_logits = self.encode(o)
         r_o = self.decode(z)
         t_o = o.reshape(-1, *o.shape[2:])
@@ -203,8 +121,7 @@ class WorldModel(Base):
         )
 
         z_pred, r_pred, d_pred = self.dynamic_model(
-            (z_inputs, a_inputs, r_inputs),
-            mask=self.mask
+            z_inputs, a_inputs, r_inputs,
         )
         dynamic_loss = cross_entropy_loss_fn(z_pred, next_z_dist)
         reward_loss = reward_loss_fn(r_targets, r_pred)
