@@ -1,7 +1,4 @@
 import torch
-import torch.nn.functional as F
-WEIGHTS_FINAL_INIT = 3e-1
-BIAS_FINAL_INIT = 3e-2
 
 
 class ValueCritic(torch.nn.Module):
@@ -27,17 +24,6 @@ class ValueCritic(torch.nn.Module):
         final_layer = torch.nn.Linear(hidden_dim, 1)
         layers.append(final_layer)
         self.layers = torch.nn.Sequential(*layers)
-
-        torch.nn.init.uniform_(
-            final_layer.weight,
-            -WEIGHTS_FINAL_INIT,
-            WEIGHTS_FINAL_INIT
-        )
-        torch.nn.init.uniform_(
-            final_layer.bias,
-            -BIAS_FINAL_INIT,
-            BIAS_FINAL_INIT
-        )
 
     def forward(self, x):
         return self.layers(x)
