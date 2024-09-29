@@ -27,7 +27,6 @@ def test_environment_step_filter(env_name, encoder, decoder):
         encoder=encoder,
         decoder=decoder,
         dynamic_model=dm,
-        num_ts=16,
     )
 
     dl = EnvDataLoader(
@@ -90,7 +89,6 @@ def test_environment_step(env_name, encoder, decoder):
         encoder=encoder, 
         decoder=decoder,
         dynamic_model=dm,
-        num_ts=16,
     )
 
     dl = EnvDataLoader(

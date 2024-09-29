@@ -42,7 +42,6 @@ class WorldModel(Base):
             encoder: ConvEncoder,
             decoder: ConvDecoder,
             dynamic_model: PytfexTransformer,
-            num_ts: int,
             num_cat: int=32,
             num_latent: int=32,
             params: Optional[WorldModelTrainingParams] = None,
@@ -54,7 +53,6 @@ class WorldModel(Base):
         self.encoder = encoder
         self.decoder = decoder
         self.dynamic_model = dynamic_model
-        self.num_ts = num_ts
         self.num_cat = num_cat
         self.num_latent = num_latent
         observation_parameters = chain(encoder.parameters(), decoder.parameters())

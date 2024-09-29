@@ -12,7 +12,6 @@ def test_world_model(timesteps, observation_model, dynamic_model_8d_action):
     wm = WorldModel(
         observation_model=observation_model,
         dynamic_model=dm,
-        num_ts=16,
     )
 
     o = torch.zeros((2, timesteps, 3, 64, 64))
@@ -36,7 +35,6 @@ def test_world_model(timesteps, encoder, decoder, dynamic_model_8d_action):
         encoder=encoder, 
         decoder=decoder,
         dynamic_model=dm,
-        num_ts=16,
     )
 
     o = torch.zeros((2, timesteps+1, 3, 64, 64))
@@ -58,7 +56,6 @@ def test_save_load(tmp_path, encoder, decoder, dynamic_model_8d_action):
         encoder=encoder,
         decoder=decoder,
         dynamic_model=dm,
-        num_ts=16,
     )    
 
     wm.save(tmp_path)
