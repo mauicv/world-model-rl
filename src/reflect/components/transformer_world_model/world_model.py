@@ -3,8 +3,10 @@ from dataclasses import dataclass
 from reflect.components.observation_model.encoder import ConvEncoder
 from reflect.components.observation_model.decoder import ConvDecoder
 from reflect.components.transformer_world_model.backend.pytfex import PytfexTransformer
+from reflect.components.actor import Actor
 from itertools import chain
 from reflect.components.base import Base
+from reflect.utils import FreezeParameters
 
 import torch
 from reflect.utils import (
@@ -100,6 +102,7 @@ class WorldModel(Base):
             r: torch.Tensor,
             d: torch.Tensor,
             params: Optional[WorldModelTrainingParams] = None,
+            return_init_states: bool=False
         ):
         if params is None:
             params = self.params
@@ -156,8 +159,7 @@ class WorldModel(Base):
         observation_grad_norm = self.observation_model_opt.backward(obs_loss, retain_graph=False)
         self.dynamic_model_opt.update_parameters()
         self.observation_model_opt.update_parameters()
-
-        return WorldModelLosses(
+        losses = WorldModelLosses(
             recon_loss=recon_loss.detach().cpu().item(),
             reg_loss= reg_loss.detach().cpu().item(),
             consistency_loss= consistency_loss.detach().cpu().item(),
@@ -167,3 +169,40 @@ class WorldModel(Base):
             dynamic_grad_norm=dynamic_grad_norm.cpu().item(),
             observation_grad_norm=observation_grad_norm.cpu().item(),
         )
+        if return_init_states:
+            return losses, self.flatten_batch_time(z=z, a=a, r=r, d=d)
+        return losses
+
+    def flatten_batch_time(self, z, a, r, d):
+        b, t, *_ = z.shape
+        z = z.detach().reshape(b * t, 1, -1)
+        a = a.detach().reshape(b * t, 1, -1)
+        r = r.detach().reshape(b * t, 1, -1)
+        d = d.detach().reshape(b * t, 1, -1)
+        return z, a, r, d
+
+    def imagine_rollout(
+            self,
+            z: torch.Tensor,
+            a: torch.Tensor,
+            r: torch.Tensor,
+            d: torch.Tensor,
+            actor: Actor,
+            num_timesteps: int=25,
+            with_observations: bool=False
+        ):
+        
+        with FreezeParameters([self.dynamic_model, self.decoder]):
+            for _ in range(num_timesteps):
+                new_z, new_r, new_d = self \
+                    .dynamic_model.rstep(z=z, a=a, r=r, d=d)
+                action = actor(new_z[:, -1, :], deterministic=True)
+                new_a = torch.cat((a, action[:, None, :]), dim=1)
+                z, a, r, d = new_z, new_a, new_r, new_d
+            if with_observations:
+                b, t, *_ = z.shape
+                o = self.decode(z.reshape(b*t, -1))
+                o = o.reshape(b, t, *o.shape[1:])
+                return z, a, r, d, o
+            return z, a, r, d
+

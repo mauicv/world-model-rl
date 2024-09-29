@@ -40,12 +40,13 @@ def decoder():
 @pytest.fixture
 def actor():
     return Actor(
-        input_dim=64,
-        output_dim=1,
+        input_dim=1024,
+        output_dim=8,
         bound=1,
         num_layers=3,
         hidden_dim=512,
     )
+
 
 @pytest.fixture
 def world_model(continuous_rssm, encoder, decoder, done_model, reward_model):
