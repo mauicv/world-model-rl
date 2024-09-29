@@ -196,7 +196,7 @@ class WorldModel(Base):
             for _ in range(num_timesteps):
                 new_z, new_r, new_d = self \
                     .dynamic_model.rstep(z=z, a=a, r=r, d=d)
-                action = actor(new_z[:, -1, :], deterministic=True)
+                action = actor(new_z[:, -1, :].detach(), deterministic=True)
                 new_a = torch.cat((a, action[:, None, :]), dim=1)
                 z, a, r, d = new_z, new_a, new_r, new_d
             if with_observations:
