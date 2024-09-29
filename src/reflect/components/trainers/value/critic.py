@@ -14,11 +14,13 @@ class ValueCritic(torch.nn.Module):
         layers = []
         layers.extend([
             torch.nn.Linear(self.state_dim, hidden_dim),
+            torch.nn.LayerNorm(hidden_dim),
             torch.nn.ReLU()
         ])
         for _ in range(num_layers - 1):
             layers.extend([
                 torch.nn.Linear(hidden_dim, hidden_dim),
+                torch.nn.LayerNorm(hidden_dim),
                 torch.nn.ReLU()
             ])
 
