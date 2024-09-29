@@ -2,6 +2,7 @@ from reflect.components.transformer_world_model import WorldModel
 from reflect.components.transformer_world_model.embedder import Embedder as Embedder
 from reflect.components.transformer_world_model.head import Head as Head
 import gymnasium as gym
+from dataclasses import asdict
 import torch
 import pytest
 
@@ -47,7 +48,7 @@ def test_world_model(timesteps, encoder, decoder, dynamic_model_8d_action):
     for key in ['recon_loss', 'reg_loss',
                 'consistency_loss', 'dynamic_loss',
                 'reward_loss', 'done_loss']:
-        assert key in results
+        assert key in asdict(results)
 
 
 def test_save_load(tmp_path, encoder, decoder, dynamic_model_8d_action):

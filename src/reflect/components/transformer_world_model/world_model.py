@@ -29,6 +29,18 @@ class WorldModelTrainingParams:
     done_coeff: float = 1.0
 
 
+@dataclass
+class WorldModelLosses:
+    recon_loss: float
+    reg_loss: float
+    consistency_loss: float
+    dynamic_loss: float
+    reward_loss: float
+    done_loss: float
+    dynamic_grad_norm: float
+    observation_grad_norm: float
+
+
 class WorldModel(Base):
     model_list = [
         'encoder',
@@ -140,16 +152,18 @@ class WorldModel(Base):
             + params.consistency_coeff * consistency_loss
         )
 
-        self.dynamic_model_opt.backward(dyn_loss, retain_graph=False)
-        self.observation_model_opt.backward(obs_loss, retain_graph=False)
+        dynamic_grad_norm = self.dynamic_model_opt.backward(dyn_loss, retain_graph=False)
+        observation_grad_norm = self.observation_model_opt.backward(obs_loss, retain_graph=False)
         self.dynamic_model_opt.update_parameters()
         self.observation_model_opt.update_parameters()
 
-        return {
-            'recon_loss': recon_loss.detach().cpu().item(),
-            'reg_loss': reg_loss.detach().cpu().item(),
-            'consistency_loss': consistency_loss.detach().cpu().item(),
-            'dynamic_loss': dynamic_loss.detach().cpu().item(),
-            'reward_loss': reward_loss.detach().cpu().item(),
-            'done_loss': done_loss.detach().cpu().item(),
-        }
+        return WorldModelLosses(
+            recon_loss=recon_loss.detach().cpu().item(),
+            reg_loss= reg_loss.detach().cpu().item(),
+            consistency_loss= consistency_loss.detach().cpu().item(),
+            dynamic_loss= dynamic_loss.detach().cpu().item(),
+            reward_loss= reward_loss.detach().cpu().item(),
+            done_loss= done_loss.detach().cpu().item(),
+            dynamic_grad_norm=dynamic_grad_norm.cpu().item(),
+            observation_grad_norm=observation_grad_norm.cpu().item(),
+        )
