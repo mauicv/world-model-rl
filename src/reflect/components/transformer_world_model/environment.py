@@ -76,7 +76,7 @@ class Environment():
         assert action.shape[0] == self.actions[self.not_done].shape[0], \
             "Some states are done, but actions are being passed for them."
         self.actions = torch.cat([self.actions[self.not_done], action], dim=1)
-        z, r, d = self.world_model.step(
+        z, r, d = self.world_model.dynamic_model.step(
             z=self.states[self.not_done],
             a=self.actions,
             r=self.rewards[self.not_done],
@@ -102,7 +102,7 @@ class Environment():
         assert action.shape[0] == self.actions.shape[0], \
             "States and actions have different batch sizes."
         self.actions = torch.cat([self.actions, action], dim=1)
-        z, r, d = self.world_model.rstep(
+        z, r, d = self.world_model.dynamic_model.rstep(
             z=self.states,
             a=self.actions,
             r=self.rewards,
