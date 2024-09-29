@@ -1,8 +1,6 @@
 import torch
 import torch.distributions as D
 from reflect.utils import FreezeParameters
-WEIGHTS_FINAL_INIT = 3e-1
-BIAS_FINAL_INIT = 3e-2
 
 
 class Actor(torch.nn.Module):
@@ -42,27 +40,6 @@ class Actor(torch.nn.Module):
         self.layers = torch.nn.Sequential(*layers)
         self.mu = torch.nn.Linear(hidden_dim, self.output_dim)
         self.stddev = torch.nn.Linear(hidden_dim, self.output_dim)
-        torch.nn.init.uniform_(
-            self.stddev.weight,
-            -WEIGHTS_FINAL_INIT,
-            WEIGHTS_FINAL_INIT
-        )
-        torch.nn.init.uniform_(
-            self.stddev.bias,
-            -BIAS_FINAL_INIT,
-            BIAS_FINAL_INIT
-        )
-
-        torch.nn.init.uniform_(
-            self.mu.weight,
-            -WEIGHTS_FINAL_INIT,
-            WEIGHTS_FINAL_INIT
-        )
-        torch.nn.init.uniform_(
-            self.mu.bias,
-            -BIAS_FINAL_INIT,
-            BIAS_FINAL_INIT
-        )
 
     def to(self, *args, **kwargs):
         super().to(*args, **kwargs)

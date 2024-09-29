@@ -27,8 +27,7 @@ class TransformerWorldModelActor:
         obs = obs.to(device)
 
         with FreezeParameters([self.world_model, self.actor]):    
-            b, t, *_ = obs.shape
-            z, z_logits = self.world_model.encode(obs)
+            z, _ = self.world_model.encode(obs)
             z = z.reshape(1, 1, -1)
             return self.actor(z, deterministic=True)
             
