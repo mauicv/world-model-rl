@@ -15,6 +15,8 @@ def test_world_model_reward_trainer(
     o_emb, prior_sequence, posterior_sequence \
         = world_model.observe_rollout(o, a)
 
+    print(o_emb.shape)
+
     losses = world_model.update(
         prior_state_sequence=prior_sequence,
         posterior_state_sequence=posterior_sequence,

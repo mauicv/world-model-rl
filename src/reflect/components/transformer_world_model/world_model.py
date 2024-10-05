@@ -109,16 +109,18 @@ class WorldModel(Base):
         b, t, *_  = o.shape
 
         z, z_logits = self.encode(o)
+        z = z.reshape(b, t, -1)
         r_o = self.decode(z)
-        t_o = o.reshape(-1, *o.shape[2:])
 
         # Observational Model
+        t_o = o.reshape(-1, *o.shape[2:])
+        r_o = r_o.reshape(-1, *r_o.shape[2:])
         recon_loss = recon_loss_fn(t_o, r_o)
         reg_loss = reg_loss_fn(z_logits)
 
         # Dynamic Models
         _, num_z, num_c = z_logits.shape
-        z = z.detach().reshape(b, t, -1)
+        z = z.detach()
         _, num_z, num_c = z_logits.shape
         z_logits = z_logits.reshape(b, t, num_z, num_c)
         r_targets = r[:, 1:].detach()
