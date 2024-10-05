@@ -1,4 +1,4 @@
-from reflect.components.actor import Actor
+from reflect.components.models.actor import Actor
 from reflect.components.rssm_world_model.world_model import WorldModel
 from reflect.utils import FreezeParameters
 import torch

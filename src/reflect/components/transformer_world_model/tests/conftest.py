@@ -1,16 +1,13 @@
 import pytest
 import gymnasium as gym
-from reflect.components.transformer_world_model.head import Head
-from reflect.components.transformer_world_model.embedder import Embedder
-from reflect.components.transformer_world_model.backend.pytfex import PytfexTransformer
+from reflect.components.transformer_world_model.transformer import PytfexTransformer
 from reflect.data.loader import EnvDataLoader
 
-from reflect.components.observation_model.encoder import ConvEncoder
-from reflect.components.observation_model.decoder import ConvDecoder
+from reflect.components.models import ConvEncoder, ConvDecoder
 from reflect.components.rssm_world_model.models import DenseModel
 from reflect.components.rssm_world_model.world_model import WorldModel
 from reflect.components.rssm_world_model.memory_actor import WorldModelActor
-from reflect.components.actor import Actor
+from reflect.components.models.actor import Actor
 from reflect.components.trainers.reward.reward_trainer import RewardGradTrainer
 from reflect.components.trainers.value.value_trainer import ValueGradTrainer
 from reflect.components.trainers.value.critic import ValueCritic
@@ -45,27 +42,6 @@ def actor():
         bound=1,
         num_layers=3,
         hidden_dim=512,
-    )
-
-
-@pytest.fixture
-def world_model(continuous_rssm, encoder, decoder, done_model, reward_model):
-    return WorldModel(
-        encoder=encoder,
-        decoder=decoder,
-        dynamic_model=continuous_rssm,
-        done_model=done_model,
-        reward_model=reward_model
-    )
-
-@pytest.fixture
-def discrete_world_model(discrete_rssm, encoder, decoder, done_model, reward_model):
-    return WorldModel(
-        encoder=encoder,
-        decoder=decoder,
-        dynamic_model=discrete_rssm,
-        done_model=done_model,
-        reward_model=reward_model
     )
 
 @pytest.fixture
