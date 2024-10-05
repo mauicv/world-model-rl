@@ -1,6 +1,6 @@
 import gymnasium as gym
 from reflect.components.trainers.value.value_trainer import ValueGradTrainer
-from reflect.components.actor import Actor
+from reflect.components.models.actor import Actor
 from reflect.components.trainers.value.critic import ValueCritic
 from conftest import make_dynamic_model
 from reflect.data.loader import EnvDataLoader

@@ -1,5 +1,5 @@
 import pytest
-from reflect.components.actor import Actor
+from reflect.components.models.actor import Actor
 import gymnasium as gym
 import torch
 
