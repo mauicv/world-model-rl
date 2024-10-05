@@ -29,6 +29,32 @@ class ConvEncoder(nn.Module):
     # TODO: This is for the RSSM world model, once testing is done
     # Need to refactor to have a single forward method
 
+    def forward_batch(self, inputs: torch.Tensor):
+        b, c, h, w = inputs.shape
+        assert (c, h, w) == self.input_shape
+        embed = self.conv_block(inputs)
+        embed = embed.reshape(b, -1)
+        if self.embed_size is not None:
+            embed = self.fc(embed)
+            embed = self.act_fn(embed)
+        return embed
+
+    def forward_batch_time(self, inputs: torch.Tensor):
+        b, t, c, h, w = inputs.shape
+        assert (c, h, w) == self.input_shape
+        reshaped = inputs.reshape(b * t, c, h, w)
+        embed = self.conv_block(reshaped)
+        embed = embed.reshape(b, t, -1)
+        if self.embed_size is not None:
+            embed = self.fc(embed)
+            embed = self.act_fn(embed)
+        return embed
+
+    def forward(self, inputs: torch.Tensor):
+        if len(inputs.shape) == 4:
+            return self.forward_batch(inputs=inputs)
+        return self.forward_batch_time(inputs=inputs)
+
     # def forward(self, inputs: torch.Tensor):
     #     b, t, c, h, w = inputs.shape
     #     assert (c, h, w) == self.input_shape
@@ -40,12 +66,12 @@ class ConvEncoder(nn.Module):
     #         embed = self.act_fn(embed)
     #     return embed
 
-    def forward(self, inputs: torch.Tensor):
-        b, c, h, w = inputs.shape
-        assert (c, h, w) == self.input_shape
-        embed = self.conv_block(inputs)
-        embed = embed.reshape(b, -1)
-        if self.embed_size is not None:
-            embed = self.fc(embed)
-            embed = self.act_fn(embed)
-        return embed
+    # def forward(self, inputs: torch.Tensor):
+    #     b, c, h, w = inputs.shape
+    #     assert (c, h, w) == self.input_shape
+    #     embed = self.conv_block(inputs)
+    #     embed = embed.reshape(b, -1)
+    #     if self.embed_size is not None:
+    #         embed = self.fc(embed)
+    #         embed = self.act_fn(embed)
+    #     return embed
