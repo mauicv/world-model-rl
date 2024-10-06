@@ -12,12 +12,11 @@ import torch
 import pytest
 
 
-@pytest.mark.skip(reason="Breaking changes, need to update tests")
 @pytest.mark.parametrize("env_name", [
     "InvertedPendulum-v4",
     "Ant-v4",
 ])
-def test_environment_step_filter(env_name, observation_model):
+def test_environment_step_filter(env_name, encoder, decoder):
     batch_size=10
     real_env = gym.make(env_name, render_mode="rgb_array")
     action_size = real_env.action_space.shape[0]
@@ -25,9 +24,9 @@ def test_environment_step_filter(env_name, observation_model):
     dm = make_dynamic_model(a_size=action_size)
 
     wm = WorldModel(
-        observation_model=observation_model,
+        encoder=encoder,
+        decoder=decoder,
         dynamic_model=dm,
-        num_ts=16,
     )
 
     dl = EnvDataLoader(
@@ -36,7 +35,7 @@ def test_environment_step_filter(env_name, observation_model):
         transforms=Compose([
             Resize((64, 64))
         ]),
-        observation_model=observation_model,
+        # observation_model=observation_model,
         env=real_env
     )
 
@@ -75,12 +74,11 @@ def test_environment_step_filter(env_name, observation_model):
         cur_batch_size = num_not_done
 
 
-@pytest.mark.skip(reason="Breaking changes, need to update tests")
 @pytest.mark.parametrize("env_name", [
     "InvertedPendulum-v4",
     "Ant-v4",
 ])
-def test_environment_step(env_name, observation_model):
+def test_environment_step(env_name, encoder, decoder):
     batch_size=10
     real_env = gym.make(env_name, render_mode="rgb_array")
     action_size = real_env.action_space.shape[0]
@@ -88,9 +86,9 @@ def test_environment_step(env_name, observation_model):
     dm = make_dynamic_model(a_size=action_size)
 
     wm = WorldModel(
-        observation_model=observation_model,
+        encoder=encoder, 
+        decoder=decoder,
         dynamic_model=dm,
-        num_ts=16,
     )
 
     dl = EnvDataLoader(
@@ -99,7 +97,7 @@ def test_environment_step(env_name, observation_model):
         transforms=Compose([
             Resize((64, 64))
         ]),
-        observation_model=observation_model,
+        # observation_model=observation_model,
         env=real_env
     )
 

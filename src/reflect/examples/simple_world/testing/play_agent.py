@@ -1,6 +1,6 @@
 from reflect.data.simple_rl_env import SimpleRLEnvironment
 from reflect.components.trainers.reward.reward_trainer import RewardGradTrainer
-from reflect.components.actor import Actor
+from reflect.components.models.actor import Actor
 from reflect.data.loader import EnvDataLoader
 from reflect.components.transformer_world_model.environment import Environment
 from reflect.components.transformer_world_model import WorldModel

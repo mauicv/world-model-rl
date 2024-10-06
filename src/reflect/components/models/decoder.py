@@ -36,7 +36,16 @@ class ConvDecoder(nn.Module):
 
         self.convtranspose = nn.Sequential(*layers)
 
-    def forward(self, features):
+    def forward_batch(self, features):
+        b, *_ = features.shape
+        features = features.reshape(-1, self.input_size)
+        out = self.dense(features)
+        out = torch.reshape(out, [-1, 32*self.depth, 1, 1])
+        out = self.convtranspose(out)
+        out = torch.reshape(out, (b, *self.output_shape))
+        return self.ouput_act(out) * 0.5
+
+    def forward_batch_time(self, features):
         b, t, *_ = features.shape
         features = features.reshape(-1, self.input_size)
         out = self.dense(features)
@@ -44,3 +53,8 @@ class ConvDecoder(nn.Module):
         out = self.convtranspose(out)
         out = torch.reshape(out, (b, t, *self.output_shape))
         return self.ouput_act(out) * 0.5
+
+    def forward(self, features):
+        if len(features.shape) == 3:
+            return self.forward_batch_time(features=features)
+        return self.forward_batch(features=features)

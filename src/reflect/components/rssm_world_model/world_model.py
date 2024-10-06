@@ -9,8 +9,8 @@ from reflect.components.rssm_world_model.rssm import (
     InternalStateDiscreteSequence
 )
 from reflect.components.rssm_world_model.models import DenseModel
-from reflect.components.actor import Actor
-from reflect.components.observation_model import ConvEncoder, ConvDecoder
+from reflect.components.models.actor import Actor
+from reflect.components.models import ConvEncoder, ConvDecoder
 import torch.distributions as D
 import torch.nn.functional as F
 import torch
