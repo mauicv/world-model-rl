@@ -1,7 +1,5 @@
 import pytest
 import gymnasium as gym
-from reflect.components.observation_model.observation_model import ObservationalModel
-from reflect.components.observation_model.latent_spaces import DiscreteLatentSpace
 from pytfex.transformer.gpt import GPT
 from pytfex.transformer.layer import TransformerLayer
 from pytfex.transformer.mlp import MLP
@@ -10,13 +8,12 @@ from reflect.components.transformer_world_model.head import Head
 from reflect.components.transformer_world_model.embedder import Embedder
 from reflect.data.loader import EnvDataLoader
 
-from reflect.components.observation_model.encoder import ConvEncoder
-from reflect.components.observation_model.decoder import ConvDecoder
+from reflect.components.models import ConvEncoder, ConvDecoder
 from reflect.components.rssm_world_model.models import DenseModel
 from reflect.components.rssm_world_model.rssm import ContinuousRSSM, DiscreteRSSM
 from reflect.components.rssm_world_model.world_model import WorldModel
 from reflect.components.rssm_world_model.memory_actor import WorldModelActor
-from reflect.components.actor import Actor
+from reflect.components.models.actor import Actor
 from reflect.components.trainers.reward.reward_trainer import RewardGradTrainer
 from reflect.components.trainers.value.value_trainer import ValueGradTrainer
 from reflect.components.trainers.value.critic import ValueCritic
@@ -24,33 +21,6 @@ from reflect.components.trainers.value.critic import ValueCritic
 import torch
 from torchvision.transforms import Resize, Compose
 
-@pytest.fixture
-def observation_model():
-    encoder = ConvEncoder(
-        input_shape=(3, 64, 64),
-        embed_size=1024,
-        activation=torch.nn.ReLU(),
-        depth=32
-    )
-
-    decoder = ConvDecoder(
-        output_shape=(3, 64, 64),
-        input_size=1024,
-        activation=torch.nn.ReLU(),
-        depth=32
-    )
-
-    latent_space = DiscreteLatentSpace(
-        num_classes=32,
-        num_latent=32,
-        input_shape=(1024, 4, 4),
-    )
-
-    return ObservationalModel(
-        encoder=encoder,
-        decoder=decoder,
-        latent_space=latent_space,
-    )
 
 @pytest.fixture
 def encoder():
@@ -178,55 +148,3 @@ def world_model_actor(world_model, actor):
         actor=actor,
         world_model=world_model
     )
-
-@pytest.fixture
-def dynamic_model_1d_action():
-    return make_dynamic_model(1)
-
-
-@pytest.fixture
-def dynamic_model_8d_action():
-    return make_dynamic_model(8)
-
-
-def make_dynamic_model(a_size):
-    hdn_dim=32
-    num_heads=8
-    latent_dim=32
-    num_cat=32
-    t_dim=48
-    input_dim=1024
-    layers=2
-    dropout=0.05
-
-    dynamic_model = GPT(
-        dropout=dropout,
-        hidden_dim=hdn_dim,
-        num_heads=num_heads,
-        embedder=Embedder(
-            z_dim=input_dim,
-            a_size=a_size,
-            hidden_dim=hdn_dim
-        ),
-        head=Head(
-            latent_dim=latent_dim,
-            num_cat=num_cat,
-            hidden_dim=hdn_dim
-        ),
-        layers=[
-            TransformerLayer(
-                hidden_dim=hdn_dim,
-                attn=RelativeAttention(
-                    hidden_dim=hdn_dim,
-                    num_heads=num_heads,
-                    num_positions=t_dim,
-                    dropout=dropout
-                ),
-                mlp=MLP(
-                    hidden_dim=hdn_dim,
-                    dropout=dropout
-                )
-            ) for _ in range(layers)
-        ]
-    )
-    return dynamic_model

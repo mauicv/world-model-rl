@@ -1,4 +1,4 @@
-from reflect.components.actor import Actor
+from reflect.components.models.actor import Actor
 from reflect.utils import AdamOptim
 from dataclasses import dataclass
 import torch

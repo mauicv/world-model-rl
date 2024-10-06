@@ -35,8 +35,10 @@ class Environment():
         )
         device = next(self.world_model.parameters()).device
         o, r, d = o.to(device), r.to(device), d.to(device)
+        b, t, *_ = o.shape
         self.world_model.eval()
-        self.states = self.world_model.encode(o)
+        z_sample, _ = self.world_model.encode(o)
+        self.states = z_sample.detach().reshape(b, t, -1)
         self.world_model.train()
         self.actions = torch.zeros(batch_size, 0, a.shape[-1], device=device)
         self.rewards = r
@@ -74,7 +76,7 @@ class Environment():
         assert action.shape[0] == self.actions[self.not_done].shape[0], \
             "Some states are done, but actions are being passed for them."
         self.actions = torch.cat([self.actions[self.not_done], action], dim=1)
-        z, r, d = self.world_model.step(
+        z, r, d = self.world_model.dynamic_model.step(
             z=self.states[self.not_done],
             a=self.actions,
             r=self.rewards[self.not_done],
@@ -100,7 +102,7 @@ class Environment():
         assert action.shape[0] == self.actions.shape[0], \
             "States and actions have different batch sizes."
         self.actions = torch.cat([self.actions, action], dim=1)
-        z, r, d = self.world_model.rstep(
+        z, r, d = self.world_model.dynamic_model.rstep(
             z=self.states,
             a=self.actions,
             r=self.rewards,

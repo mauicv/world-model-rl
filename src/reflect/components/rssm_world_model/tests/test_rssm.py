@@ -5,11 +5,8 @@ from reflect.components.rssm_world_model.rssm import (
     DiscreteRSSM,
     InternalStateDiscrete
 )
-from reflect.components.observation_model import (
-    ConvEncoder,
-    ConvDecoder
-)
-from reflect.components.actor import Actor
+from reflect.components.models import ConvEncoder, ConvDecoder
+from reflect.components.models.actor import Actor
 
 
 def test_continuous_rssm_observe_rollout(

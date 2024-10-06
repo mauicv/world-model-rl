@@ -1,5 +1,3 @@
-from reflect.components.observation_model import ObservationalModel
-from reflect.components.observation_model.latent_spaces import DiscreteLatentSpace
 from pytfex.convolutional.decoder import DecoderLayer, Decoder
 from pytfex.convolutional.encoder import EncoderLayer, Encoder
 from pytfex.transformer.gpt import GPT
@@ -82,16 +80,16 @@ def make_models():
         output_activation=torch.nn.Sigmoid(),
     )
 
-    latent_space = DiscreteLatentSpace(
-        num_latent=latent_dim,
-        num_classes=num_cat,
-        input_shape=(128, 2, 2),
-    )
+    # latent_space = DiscreteLatentSpace(
+    #     num_latent=latent_dim,
+    #     num_classes=num_cat,
+    #     input_shape=(128, 2, 2),
+    # )
 
-    observation_model = ObservationalModel(
-        encoder=encoder,
-        decoder=decoder,
-        latent_space=latent_space,
-    )
+    # observation_model = ObservationalModel(
+    #     encoder=encoder,
+    #     decoder=decoder,
+    #     latent_space=latent_space,
+    # )
 
-    return observation_model, dynamic_model
+    return dynamic_model
