@@ -1,9 +1,7 @@
-# from reflect.models.world_model.observation_model import ObservationalModel
 from reflect.data.loader import EnvDataLoader
 from reflect.components.transformer_world_model import WorldModel
 from reflect.components.transformer_world_model.environment import Environment
-# from reflect.models.world_model import DynamicsModel
-from conftest import make_dynamic_model
+from reflect.components.transformer_world_model.tests.conftest import make_dynamic_model
 from reflect.components.transformer_world_model.embedder import Embedder as Embedder
 from reflect.components.transformer_world_model.head import Head as Head
 from torchvision.transforms import Resize, Compose

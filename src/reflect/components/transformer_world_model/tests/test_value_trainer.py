@@ -2,7 +2,7 @@ import gymnasium as gym
 from reflect.components.trainers.value.value_trainer import ValueGradTrainer
 from reflect.components.models.actor import Actor
 from reflect.components.trainers.value.critic import ValueCritic
-from conftest import make_dynamic_model
+from reflect.components.transformer_world_model.tests.conftest import make_dynamic_model
 from reflect.data.loader import EnvDataLoader
 from reflect.components.transformer_world_model import WorldModel
 from reflect.components.transformer_world_model.environment import Environment
