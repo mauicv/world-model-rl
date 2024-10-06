@@ -1,16 +1,46 @@
 # World Model RL
 
-__Note__: This codebase is a work in progress.
-
-
 This repo contains code to perform reinforcement learning inside learnt world models. My focus is n continuous control tasks. It's based on a number of different papers:
 
 1. [World Models](https://arxiv.org/abs/1803.10122), see also [this blog post](https://worldmodels.github.io/). Introduce the idea of a world model. In particular they use a VAE to learn a latent space of the environment and an RNN to predict the next latent state. They then use a controller to generate actions based on the latent state. The controller is trained using CMA-ES.
 2. [Dream to Control: Learning Behaviors by Latent Imagination](https://arxiv.org/abs/1912.01603). Introduces the idea of training the actor to maximize the reward using the differentiability of the world model reward signal. Also extends this with a further value function for better reward estimation beyond the imagination rollouts.
 3. [Mastering Atari with Discrete World Models](https://arxiv.org/abs/2010.02193). This paper extends the original world models paper to discrete action spaces.
-4. [Transformer-based World Models Are Happy With 100k Interactions](https://arxiv.org/abs/2303.07109). This paper extends the above to use a transformer instead of an RNN.
+4. [Transformer-based World Models Are Happy With 100k Interactions](https://arxiv.org/abs/2303.07109). This paper extends the above to use a transformer instead of an RNN, however it uses actor critic methods to train the agent instead of differntiability of the world model reward signal.
+5. [TransDreamer: Reinforcement Learning with Transformer World Models](https://arxiv.org/abs/2202.09481) This paper also uses a transformer based architecture, albeit a different one to paper number 4. These authors do use the differentiability of the world model reward signal to train the model.
 
-We implement bits and pieces from each. In particular we learn the discrete latent space using a CNN vae. We then learn the dynamics model using a transformer. Both these models are implemented [here](https://github.com/mauicv/transformers). When training the agent we train a value model to predict the rollout state value and then train the actor to maximize the value by directly propagating the gradients through the dynamic and value model.
+## Approach
+
+The general approach taken in most of the above papers is to do three things:
+
+1. Create a representation model that compresses the size of the input states (in our case images). We use a pair of encoder and decoder CNN networks for this. In particular we can choose to either a continuous or discrete latent representation. The benefit of compressing the state into a lower dimensional representation like this is that it makes training the world model less computationally expensive/easier.
+2. Train a world model which takes the latent representation and predicts the next one in a sequence. I've implemented 2 approaches here. The recurrent state space model (RSSM, from papers 1, 2.) and the transformer state space model (TSSM, from papers 4, 5.).
+3. Train an agent inside the world model to take actions that maximize rollout reward. In particular because we have a differentiable world model we can train the agent to do this directly rather than estimating the reward gradients using monte carlo methods. Note that we can obtain a world model rollout and just maximize the rewards directly but doing so means we're limited to the finite time horizon of the rollout. We can also train a value function that estimate the reward beyond this time horizon and doing so facilitates more stable learning.
+
+### RSSM:
+
+The RSSM world model uses a Recurrent neural network as the dynamic model (the model that predicts the next state). A limitation of this approach is that training requires an iteration step over the observed environment rollouts in order to calculate the hidden state at each step. The following example runs are taken from a model with limited training (~400 steps) on a google colab.
+
+![](/Users/alexathorne/development/personal/world-model-rl/assets/rssm-imagined-rollout.gif)
+![](/Users/alexathorne/development/personal/world-model-rl/assets/rssm-real-rollout.gif)
+
+
+### TSSM:
+
+The TSSM world model uses a transformer as the backend. Its implemented [here](https://github.com/mauicv/transformers) and based on [karpathy's nanoGPT](https://github.com/karpathy/nanoGPT). The transformer acts on a sequence of states, rewards and actions. It embeds each as a separate token and and predicts the next state and reward in much the same way such models are applied to language modelling. We use relative positional embeddings introduced by Shaw et al in [Self-Attention with Relative Position Representations](https://arxiv.org/abs/1803.02155v2).
+
+Because the transformer model has no hidden state bottleneck in the same way the RNN does, it can be trained all at once instead of requiring iterating through the real environment rollout. The following are generated and real rollouts from an agent trained via the TSSM world model - again trained in a google collab but for longer.
+
+![](/Users/alexathorne/development/personal/world-model-rl/assets/tssm-imagined-rollout.gif)
+![](/Users/alexathorne/development/personal/world-model-rl/assets/tssm-real-rollout.gif)
+
+
+### Note:
+
+The transformer world model performs worse than the RNN based world model - took about double the amount of time to get to comparable performance. There are a couple of reasons this might be the case.
+
+1. The transformer world model reward target has many more gradients paths through the model than the recurrent model. This potentially leads to instability when training the agent. This is the argument put forward in [Do Transformer World Models Give Better Policy Gradients?](https://arxiv.org/abs/2402.05290) by Ma et al.
+2. The transformer model is a bigger model than the RSSM and the size of the model comes with trade offs - in this case shorter rollouts. The RSSM is trained on longer (15 steps) rollouts than the transformer model is (10 steps).
+
 
 ## Setup
 
@@ -25,16 +55,4 @@ pip install -e .
 ```bash
 source venv/bin/activate
 pytest src
-```
-
-## Examples
-
-### Simple World Model
-
-This implements the full world model and RL loop on a very simple environment made up of a square grid of 16 squares. One of the squares is green and the agent (black square) must navigate to the goal while avoiding the red square. The agent can move up, down, left or right.
-
-To see the options run:
-    
-```bash
-python src/reflect/examples/simple_world/__init__.py --help
 ```
