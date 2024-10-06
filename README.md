@@ -20,8 +20,8 @@ The general approach taken in most of the above papers is to do three things:
 
 The RSSM world model uses a Recurrent neural network as the dynamic model (the model that predicts the next state). A limitation of this approach is that training requires an iteration step over the observed environment rollouts in order to calculate the hidden state at each step. The following example runs are taken from a model with limited training (~400 steps) on a google colab.
 
-![](/Users/alexathorne/development/personal/world-model-rl/assets/rssm-imagined-rollout.gif)
-![](/Users/alexathorne/development/personal/world-model-rl/assets/rssm-real-rollout.gif)
+![](/assets/rssm-imagined-rollout.gif)
+![](/assets/rssm-real-rollout.gif)
 
 
 ### TSSM:
@@ -30,8 +30,8 @@ The TSSM world model uses a transformer as the backend. Its implemented [here](h
 
 Because the transformer model has no hidden state bottleneck in the same way the RNN does, it can be trained all at once instead of requiring iterating through the real environment rollout. The following are generated and real rollouts from an agent trained via the TSSM world model - again trained in a google collab but for longer.
 
-![](/Users/alexathorne/development/personal/world-model-rl/assets/tssm-imagined-rollout.gif)
-![](/Users/alexathorne/development/personal/world-model-rl/assets/tssm-real-rollout.gif)
+![](/assets/tssm-imagined-rollout.gif)
+![](/assets/tssm-real-rollout.gif)
 
 
 ### Note:
