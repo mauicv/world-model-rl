@@ -20,8 +20,8 @@ The general approach taken in most of the above papers is to do three things:
 
 The RSSM world model uses a Recurrent neural network as the dynamic model (the model that predicts the next state). A limitation of this approach is that training requires an iteration step over the observed environment rollouts in order to calculate the hidden state at each step. The following example runs are taken from a model with limited training (~400 steps) on a google colab.
 
-![](/assets/rssm-imagined-rollout.gif)
-![](/assets/rssm-real-rollout.gif)
+![Imagined rollout for the RNN based world model agent](/assets/rssm-imagined-rollout.gif)
+![Real rollout for the RNN based world model agent](/assets/rssm-real-rollout.gif)
 
 
 ### TSSM:
@@ -30,17 +30,29 @@ The TSSM world model uses a transformer as the backend. Its implemented [here](h
 
 Because the transformer model has no hidden state bottleneck in the same way the RNN does, it can be trained all at once instead of requiring iterating through the real environment rollout. The following are generated and real rollouts from an agent trained via the TSSM world model - again trained in a google collab but for longer.
 
-![](/assets/tssm-imagined-rollout.gif)
-![](/assets/tssm-real-rollout.gif)
+![Imagined rollout for the Transformer based world model agent](/assets/tssm-imagined-rollout.gif)
+![Real rollout for the Transformer based world model agent](/assets/tssm-real-rollout.gif)
 
 
 ### Note:
 
-The transformer world model performs worse than the RNN based world model - took about double the amount of time to get to comparable performance. There are a couple of reasons this might be the case.
+The above are not fair comparisons because they are trained for different periods of time - but my experience was that the transformer world model trains slower than the RNN based world model - took about double the amount of time to get to comparable performance. There are a couple of reasons this might be the case.
 
 1. The transformer world model reward target has many more gradients paths through the model than the recurrent model. This potentially leads to instability when training the agent. This is the argument put forward in [Do Transformer World Models Give Better Policy Gradients?](https://arxiv.org/abs/2402.05290) by Ma et al.
 2. The transformer model is a bigger model than the RSSM and the size of the model comes with trade offs - in this case shorter rollouts. The RSSM is trained on longer (15 steps) rollouts than the transformer model is (10 steps).
 
+
+## Colab Examples:
+
+1. [TSSM colab Example](https://colab.research.google.com/drive/1VgJ7E-THAOO1kPk7UWgfpbI0kNF_6gTi#scrollTo=h2YjNpooauT3)
+2. [RSSM colab Example](https://colab.research.google.com/drive/1Lj1Bhg5vwQJAhS_Ehq5X_w6AF3MTxfnk#scrollTo=v5-ZFiOSbd9v)
+
+## Whats next:
+
+There are a couple of avenues for other RL projects here. 
+
+1. In [DayDreamer: World Models for Physical Robot Learning](https://arxiv.org/abs/2206.14176) Wu et al apply the RSSM world model to different real world robots.
+2. Deng et al utilize [structured state space models](https://arxiv.org/abs/2111.00396) as the dynamic model in [Facing Off World Model Backbones: RNNs, Transformers, and S4](https://arxiv.org/abs/2307.02064).
 
 ## Setup
 
