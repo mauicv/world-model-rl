@@ -44,8 +44,9 @@ The above are not fair comparisons because they are trained for different period
 
 ## Colab Examples:
 
-1. [TSSM colab Example](https://colab.research.google.com/drive/1VgJ7E-THAOO1kPk7UWgfpbI0kNF_6gTi#scrollTo=h2YjNpooauT3)
-2. [RSSM colab Example](https://colab.research.google.com/drive/1Lj1Bhg5vwQJAhS_Ehq5X_w6AF3MTxfnk#scrollTo=v5-ZFiOSbd9v)
+1. [TSSM colab Example](https://colab.research.google.com/drive/1VgJ7E-THAOO1kPk7UWgfpbI0kNF_6gTi)
+2. [RSSM-continuous colab Example](https://colab.research.google.com/drive/1Lj1Bhg5vwQJAhS_Ehq5X_w6AF3MTxfnk)
+2. [RSSM-discrete colab Example](https://colab.research.google.com/drive/1PBCTxeD_x_aKmc0ciNfpzB_8E4zkIIEo)
 
 ## Whats next:
 
