@@ -1,4 +1,4 @@
-from reflect.data.differentiable_pendulum import DiffPendulumEnv
+from reflect.examples.differentiable_pendulum import DiffPendulumEnv
 import torch.nn as nn
 import torch
 import tqdm
