@@ -2,7 +2,7 @@ import torch
 from collections import defaultdict
 from tqdm import tqdm
 
-from reflect.data.differentiable_pendulum import DiffPendulumEnv
+from reflect.examples.differentiable_pendulum import DiffPendulumEnv
 from reflect.components.trainers.value_trainer.value_trainer import ValueGradTrainer, update_target_network
 from reflect.components.models.actor import Actor
 from reflect.components.trainers.value_trainer.value_critic import ValueCritic

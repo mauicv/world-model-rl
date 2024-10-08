@@ -1,4 +1,4 @@
-from reflect.data.simple_rl_env import SimpleRLEnvironment
+from reflect.examples.simple_rl_env import SimpleRLEnvironment
 from reflect.data.loader import EnvDataLoader
 from reflect.models.world_model.observation_model import ObservationalModel, LatentSpace
 from reflect.components.transformer_world_model.environment import Environment

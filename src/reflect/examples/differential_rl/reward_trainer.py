@@ -1,4 +1,4 @@
-from reflect.data.differentiable_pendulum import DiffPendulumEnv
+from reflect.examples.differentiable_pendulum import DiffPendulumEnv
 from reflect.components.trainers.reward.reward_trainer import RewardGradTrainer
 import torch.nn as nn
 import torch

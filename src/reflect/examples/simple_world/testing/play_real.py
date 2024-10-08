@@ -1,4 +1,4 @@
-from reflect.data.simple_rl_env import SimpleRLEnvironment
+from reflect.examples.simple_rl_env import SimpleRLEnvironment
 import click
 import numpy as np
 import pygame
