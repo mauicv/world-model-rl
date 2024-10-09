@@ -42,7 +42,7 @@ class NoNoise:
         self.reset()
 
     def __call__(self):
-        return np.zeros((self.dim, ))
+        return torch.zeros((self.dim, ))
 
     def reset(self):
         return

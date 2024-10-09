@@ -150,9 +150,11 @@ class EnvDataLoader:
         if not noise_size:
             noise_size = self.noise_size
         action = self.policy(observation)
+        action = action.to(observation.device)
         noise = self.noise_generator()
+        noise = noise.to(observation.device)
         action = action.squeeze(0)
-        action = action + torch.tensor(noise)
+        action = action + noise
         l, u = self.bounds
         l, u = l.to(action.device), u.to(action.device)
         action = torch.clamp(action, l, u)
