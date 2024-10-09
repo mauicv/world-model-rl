@@ -4,14 +4,31 @@ See also: https://colab.research.google.com/drive/10-QQlnSFZeWBC7JCm0mPraGBPLVU2
 """
 
 import gymnasium as gym
-from reflect.data.noise import NoNoise
-from reflect.utils import FreezeParameters
 import torch
+import numpy as np
+from reflect.data.noise import NoNoise
+
 
 def to_tensor(t):
     if isinstance(t, torch.Tensor):
         return t
     return torch.tensor(t)
+
+
+class NoPolicy:
+    def __init__(self, dim):
+        self.dim = dim
+
+    def __call__(
+            self,
+            x: torch.Tensor,
+            *args,
+            **kwargs
+        ):
+        return torch.zeros((1, self.dim))
+
+    def reset(self):
+        pass
 
 
 class EnvDataLoader:
@@ -52,8 +69,8 @@ class EnvDataLoader:
         self.num_runs = num_runs
         self.rollout_length = rollout_length
         self.img_shape = img_shape
-        self.policy = policy
         self.noise_generator = noise_generator
+        self.policy = policy
 
         self.rollout_ind = 0
         self.img_buffer = torch.zeros(
@@ -87,6 +104,9 @@ class EnvDataLoader:
         if noise_generator is None:
             self.noise_generator = NoNoise(dim=self.action_dim)
 
+        if policy is None:
+            self.policy = NoPolicy(dim=self.action_dim)
+
     def perform_rollout(self):
         """Performs a rollout of the environment.
 
@@ -98,6 +118,8 @@ class EnvDataLoader:
         that generated s_t.
         """
         _ = self.env.reset(seed=self.seed)
+        if self.noise_generator is not None:
+            self.noise_generator.reset()
         if self.policy is not None:
             self.policy.reset()
         img = self.env.render()
@@ -124,14 +146,13 @@ class EnvDataLoader:
         self.end_index[run_index] = index
         self.rollout_ind += 1
 
-    def compute_action(self, observation):
-        if self.policy:
-            action = self.policy(observation)
-            action = action + torch.normal(torch.zeros_like(action), self.noise_size)
-            action = action.squeeze(0)
-        else:
-            action = self.noise_generator()
-            action = torch.tensor(action, device=observation.device)
+    def compute_action(self, observation, noise_size=None):
+        if not noise_size:
+            noise_size = self.noise_size
+        action = self.policy(observation)
+        noise = self.noise_generator()
+        action = action.squeeze(0)
+        action = action + torch.tensor(noise)
         l, u = self.bounds
         l, u = l.to(action.device), u.to(action.device)
         action = torch.clamp(action, l, u)
