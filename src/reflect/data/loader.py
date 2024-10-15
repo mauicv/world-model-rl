@@ -6,7 +6,7 @@ See also: https://colab.research.google.com/drive/10-QQlnSFZeWBC7JCm0mPraGBPLVU2
 import gymnasium as gym
 import torch
 import numpy as np
-from reflect.data.noise import NoNoise
+from reflect.data.noise import NormalNoise
 
 
 def to_tensor(t):
@@ -102,7 +102,10 @@ class EnvDataLoader:
         self.transforms = transforms
 
         if noise_generator is None:
-            self.noise_generator = NoNoise(dim=self.action_dim)
+            self.noise_generator = NormalNoise(
+                dim=self.action_dim,
+                noise_size=0.3
+            )
 
         if policy is None:
             self.policy = NoPolicy(dim=self.action_dim)
