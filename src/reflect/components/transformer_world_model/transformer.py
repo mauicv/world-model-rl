@@ -2,8 +2,8 @@ from pytfex.transformer.gpt import GPT
 from pytfex.transformer.layer import TransformerLayer
 from pytfex.transformer.mlp import MLP
 from pytfex.transformer.attention import RelativeAttention
-from reflect.components.transformer_world_model.head import Head
-from reflect.components.transformer_world_model.embedder import Embedder
+from reflect.components.transformer_world_model.head import StackHead
+from reflect.components.transformer_world_model.embedder import StackEmbedder
 from pytfex.transformer.gpt import GPT
 import torch
 
@@ -37,12 +37,12 @@ class PytfexTransformer(torch.nn.Module):
             dropout=dropout,
             hidden_dim=hdn_dim,
             num_heads=num_heads,
-            embedder=Embedder(
+            embedder=StackEmbedder(
                 z_dim=latent_dim*num_cat,
                 a_size=action_size,
                 hidden_dim=hdn_dim
             ),
-            head=Head(
+            head=StackHead(
                 latent_dim=latent_dim,
                 num_cat=num_cat,
                 hidden_dim=hdn_dim

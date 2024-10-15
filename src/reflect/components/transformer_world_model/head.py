@@ -1,18 +1,15 @@
 import torch
 import torch.distributions as D
 
-from pytfex.transformer.make_model import TransformerObjectRegistry
 
-
-@TransformerObjectRegistry.register('Head')
-class Head(torch.nn.Module):
+class BaseHead(torch.nn.Module):
     def __init__(
             self,
             latent_dim: int=None,
             num_cat: int=None,
             hidden_dim: int=None,
         ):
-        super(Head, self).__init__()
+        super(BaseHead, self).__init__()
         self.hidden_dim = hidden_dim
         self.latent_dim = latent_dim
         self.num_cat = num_cat
@@ -53,6 +50,20 @@ class Head(torch.nn.Module):
         )
         return D.Independent(dist, 1)
 
+
+class StackHead(BaseHead):
+    def __init__(
+            self,
+            latent_dim: int=None,
+            num_cat: int=None,
+            hidden_dim: int=None,
+        ):
+        super(StackHead, self).__init__(
+            latent_dim=latent_dim,
+            num_cat=num_cat,
+            hidden_dim=hidden_dim
+        )
+
     def forward(self, x):
         b, t, _ = x.shape
         reshaped_x = x.view(b, -1, 3, self.hidden_dim)
@@ -61,5 +72,53 @@ class Head(torch.nn.Module):
         r = self.reward(r_emb)
         s = self.predictor(a_emb)
         s = s.reshape(b, int(t/3), self.latent_dim, self.num_cat)
+        z_dist = self.create_z_dist(s)
+        return z_dist, r, d
+
+
+class AddHead(BaseHead):
+    def __init__(
+            self,
+            latent_dim: int=None,
+            num_cat: int=None,
+            hidden_dim: int=None,
+        ):
+        super(AddHead, self).__init__(
+            latent_dim=latent_dim,
+            num_cat=num_cat,
+            hidden_dim=hidden_dim
+        )
+
+    def forward(self, x):
+        b, t, _ = x.shape
+        d = self.done_output_activation(self.done(x))
+        r = self.reward(x)
+        s = self.predictor(x)
+        s = s.reshape(b, t, self.latent_dim, self.num_cat)
+        z_dist = self.create_z_dist(s)
+        return z_dist, r, d
+
+
+class ConcatHead(BaseHead):
+    def __init__(
+            self,
+            latent_dim: int=None,
+            num_cat: int=None,
+            hidden_dim: int=None,
+        ):
+        super(ConcatHead, self).__init__(
+            latent_dim=latent_dim,
+            num_cat=num_cat,
+            hidden_dim=hidden_dim
+        )
+
+    def forward(self, x):
+        b, t, d = x.shape
+        split_size = int(d/3)
+        s_emb, a_emb, r_emb = torch.split(x, split_size, dim=-1)
+        d = self.done_output_activation(self.done(s_emb))
+        r = self.reward(r_emb)
+        s = self.predictor(a_emb)
+        s = s.reshape(b, t, self.latent_dim, self.num_cat)
         z_dist = self.create_z_dist(s)
         return z_dist, r, d
