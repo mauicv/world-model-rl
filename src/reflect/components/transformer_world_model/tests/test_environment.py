@@ -2,8 +2,6 @@ from reflect.data.loader import EnvDataLoader
 from reflect.components.transformer_world_model import WorldModel
 from reflect.components.transformer_world_model.environment import Environment
 from reflect.components.transformer_world_model.tests.conftest import make_dynamic_model
-from reflect.components.transformer_world_model.embedder import Embedder as Embedder
-from reflect.components.transformer_world_model.head import Head as Head
 from torchvision.transforms import Resize, Compose
 import gymnasium as gym
 import torch
