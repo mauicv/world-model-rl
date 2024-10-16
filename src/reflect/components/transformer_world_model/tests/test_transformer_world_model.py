@@ -1,6 +1,4 @@
 from reflect.components.transformer_world_model import WorldModel
-from reflect.components.transformer_world_model.embedder import Embedder as Embedder
-from reflect.components.transformer_world_model.head import Head as Head
 import gymnasium as gym
 from dataclasses import asdict
 import torch

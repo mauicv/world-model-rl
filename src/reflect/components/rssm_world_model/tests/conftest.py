@@ -1,11 +1,5 @@
 import pytest
 import gymnasium as gym
-from pytfex.transformer.gpt import GPT
-from pytfex.transformer.layer import TransformerLayer
-from pytfex.transformer.mlp import MLP
-from pytfex.transformer.attention import RelativeAttention
-from reflect.components.transformer_world_model.head import Head
-from reflect.components.transformer_world_model.embedder import Embedder
 from reflect.data.loader import EnvDataLoader
 
 from reflect.components.models import ConvEncoder, ConvDecoder

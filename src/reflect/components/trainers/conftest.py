@@ -1,17 +1,10 @@
 import pytest
 import gymnasium as gym
-from pytfex.transformer.gpt import GPT
-from pytfex.transformer.layer import TransformerLayer
-from pytfex.transformer.mlp import MLP
-from pytfex.transformer.attention import RelativeAttention
-from reflect.components.transformer_world_model.head import Head
-from reflect.components.transformer_world_model.embedder import Embedder
 from reflect.data.loader import EnvDataLoader
-
 from reflect.components.models.encoder import ConvEncoder
 from reflect.components.models.decoder import ConvDecoder
 from reflect.components.rssm_world_model.models import DenseModel
-from reflect.components.rssm_world_model.rssm import ContinuousRSSM, DiscreteRSSM
+from reflect.components.rssm_world_model.rssm import ContinuousRSSM
 from reflect.components.rssm_world_model.world_model import WorldModel
 from reflect.components.rssm_world_model.memory_actor import WorldModelActor
 from reflect.components.models.actor import Actor
