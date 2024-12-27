@@ -22,7 +22,7 @@ class EnvDataLoader:
             num_runs=64,
             rollout_length=100,
             transforms=None,
-            img_shape=(256, 256),
+            img_shape=(3, 256, 256),
             policy=None,
             env=gym.make(
                 "InvertedPendulum-v4",
@@ -30,11 +30,13 @@ class EnvDataLoader:
             ),
             noise_generator=None,
             seed=None,
-            noise_size=0.05
+            noise_size=0.05,
+            use_imgs_as_states=True
         ):
         self.env = env
         self.seed = seed
         self.noise_size = noise_size
+        self.use_imgs_as_states = use_imgs_as_states
         _ = self.env.reset()
         self.action_dim = self.env.action_space.shape[0]
         self.bounds = (
@@ -87,6 +89,23 @@ class EnvDataLoader:
         if noise_generator is None:
             self.noise_generator = NoNoise(dim=self.action_dim)
 
+    def step(self, action):
+        state, reward, done, *_ \
+            = self.env.step(action.cpu().numpy())
+        if self.use_imgs_as_states:
+            state = self.env.render()
+        state = self._preprocess(state)
+        return state, reward, done
+
+    def reset(self):
+        state, *_ = self.env.reset(seed=self.seed)
+        if self.policy is not None:
+            self.policy.reset()
+        if self.use_imgs_as_states:
+            state = self.env.render()
+        state = self._preprocess(state)
+        return state
+
     def perform_rollout(self):
         """Performs a rollout of the environment.
 
@@ -97,11 +116,7 @@ class EnvDataLoader:
         the time step. So a_t is the action taken at time step t not the action
         that generated s_t.
         """
-        _ = self.env.reset(seed=self.seed)
-        if self.policy is not None:
-            self.policy.reset()
-        img = self.env.render()
-        img = self._preprocess(img)
+        img = self.reset()
         done = False
         reward = 0
         run_index = self.rollout_ind % self.num_runs
@@ -115,10 +130,7 @@ class EnvDataLoader:
                 reward = -10 if done else 1
             self.reward_buffer[run_index, index] = to_tensor(reward)
             self.done_buffer[run_index, index] = to_tensor(done)
-            _, reward, done, *_ \
-                = self.env.step(action.cpu().numpy())
-            img = self.env.render()
-            img = self._preprocess(img)
+            img, reward, done = self.step(action)
             if done and index > self.num_time_steps:
                 break
         self.end_index[run_index] = index
@@ -142,12 +154,15 @@ class EnvDataLoader:
 
     def _preprocess(self, x):
         x = to_tensor(x.copy())
+        # this code is specific to the data set (specifically image or state)
+        # and should be removed and set as default within the transform
         x = x.permute(2, 0, 1)
         x = self.transforms(x)
         x = x / 256 - 0.5
         return x
 
     def postprocess(self, x):
+        # this code is specific to the data set (specifically image or state)
         x = x.permute(1, 2, 0)
         x = (x + 0.5) * 256
         return x
