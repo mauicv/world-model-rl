@@ -1,4 +1,4 @@
-from reflect.data.loader import EnvDataLoader
+from reflect.data.loader import EnvDataLoader, GymRenderImgProcessing
 from reflect.components.transformer_world_model import WorldModel
 from reflect.components.transformer_world_model.environment import Environment
 from reflect.components.transformer_world_model.tests.conftest import make_dynamic_model
@@ -28,10 +28,11 @@ def test_environment_step_filter(env_name, encoder, decoder):
     dl = EnvDataLoader(
         num_time_steps=17,
         img_shape=(3, 64, 64),
-        transforms=Compose([
-            Resize((64, 64))
-        ]),
-        # observation_model=observation_model,
+        processing=GymRenderImgProcessing(
+            transforms=Compose([
+                Resize((64, 64))
+            ])
+        ),
         env=real_env
     )
 
@@ -90,10 +91,11 @@ def test_environment_step(env_name, encoder, decoder):
     dl = EnvDataLoader(
         num_time_steps=17,
         img_shape=(3, 64, 64),
-        transforms=Compose([
-            Resize((64, 64))
-        ]),
-        # observation_model=observation_model,
+        processing=GymRenderImgProcessing(
+            transforms=Compose([
+                Resize((64, 64))
+            ])
+        ),
         env=real_env
     )
 
