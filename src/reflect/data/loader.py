@@ -70,7 +70,7 @@ class EnvDataLoader:
             num_runs=64,
             rollout_length=100,
             processing=None,
-            img_shape=(3, 256, 256),
+            state_shape=(3, 256, 256),
             policy=None,
             env=gym.make(
                 "InvertedPendulum-v4",
@@ -110,13 +110,13 @@ class EnvDataLoader:
         self.batch_size = batch_size
         self.num_runs = num_runs
         self.rollout_length = rollout_length
-        self.img_shape = img_shape
+        self.state_shape = state_shape
         self.policy = policy
         self.noise_generator = noise_generator
 
         self.rollout_ind = 0
-        self.img_buffer = torch.zeros(
-            (self.num_runs, self.rollout_length, *self.img_shape),
+        self.state_buffer = torch.zeros(
+            (self.num_runs, self.rollout_length, *self.state_shape),
             dtype=torch.float32
         )
 
@@ -174,13 +174,13 @@ class EnvDataLoader:
         the time step. So a_t is the action taken at time step t not the action
         that generated s_t.
         """
-        img = self.reset()
+        state = self.reset()
         done = False
         reward = 0
         run_index = self.rollout_ind % self.num_runs
         for index in range(self.rollout_length):
-            action = self.compute_action(img[None, :])
-            self.img_buffer[run_index, index] = img
+            action = self.compute_action(state[None, :])
+            self.state_buffer[run_index, index] = state
             self.action_buffer[run_index, index] = to_tensor(action)
             # weird issue with pendulum environment always returns 1 reward
             if hasattr(self.env, 'unwrapped') and \
@@ -188,7 +188,7 @@ class EnvDataLoader:
                 reward = -10 if done else 1
             self.reward_buffer[run_index, index] = to_tensor(reward)
             self.done_buffer[run_index, index] = to_tensor(done)
-            img, reward, done = self.step(action)
+            state, reward, done = self.step(action)
             if done and index > self.num_time_steps:
                 break
         self.end_index[run_index] = index
@@ -247,7 +247,7 @@ class EnvDataLoader:
             t_inds = torch.cat(t_inds, dim=0)
         t_inds = t_inds[:, None] + torch.arange(0, num_time_steps)
         return (
-            self.img_buffer[b_inds, t_inds].detach(),
+            self.state_buffer[b_inds, t_inds].detach(),
             self.action_buffer[b_inds, t_inds].detach(),
             self.reward_buffer[b_inds, t_inds].unsqueeze(-1).detach(),
             self.done_buffer[b_inds, t_inds].unsqueeze(-1).detach(),

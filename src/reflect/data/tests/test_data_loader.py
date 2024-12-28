@@ -15,7 +15,7 @@ def test_data_loader_imgs(env_name):
     action_shape, = env.action_space.shape
     data_loader = EnvDataLoader(
         num_time_steps=num_time_steps + 1,
-        img_shape=(3, 64, 64),
+        state_shape=(3, 64, 64),
         use_imgs_as_states=True,
         # transforms=Compose([Resize((64, 64))]),
         env=env
@@ -24,7 +24,7 @@ def test_data_loader_imgs(env_name):
         data_loader.perform_rollout()
     for i in range(4):
         assert data_loader.end_index[i] >= num_time_steps, f'{data_loader.end_index=}'
-        assert torch.all(data_loader.img_buffer[i, data_loader.end_index[i]+1:] == 0)
+        assert torch.all(data_loader.state_buffer[i, data_loader.end_index[i]+1:] == 0)
         assert torch.all(data_loader.action_buffer[i, data_loader.end_index[i]+1:] == 0)
         assert torch.all(data_loader.reward_buffer[i, data_loader.end_index[i]+1:] == 0)
 
@@ -46,7 +46,7 @@ def test_data_loader_states(env_name):
     action_shape, = env.action_space.shape
     data_loader = EnvDataLoader(
         num_time_steps=num_time_steps + 1,
-        img_shape=(27,),
+        state_shape=(27,),
         # transforms=Compose([Resize((64, 64))]),
         env=env,
         use_imgs_as_states=False
@@ -55,7 +55,7 @@ def test_data_loader_states(env_name):
         data_loader.perform_rollout()
     for i in range(4):
         assert data_loader.end_index[i] >= num_time_steps, f'{data_loader.end_index=}'
-        assert torch.all(data_loader.img_buffer[i, data_loader.end_index[i]+1:] == 0)
+        assert torch.all(data_loader.state_buffer[i, data_loader.end_index[i]+1:] == 0)
         assert torch.all(data_loader.action_buffer[i, data_loader.end_index[i]+1:] == 0)
         assert torch.all(data_loader.reward_buffer[i, data_loader.end_index[i]+1:] == 0)
 

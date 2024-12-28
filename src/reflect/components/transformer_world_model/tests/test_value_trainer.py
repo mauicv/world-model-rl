@@ -24,7 +24,7 @@ def test_update(encoder, decoder, actor):
 
     dl = EnvDataLoader(
         num_time_steps=17,
-        img_shape=(3, 64, 64),
+        state_shape=(3, 64, 64),
         processing=GymRenderImgProcessing(
             transforms=Compose([
                 Resize((64, 64))
