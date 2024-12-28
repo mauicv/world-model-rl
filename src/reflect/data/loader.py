@@ -6,12 +6,60 @@ See also: https://colab.research.google.com/drive/10-QQlnSFZeWBC7JCm0mPraGBPLVU2
 import gymnasium as gym
 from reflect.data.noise import NoNoise
 from reflect.utils import FreezeParameters
+from torchvision.transforms import Resize, Compose
 import torch
+import numpy as np
+
 
 def to_tensor(t):
     if isinstance(t, torch.Tensor):
         return t
+    if isinstance(t, np.ndarray):
+        return torch.tensor(t.copy())
     return torch.tensor(t)
+
+
+class Processing:
+    def __init__(self, transforms):
+        self.transforms = transforms
+
+    def preprocess(self, x):
+        raise NotImplementedError
+
+    def postprocess(self, x):
+        raise NotImplementedError
+
+
+class GymRenderImgProcessing(Processing):
+    def __init__(
+            self,
+            transforms=None
+        ):
+        if transforms is None:
+            transforms = Compose([Resize((64, 64))])
+        self.transforms = transforms
+
+    def preprocess(self, x):
+        x = x.permute(2, 0, 1)
+        x = self.transforms(x)
+        x = x / 256 - 0.5
+        return x
+
+    def postprocess(self, x):
+        x = x.permute(1, 2, 0)
+        x = (x + 0.5) * 256
+        return x
+
+
+class GymStateProcessing(Processing):
+    def __init__(self, transforms=None):
+        self.transforms = transforms
+
+    def preprocess(self, x):
+        return x
+
+    def postprocess(self, x):
+        return x
 
 
 class EnvDataLoader:
@@ -21,7 +69,7 @@ class EnvDataLoader:
             batch_size=64,
             num_runs=64,
             rollout_length=100,
-            transforms=None,
+            processing=None,
             img_shape=(3, 256, 256),
             policy=None,
             env=gym.make(
@@ -33,6 +81,14 @@ class EnvDataLoader:
             noise_size=0.05,
             use_imgs_as_states=True
         ):
+
+        if processing is None:
+            if use_imgs_as_states:
+                processing = GymRenderImgProcessing(transforms=None)
+            else:
+                processing = GymStateProcessing(transforms=None)
+
+        self.processing = processing
         self.env = env
         self.seed = seed
         self.noise_size = noise_size
@@ -49,6 +105,7 @@ class EnvDataLoader:
                 dtype=torch.float32
             )
         )
+
         self.num_time_steps = num_time_steps
         self.batch_size = batch_size
         self.num_runs = num_runs
@@ -84,7 +141,6 @@ class EnvDataLoader:
         )
 
         self.current_index = 0
-        self.transforms = transforms
 
         if noise_generator is None:
             self.noise_generator = NoNoise(dim=self.action_dim)
@@ -94,7 +150,8 @@ class EnvDataLoader:
             = self.env.step(action.cpu().numpy())
         if self.use_imgs_as_states:
             state = self.env.render()
-        state = self._preprocess(state)
+        state = to_tensor(state)
+        state = self.processing.preprocess(state)
         return state, reward, done
 
     def reset(self):
@@ -103,7 +160,8 @@ class EnvDataLoader:
             self.policy.reset()
         if self.use_imgs_as_states:
             state = self.env.render()
-        state = self._preprocess(state)
+        state = to_tensor(state)
+        state = self.processing.preprocess(state)
         return state
 
     def perform_rollout(self):
@@ -152,20 +210,8 @@ class EnvDataLoader:
     def close(self):
         self.env.close()
 
-    def _preprocess(self, x):
-        x = to_tensor(x.copy())
-        # this code is specific to the data set (specifically image or state)
-        # and should be removed and set as default within the transform
-        x = x.permute(2, 0, 1)
-        x = self.transforms(x)
-        x = x / 256 - 0.5
-        return x
-
     def postprocess(self, x):
-        # this code is specific to the data set (specifically image or state)
-        x = x.permute(1, 2, 0)
-        x = (x + 0.5) * 256
-        return x
+        return self.processing.postprocess(x)
 
     def sample(
             self,
