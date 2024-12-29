@@ -26,12 +26,30 @@ def encoder():
     )
 
 @pytest.fixture
+def state_encoder():
+    return DenseModel(
+        depth=1,
+        input_dim=27,
+        hidden_dim=256,
+        output_dim=1024,
+    )
+
+@pytest.fixture
 def decoder():
     return ConvDecoder(
         output_shape=(3, 64, 64),
         input_size=1024,
         activation=torch.nn.ReLU(),
         depth=32
+    )
+
+@pytest.fixture
+def state_decoder():
+    return DenseModel(
+        depth=1,
+        input_dim=1024,
+        hidden_dim=256,
+        output_dim=27,
     )
 
 @pytest.fixture

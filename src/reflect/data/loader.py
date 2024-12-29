@@ -15,8 +15,8 @@ def to_tensor(t):
     if isinstance(t, torch.Tensor):
         return t
     if isinstance(t, np.ndarray):
-        return torch.tensor(t.copy())
-    return torch.tensor(t)
+        return torch.tensor(t.copy(), dtype=torch.float32)
+    return torch.tensor(t, dtype=torch.float32)
 
 
 class Processing:
@@ -151,6 +151,12 @@ class EnvDataLoader:
         if self.use_imgs_as_states:
             state = self.env.render()
         state = to_tensor(state)
+        # delete this
+        if self.use_imgs_as_states:
+            print('img', state.shape)
+        else:
+            print('state', state.shape)
+        ##############
         state = self.processing.preprocess(state)
         return state, reward, done
 
@@ -161,6 +167,12 @@ class EnvDataLoader:
         if self.use_imgs_as_states:
             state = self.env.render()
         state = to_tensor(state)
+        # delete this
+        if self.use_imgs_as_states:
+            print('img', state.shape)
+        else:
+            print('state', state.shape)
+        ##############
         state = self.processing.preprocess(state)
         return state
 
