@@ -27,8 +27,15 @@ class WorldModelActor:
         a_{t} = actor(s_{t}, h_{t})
         h_{t+1} = f(s_{t}, a_{t}, h_{t})
         """
-        if obs.dim() == 4:
+        #################################
+        # TODO: This code is a hack which adds in a time dim if it's missing for both
+        # images and states. obs.dim() == 4 is for images, obs.dim() == 2 is
+        # for states for when the time dimension is missing. i.e.
+        # (b, c, h, w) and (b, s) Becuase we hard code these values we can't
+        # handle the case where obs.dim() == 3.
+        if obs.dim() == 4 or obs.dim() == 2:
             obs = obs.unsqueeze(1)
+        #################################
         device = next(self.actor.parameters()).device
         obs = obs.to(device)
         with FreezeParameters([self.world_model, self.actor]):    

@@ -1,7 +1,7 @@
 import pytest
 import gymnasium as gym
 from reflect.components.transformer_world_model.transformer import PytfexTransformer
-from reflect.data.loader import EnvDataLoader
+from reflect.data.loader import EnvDataLoader, GymRenderImgProcessing
 
 from reflect.components.models import ConvEncoder, ConvDecoder
 from reflect.components.rssm_world_model.models import DenseModel
@@ -26,12 +26,30 @@ def encoder():
     )
 
 @pytest.fixture
+def state_encoder():
+    return DenseModel(
+        depth=1,
+        input_dim=27,
+        hidden_dim=256,
+        output_dim=1024,
+    )
+
+@pytest.fixture
 def decoder():
     return ConvDecoder(
         output_shape=(3, 64, 64),
         input_size=1024,
         activation=torch.nn.ReLU(),
         depth=32
+    )
+
+@pytest.fixture
+def state_decoder():
+    return DenseModel(
+        depth=1,
+        input_dim=1024,
+        hidden_dim=256,
+        output_dim=27,
     )
 
 @pytest.fixture
@@ -49,8 +67,12 @@ def env_data_loader(world_model_actor):
     env = gym.make("InvertedPendulum-v4", render_mode="rgb_array")
     return EnvDataLoader(
         num_time_steps=10,
-        img_shape=(3, 64, 64),
-        transforms=Compose([Resize((64, 64))]),
+        state_shape=(3, 64, 64),
+        processing=GymRenderImgProcessing(
+            transforms=Compose([
+                Resize((64, 64))
+            ])
+        ),
         policy=world_model_actor,
         env=env
     )

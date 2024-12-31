@@ -65,7 +65,8 @@ def get_norm_dist(means, stds=None):
 def observation_loss(obs, decoded_obs):
     obs = obs.reshape(-1, *obs.shape[2:])
     decoded_obs = decoded_obs.reshape(-1, *decoded_obs.shape[2:])
-    normal = D.Independent(D.Normal(decoded_obs, 1.0), 3)
+    ind_dim = len(decoded_obs.shape[2:])
+    normal = D.Independent(D.Normal(decoded_obs, 1.0), ind_dim)
     return -normal.log_prob(obs).mean()
 
 

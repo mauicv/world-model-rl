@@ -6,12 +6,60 @@ See also: https://colab.research.google.com/drive/10-QQlnSFZeWBC7JCm0mPraGBPLVU2
 import gymnasium as gym
 from reflect.data.noise import NoNoise
 from reflect.utils import FreezeParameters
+from torchvision.transforms import Resize, Compose
 import torch
+import numpy as np
+
 
 def to_tensor(t):
     if isinstance(t, torch.Tensor):
         return t
-    return torch.tensor(t)
+    if isinstance(t, np.ndarray):
+        return torch.tensor(t.copy(), dtype=torch.float32)
+    return torch.tensor(t, dtype=torch.float32)
+
+
+class Processing:
+    def __init__(self, transforms):
+        self.transforms = transforms
+
+    def preprocess(self, x):
+        raise NotImplementedError
+
+    def postprocess(self, x):
+        raise NotImplementedError
+
+
+class GymRenderImgProcessing(Processing):
+    def __init__(
+            self,
+            transforms=None
+        ):
+        if transforms is None:
+            transforms = Compose([Resize((64, 64))])
+        self.transforms = transforms
+
+    def preprocess(self, x):
+        x = x.permute(2, 0, 1)
+        x = self.transforms(x)
+        x = x / 256 - 0.5
+        return x
+
+    def postprocess(self, x):
+        x = x.permute(1, 2, 0)
+        x = (x + 0.5) * 256
+        return x
+
+
+class GymStateProcessing(Processing):
+    def __init__(self, transforms=None):
+        self.transforms = transforms
+
+    def preprocess(self, x):
+        return x
+
+    def postprocess(self, x):
+        return x
 
 
 class EnvDataLoader:
@@ -21,8 +69,8 @@ class EnvDataLoader:
             batch_size=64,
             num_runs=64,
             rollout_length=100,
-            transforms=None,
-            img_shape=(256, 256),
+            processing=None,
+            state_shape=(3, 256, 256),
             policy=None,
             env=gym.make(
                 "InvertedPendulum-v4",
@@ -30,11 +78,21 @@ class EnvDataLoader:
             ),
             noise_generator=None,
             seed=None,
-            noise_size=0.05
+            noise_size=0.05,
+            use_imgs_as_states=True
         ):
+
+        if processing is None:
+            if use_imgs_as_states:
+                processing = GymRenderImgProcessing(transforms=None)
+            else:
+                processing = GymStateProcessing(transforms=None)
+
+        self.processing = processing
         self.env = env
         self.seed = seed
         self.noise_size = noise_size
+        self.use_imgs_as_states = use_imgs_as_states
         _ = self.env.reset()
         self.action_dim = self.env.action_space.shape[0]
         self.bounds = (
@@ -47,17 +105,18 @@ class EnvDataLoader:
                 dtype=torch.float32
             )
         )
+
         self.num_time_steps = num_time_steps
         self.batch_size = batch_size
         self.num_runs = num_runs
         self.rollout_length = rollout_length
-        self.img_shape = img_shape
+        self.state_shape = state_shape
         self.policy = policy
         self.noise_generator = noise_generator
 
         self.rollout_ind = 0
-        self.img_buffer = torch.zeros(
-            (self.num_runs, self.rollout_length, *self.img_shape),
+        self.state_buffer = torch.zeros(
+            (self.num_runs, self.rollout_length, *self.state_shape),
             dtype=torch.float32
         )
 
@@ -82,10 +141,28 @@ class EnvDataLoader:
         )
 
         self.current_index = 0
-        self.transforms = transforms
 
         if noise_generator is None:
             self.noise_generator = NoNoise(dim=self.action_dim)
+
+    def step(self, action):
+        state, reward, done, *_ \
+            = self.env.step(action.cpu().numpy())
+        if self.use_imgs_as_states:
+            state = self.env.render()
+        state = to_tensor(state)
+        state = self.processing.preprocess(state)
+        return state, reward, done
+
+    def reset(self):
+        state, *_ = self.env.reset(seed=self.seed)
+        if self.policy is not None:
+            self.policy.reset()
+        if self.use_imgs_as_states:
+            state = self.env.render()
+        state = to_tensor(state)
+        state = self.processing.preprocess(state)
+        return state
 
     def perform_rollout(self):
         """Performs a rollout of the environment.
@@ -97,17 +174,13 @@ class EnvDataLoader:
         the time step. So a_t is the action taken at time step t not the action
         that generated s_t.
         """
-        _ = self.env.reset(seed=self.seed)
-        if self.policy is not None:
-            self.policy.reset()
-        img = self.env.render()
-        img = self._preprocess(img)
+        state = self.reset()
         done = False
         reward = 0
         run_index = self.rollout_ind % self.num_runs
         for index in range(self.rollout_length):
-            action = self.compute_action(img[None, :])
-            self.img_buffer[run_index, index] = img
+            action = self.compute_action(state[None, :])
+            self.state_buffer[run_index, index] = state
             self.action_buffer[run_index, index] = to_tensor(action)
             # weird issue with pendulum environment always returns 1 reward
             if hasattr(self.env, 'unwrapped') and \
@@ -115,10 +188,7 @@ class EnvDataLoader:
                 reward = -10 if done else 1
             self.reward_buffer[run_index, index] = to_tensor(reward)
             self.done_buffer[run_index, index] = to_tensor(done)
-            _, reward, done, *_ \
-                = self.env.step(action.cpu().numpy())
-            img = self.env.render()
-            img = self._preprocess(img)
+            state, reward, done = self.step(action)
             if done and index > self.num_time_steps:
                 break
         self.end_index[run_index] = index
@@ -140,17 +210,8 @@ class EnvDataLoader:
     def close(self):
         self.env.close()
 
-    def _preprocess(self, x):
-        x = to_tensor(x.copy())
-        x = x.permute(2, 0, 1)
-        x = self.transforms(x)
-        x = x / 256 - 0.5
-        return x
-
     def postprocess(self, x):
-        x = x.permute(1, 2, 0)
-        x = (x + 0.5) * 256
-        return x
+        return self.processing.postprocess(x)
 
     def sample(
             self,
@@ -186,7 +247,7 @@ class EnvDataLoader:
             t_inds = torch.cat(t_inds, dim=0)
         t_inds = t_inds[:, None] + torch.arange(0, num_time_steps)
         return (
-            self.img_buffer[b_inds, t_inds].detach(),
+            self.state_buffer[b_inds, t_inds].detach(),
             self.action_buffer[b_inds, t_inds].detach(),
             self.reward_buffer[b_inds, t_inds].unsqueeze(-1).detach(),
             self.done_buffer[b_inds, t_inds].unsqueeze(-1).detach(),
