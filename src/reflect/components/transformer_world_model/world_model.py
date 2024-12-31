@@ -84,8 +84,10 @@ class WorldModel(Base):
         )
 
     def encode(self, image):
-        b, t, c, h, w = image.shape
-        image = image.reshape(b * t, c, h, w)
+        image = image.reshape(
+            image.shape[0] * image.shape[1],
+            *image.shape[2:]
+        )
         z = self.encoder(image)
         z_logits = z.reshape(-1, self.num_latent, self.num_cat)
         z_dist = create_z_dist(z_logits)

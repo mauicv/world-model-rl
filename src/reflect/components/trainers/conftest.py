@@ -1,6 +1,6 @@
 import pytest
 import gymnasium as gym
-from reflect.data.loader import EnvDataLoader
+from reflect.data.loader import EnvDataLoader, GymRenderImgProcessing
 from reflect.components.models.encoder import ConvEncoder
 from reflect.components.models.decoder import ConvDecoder
 from reflect.components.rssm_world_model.models import DenseModel
@@ -71,8 +71,12 @@ def env_data_loader(world_model_actor):
     env = gym.make("InvertedPendulum-v4", render_mode="rgb_array")
     return EnvDataLoader(
         num_time_steps=10,
-        img_shape=(3, 64, 64),
-        transforms=Compose([Resize((64, 64))]),
+        state_shape=(3, 64, 64),
+        processing=GymRenderImgProcessing(
+            transforms=Compose([
+                Resize((64, 64))
+            ])
+        ),
         policy=world_model_actor,
         env=env
     )

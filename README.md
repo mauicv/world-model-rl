@@ -44,9 +44,18 @@ The above are not fair comparisons because they are trained for different period
 
 ## Colab Examples:
 
-1. [TSSM colab Example](https://colab.research.google.com/drive/1VgJ7E-THAOO1kPk7UWgfpbI0kNF_6gTi)
-2. [RSSM-continuous colab Example](https://colab.research.google.com/drive/1Lj1Bhg5vwQJAhS_Ehq5X_w6AF3MTxfnk)
-2. [RSSM-discrete colab Example](https://colab.research.google.com/drive/1PBCTxeD_x_aKmc0ciNfpzB_8E4zkIIEo)
+The following colab examples train from images of the environment.
+
+1. [TSSM colab Example](https://colab.research.google.com/drive/13SLo7x_sciK5QDZhKSeCgokpA4ZeLmRp)
+2. [RSSM-continuous colab Example](https://colab.research.google.com/drive/1YVZw9tGJ9_YUnq11KAAE69ne3Zn-xIDH)
+2. [RSSM-discrete colab Example](https://colab.research.google.com/drive/1_4exqY9vSCREyBbkJ9EPHoRMzuJOv0ke)
+
+Whereas these colab examples train from state space.
+
+1. [TSSM-state-space colab Example](https://colab.research.google.com/drive/1UboktIA38uHxjH44houFtJQcb7eV9b3R)
+2. [Discrete-RSSM-state-space colab Example](https://colab.research.google.com/drive/19rgE_bG905dnKVtN3kgjpikW8xOjt9nm)
+3. [Continuous-RSSM-state-space colab Example](https://colab.research.google.com/drive/1R3igZtondDMbOZHs-Lo_vXwdivQtHwpP)
+
 
 ## Whats next:
 
