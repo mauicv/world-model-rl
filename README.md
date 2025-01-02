@@ -54,7 +54,7 @@ Whereas these colab examples train from state space.
 
 1. [TSSM-state-space colab Example](https://colab.research.google.com/drive/1UboktIA38uHxjH44houFtJQcb7eV9b3R)
 2. [Discrete-RSSM-state-space colab Example](https://colab.research.google.com/drive/19rgE_bG905dnKVtN3kgjpikW8xOjt9nm)
-3. [Continuous-RSSM-state-space colab Example](https://colab.research.google.com/drive/1R3igZtondDMbOZHs-Lo_vXwdivQtHwpP)
+3. [Continuous-RSSM-state-space colab Example](https://colab.research.google.com/drive/1GUJWQuB1JnR9WuvtG0YSv_m7Tv_7_QMe)
 
 
 ## Whats next:
