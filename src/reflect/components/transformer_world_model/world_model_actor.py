@@ -6,17 +6,21 @@ from reflect.components.models import ConvEncoder
 from reflect.components.rssm_world_model.models import DenseModel
 from reflect.components.transformer_world_model.world_model import WorldModel
 from reflect.utils import FreezeParameters
-
+from reflect.utils import create_z_dist
 
 class EncoderActor(torch.nn.Module):
     def __init__(
             self,
             encoder: Union[DenseModel, ConvEncoder],
-            actor: Actor
+            actor: Actor,
+            num_latent: int = 256,
+            num_cat: int = 32
         ):
         super().__init__()
         self.encoder = encoder
         self.actor = actor
+        self.num_latent = num_latent
+        self.num_cat = num_cat
 
     def reset(self):
         pass
@@ -32,9 +36,12 @@ class EncoderActor(torch.nn.Module):
         obs = obs.to(device)
 
         with FreezeParameters([self.encoder, self.actor]):    
-            z, _ = self.encoder(obs)
-            z = z.reshape(1, 1, -1)
-            return self.actor(z, deterministic=True)
+            z = self.encoder(obs)
+            z_logits = z.reshape(-1, self.num_latent, self.num_cat)
+            z_dist = create_z_dist(z_logits)
+            z_sample = z_dist.rsample()
+            z_sample = z_sample.reshape(1, 1, -1)
+            return self.actor(z_sample, deterministic=True)
 
 
 class TransformerWorldModelActor:
