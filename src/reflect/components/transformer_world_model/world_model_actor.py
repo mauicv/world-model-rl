@@ -2,7 +2,7 @@ from typing import Union
 import torch
 
 from reflect.components.models.actor import Actor
-from reflect.components.models.encoder import Encoder
+from reflect.components.models import ConvEncoder
 from reflect.components.rssm_world_model.models import DenseModel
 from reflect.components.transformer_world_model.world_model import WorldModel
 from reflect.utils import FreezeParameters
@@ -11,7 +11,7 @@ from reflect.utils import FreezeParameters
 class EncoderActor(torch.nn.Module):
     def __init__(
             self,
-            encoder: Union[DenseModel, Encoder],
+            encoder: Union[DenseModel, ConvEncoder],
             actor: Actor
         ):
         super().__init__()
