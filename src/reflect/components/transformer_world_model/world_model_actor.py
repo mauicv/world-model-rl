@@ -1,16 +1,19 @@
+from typing import Union
 from reflect.components.models.actor import Actor
-from reflect.components.rssm_world_model.world_model import WorldModel
+from reflect.components.models.encoder import Encoder
+from reflect.components.rssm_world_model.models import DenseModel
 from reflect.utils import FreezeParameters
 import torch
 
 
-class TransformerWorldModelActor:
+class EncoderActor(torch.nn.Module):
     def __init__(
             self,
-            world_model: WorldModel,
+            encoder: Union[DenseModel, Encoder],
             actor: Actor
         ):
-        self.world_model = world_model
+        super().__init__()
+        self.encoder = encoder
         self.actor = actor
 
     def reset(self):
@@ -26,8 +29,8 @@ class TransformerWorldModelActor:
             obs = obs.unsqueeze(1)
         obs = obs.to(device)
 
-        with FreezeParameters([self.world_model, self.actor]):    
-            z, _ = self.world_model.encode(obs)
+        with FreezeParameters([self.encoder, self.actor]):    
+            z, _ = self.encoder(obs)
             z = z.reshape(1, 1, -1)
             return self.actor(z, deterministic=True)
             
