@@ -28,6 +28,14 @@ class AdamOptim:
 
     def state_dict(self):
         return self.optimizer.state_dict()
+    
+    def update_lr(self, lr):
+        for param_group in self.optimizer.param_groups:
+            param_group['lr'] = lr
+
+    def update_lr_by_factor(self, factor):
+        for param_group in self.optimizer.param_groups:
+            param_group['lr'] = param_group['lr'] * factor
 
     def to(self, device):
         # see https://github.com/pytorch/pytorch/issues/2830
