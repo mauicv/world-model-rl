@@ -148,7 +148,6 @@ class EnvDataLoader:
             self.noise_generator = NoNoise(dim=self.action_dim)
 
     def step(self, action):
-        print(action.shape)
         state, reward, done, *_ \
             = self.env.step(action.cpu().numpy())
         if self.use_imgs_as_states:
