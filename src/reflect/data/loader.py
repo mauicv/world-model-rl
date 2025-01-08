@@ -79,6 +79,7 @@ class EnvDataLoader:
             noise_generator=None,
             seed=None,
             noise_size=0.05,
+            weight_perturbation_size=0.01,
             use_imgs_as_states=True
         ):
 
@@ -95,6 +96,7 @@ class EnvDataLoader:
         self.use_imgs_as_states = use_imgs_as_states
         _ = self.env.reset()
         self.action_dim = self.env.action_space.shape[0]
+        self.weight_perturbation_size = weight_perturbation_size
         self.bounds = (
             torch.tensor(
                 self.env.action_space.low,
@@ -146,6 +148,7 @@ class EnvDataLoader:
             self.noise_generator = NoNoise(dim=self.action_dim)
 
     def step(self, action):
+        print(action.shape)
         state, reward, done, *_ \
             = self.env.step(action.cpu().numpy())
         if self.use_imgs_as_states:
@@ -158,6 +161,9 @@ class EnvDataLoader:
         state, *_ = self.env.reset(seed=self.seed)
         if self.policy is not None:
             self.policy.reset()
+            self.policy.perturb_actor(
+                weight_perturbation_size=self.weight_perturbation_size
+            )
         if self.use_imgs_as_states:
             state = self.env.render()
         state = to_tensor(state)
@@ -198,7 +204,8 @@ class EnvDataLoader:
         if self.policy:
             action = self.policy(observation)
             action = action + torch.normal(torch.zeros_like(action), self.noise_size)
-            action = action.squeeze(0)
+            # action = action.squeeze(0)
+            action = action.squeeze()
         else:
             action = self.noise_generator()
             action = torch.tensor(action, device=observation.device)
