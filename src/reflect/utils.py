@@ -35,7 +35,7 @@ class AdamOptim:
 
     def update_lr_by_factor(self, factor):
         for param_group in self.optimizer.param_groups:
-            param_group['lr'] = param_group['lr'] * factor
+            param_group['lr'] = self.lr * factor
 
     def to(self, device):
         # see https://github.com/pytorch/pytorch/issues/2830
