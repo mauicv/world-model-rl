@@ -12,6 +12,7 @@ class AdamOptim:
     def __init__(self, parameters, lr, betas=(0.9, 0.999), eps=1e-8, grad_clip=torch.inf):
         self.parameters = list(parameters)
         self.grad_clip = grad_clip
+        self.lr = lr
         self.optimizer = Adam(self.parameters, lr=lr, betas=betas, eps=eps)
 
     def backward(self, loss, retain_graph=False):
