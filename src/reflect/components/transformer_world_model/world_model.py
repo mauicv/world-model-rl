@@ -110,7 +110,7 @@ class WorldModel(Base):
         if params is None:
             params = self.params
         if training_mask is None:
-            training_mask = torch.ones(o.shape[:2])
+            training_mask = torch.ones(o.shape[:2]).to(o.device)
         b, t, *_  = o.shape
 
         z, z_logits = self.encode(o)
