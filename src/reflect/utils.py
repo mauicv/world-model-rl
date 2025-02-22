@@ -71,7 +71,7 @@ def create_z_dist(logits, temperature=1):
     dist = D.OneHotCategoricalStraightThrough(logits=logits / temperature)
     return D.Independent(dist, 1)
 
-def cross_entropy_loss_fn(z, z_hat):
+def cross_entropy_loss_fn(z, z_hat, training_mask=None):
     """
     In the case of the observational model, the cross_entropy_loss_fn is the
     consistency loss. In that case the z is the output of the observational
@@ -81,8 +81,13 @@ def cross_entropy_loss_fn(z, z_hat):
     the output of the dynamic model given z_(i-1) and z_hat is the output of the
     observational model given o_(i).
     """
+    a = z.base_dist.logits
+    b = z_hat.base_dist.probs.detach()
+    if training_mask is not None:
+        a = a * training_mask[:, :, None, None]
+        b = b
     cross_entropy = (
-        z.base_dist.logits * z_hat.base_dist.probs.detach()
+        a * b
     ).sum(-1)
     return - cross_entropy.sum()
 
