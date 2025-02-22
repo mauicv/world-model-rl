@@ -101,9 +101,10 @@ def test_state_flatten_batch_time(timesteps, state_encoder, state_decoder, dynam
     assert d.shape == (2*timesteps, 1, 1)
 
 
-@pytest.mark.parametrize("timesteps", [16])
 @pytest.mark.parametrize("return_init_states", [True, False])
-def test_world_model(timesteps, return_init_states, encoder, decoder, dynamic_model_8d_action):
+@pytest.mark.parametrize("training_mask", [None, torch.randint(0, 2, (2, 17))])
+def test_world_model(return_init_states, training_mask, encoder, decoder, dynamic_model_8d_action):
+    timesteps = 16
     dm = dynamic_model_8d_action
     wm = WorldModel(
         encoder=encoder, 
@@ -115,37 +116,6 @@ def test_world_model(timesteps, return_init_states, encoder, decoder, dynamic_mo
     a = torch.zeros((2, timesteps+1, 8))
     r = torch.zeros((2, timesteps+1, 1))
     d = torch.zeros((2, timesteps+1, 1))
-
-    if return_init_states:
-        results, (z, a, r, d) = wm.update(o, a, r, d, return_init_states=return_init_states)
-        assert z.shape == (2*(timesteps + 1), 1, 1024)
-        assert a.shape == (2*(timesteps + 1), 1, 8)
-        assert r.shape == (2*(timesteps + 1), 1, 1)
-        assert d.shape == (2*(timesteps + 1), 1, 1)
-    else:
-        results = wm.update(o, a, r, d)
-
-    for key in ['recon_loss', 'reg_loss',
-                'consistency_loss', 'dynamic_loss',
-                'reward_loss', 'done_loss']:
-        assert key in asdict(results)
-
-
-@pytest.mark.parametrize("timesteps", [16])
-@pytest.mark.parametrize("return_init_states", [True, False])
-def test_world_model_update_with_mask(timesteps, return_init_states, encoder, decoder, dynamic_model_8d_action):
-    dm = dynamic_model_8d_action
-    wm = WorldModel(
-        encoder=encoder, 
-        decoder=decoder,
-        dynamic_model=dm,
-    )
-
-    o = torch.zeros((2, timesteps+1, 3, 64, 64))
-    a = torch.zeros((2, timesteps+1, 8))
-    r = torch.zeros((2, timesteps+1, 1))
-    d = torch.zeros((2, timesteps+1, 1))
-    training_mask = torch.randint(0, 2, (2, timesteps+1))
 
     if return_init_states:
         results, (z, a, r, d) = wm.update(o, a, r, d, training_mask=training_mask, return_init_states=return_init_states)
@@ -162,9 +132,10 @@ def test_world_model_update_with_mask(timesteps, return_init_states, encoder, de
         assert key in asdict(results)
 
 
-@pytest.mark.parametrize("timesteps", [16])
 @pytest.mark.parametrize("return_init_states", [True, False])
-def test_state_world_model(timesteps, return_init_states, state_encoder, state_decoder, dynamic_model_8d_action):
+@pytest.mark.parametrize("training_mask", [None, torch.randint(0, 2, (2, 17))])
+def test_state_world_model(return_init_states, training_mask, state_encoder, state_decoder, dynamic_model_8d_action):
+    timesteps = 16
     dm = dynamic_model_8d_action
     wm = WorldModel(
         encoder=state_encoder, 
@@ -178,13 +149,13 @@ def test_state_world_model(timesteps, return_init_states, state_encoder, state_d
     d = torch.zeros((2, timesteps+1, 1))
 
     if return_init_states:
-        results, (z, a, r, d) = wm.update(o, a, r, d, return_init_states=return_init_states)
+        results, (z, a, r, d) = wm.update(o, a, r, d, training_mask=training_mask, return_init_states=return_init_states)
         assert z.shape == (2*(timesteps + 1), 1, 1024)
         assert a.shape == (2*(timesteps + 1), 1, 8)
         assert r.shape == (2*(timesteps + 1), 1, 1)
         assert d.shape == (2*(timesteps + 1), 1, 1)
     else:
-        results = wm.update(o, a, r, d)
+        results = wm.update(o, a, r, d, training_mask=training_mask,)
 
     for key in ['recon_loss', 'reg_loss',
                 'consistency_loss', 'dynamic_loss',
