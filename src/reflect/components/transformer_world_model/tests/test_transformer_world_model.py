@@ -255,3 +255,34 @@ def test_state_world_model_imagine_rollout(
     assert a.shape == (34, 26, 8)
     assert r.shape == (34, 26, 1)
     assert d.shape == (34, 26, 1)
+
+
+@pytest.mark.parametrize("timesteps", [16])
+def test_world_model_imagine_rollout_non_deterministic(
+        timesteps,
+        state_encoder,
+        state_decoder,
+        dynamic_model_8d_action,
+        actor
+    ):
+    dm = dynamic_model_8d_action
+    wm = WorldModel(
+        encoder=state_encoder, 
+        decoder=state_decoder,
+        dynamic_model=dm,
+    )
+    o = torch.zeros((2, timesteps+1, 27))
+    a = torch.zeros((2, timesteps+1, 8))
+    r = torch.zeros((2, timesteps+1, 1))
+    d = torch.zeros((2, timesteps+1, 1))
+    _, (z, a, r, d) = wm.update(o, a, r, d, return_init_states=True)
+    z, a, r, d, entropy = wm.imagine_rollout(
+        z=z, a=a, r=r, d=d,
+        actor=actor,
+        with_entropies=True
+    )
+    assert z.shape == (34, 26, 1024)
+    assert a.shape == (34, 26, 8)
+    assert r.shape == (34, 26, 1)
+    assert d.shape == (34, 26, 1)
+    assert entropy.shape == (34, 26, 1)
