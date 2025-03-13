@@ -153,7 +153,7 @@ class ValueGradTrainer:
         self.critic_optim.update_parameters()
 
         if entropy is not None:
-            entropy = - entropy.mean()
+            entropy = entropy.mean()
             actor_loss = - target_values.mean() - self.eta * entropy
             entropy_loss = entropy.item()
         else:
