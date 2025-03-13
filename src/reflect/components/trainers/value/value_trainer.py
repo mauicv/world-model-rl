@@ -139,7 +139,7 @@ class ValueGradTrainer:
             state_samples,
             reward_samples,
             done_samples,
-            action_distribution_samples=None
+            entropy=None
         ):
         value_loss, target_values = self.value_loss(
             state_samples=state_samples,
@@ -152,8 +152,8 @@ class ValueGradTrainer:
         )
         self.critic_optim.update_parameters()
 
-        if action_distribution_samples is not None:
-            entropy = - action_distribution_samples.entropy().mean()
+        if entropy is not None:
+            entropy = - entropy.mean()
             actor_loss = - target_values.mean() - self.eta * entropy
             entropy_loss = entropy.item()
         else:
