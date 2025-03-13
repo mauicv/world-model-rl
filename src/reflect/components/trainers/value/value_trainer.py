@@ -23,6 +23,7 @@ class ValueGradTrainerLosses:
     actor_grad_norm: float
     value_loss: float
     value_grad_norm: float
+    entropy_loss: float
 
 
 class ValueGradTrainer:
@@ -34,6 +35,7 @@ class ValueGradTrainer:
             grad_clip: float=100,
             gamma: float=0.99,
             lam: float=0.95,
+            eta: float=0.001
         ):
         self.gamma = gamma
         self.actor_lr = actor_lr
@@ -53,6 +55,7 @@ class ValueGradTrainer:
             grad_clip=grad_clip
         )
         self.lam = lam
+        self.eta = eta
         self.gamma_rollout = None
 
     def compute_rollout_value(
@@ -136,6 +139,7 @@ class ValueGradTrainer:
             state_samples,
             reward_samples,
             done_samples,
+            action_distribution_samples=None
         ):
         value_loss, target_values = self.value_loss(
             state_samples=state_samples,
@@ -148,7 +152,13 @@ class ValueGradTrainer:
         )
         self.critic_optim.update_parameters()
 
-        actor_loss = - target_values.mean()
+        if action_distribution_samples is not None:
+            entropy = - action_distribution_samples.entropy().mean()
+            actor_loss = - target_values.mean() - self.eta * entropy
+            entropy_loss = entropy.item()
+        else:
+            actor_loss = - target_values.mean()
+            entropy_loss = 0.0
         actor_gn = self.actor_optim.backward(actor_loss)
         self.actor_optim.update_parameters()
 
@@ -157,7 +167,8 @@ class ValueGradTrainer:
             value_loss=value_loss.item(),
             value_grad_norm=value_gn.item(),
             actor_loss=actor_loss.item(),
-            actor_grad_norm=actor_gn.item()
+            entropy_loss=entropy_loss,
+            actor_grad_norm=actor_gn.item(),
         )
 
     def to(self, device):
