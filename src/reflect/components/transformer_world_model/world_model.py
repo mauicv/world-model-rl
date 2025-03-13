@@ -193,20 +193,42 @@ class WorldModel(Base):
             d: torch.Tensor,
             actor: Actor,
             num_timesteps: int=25,
-            with_observations: bool=False
+            with_observations: bool=False,
+            with_entropies: bool=False
         ):
         
         with FreezeParameters([self.dynamic_model, self.decoder]):
-            for _ in range(num_timesteps):
+            if with_entropies:
+                entropies = []  # Use a list to collect entropies
+                # Calculate entropy for initial state
+                action_dist = actor(z[:, -1, :].detach(), deterministic=False)
+                entropies.append(action_dist.entropy()[:, None])
+
+            for i in range(num_timesteps):
                 new_z, new_r, new_d = self \
                     .dynamic_model.rstep(z=z, a=a, r=r, d=d)
-                action = actor(new_z[:, -1, :].detach(), deterministic=True)
+                if with_entropies:
+                    action_dist = actor(
+                        new_z[:, -1, :].detach(),
+                        deterministic=False
+                    )
+                    action = action_dist.rsample()
+                    entropies.append(action_dist.entropy()[:, None])
+                else:
+                    action = actor(
+                        new_z[:, -1, :].detach(),
+                        deterministic=True
+                    )
                 new_a = torch.cat((a, action[:, None, :]), dim=1)
                 z, a, r, d = new_z, new_a, new_r, new_d
+            to_return = [z, a, r, d]
+            if with_entropies:
+                # Stack the entropies along time dimension
+                entropy = torch.stack(entropies, dim=1)  # [batch, time, 1]
+                to_return.append(entropy)
             if with_observations:
                 b, t, *_ = z.shape
                 o = self.decode(z.reshape(b*t, -1))
                 o = o.reshape(b, t, *o.shape[1:])
-                return z, a, r, d, o
-            return z, a, r, d
-
+                to_return.append(o)
+            return to_return
