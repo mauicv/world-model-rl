@@ -103,11 +103,14 @@ class WorldModel(Base):
             a: torch.Tensor,
             r: torch.Tensor,
             d: torch.Tensor,
+            training_mask: Optional[torch.Tensor] = None,
             params: Optional[WorldModelTrainingParams] = None,
             return_init_states: bool=False
         ):
         if params is None:
             params = self.params
+        if training_mask is None:
+            training_mask = torch.ones(o.shape[:2]).to(o.device)
         b, t, *_  = o.shape
 
         z, z_logits = self.encode(o)
@@ -125,22 +128,31 @@ class WorldModel(Base):
         z = z.detach()
         _, num_z, num_c = z_logits.shape
         z_logits = z_logits.reshape(b, t, num_z, num_c)
+
         r_targets = r[:, 1:].detach()
         d_targets = d[:, 1:].detach()
         z_logits = z_logits[:, 1:]
         next_z_dist = create_z_dist(z_logits.detach())
         c_z_dist = create_z_dist(z_logits)
         
-        z_inputs, r_inputs, a_inputs = (
+        z_inputs, r_inputs, a_inputs, training_mask_inputs = (
             z[:, :-1].detach(),
             r[:, :-1].detach(),
-            a[:, :-1].detach()
+            a[:, :-1].detach(),
+            training_mask[:, :-1].detach()
         )
-
+        z_inputs = z_inputs * training_mask_inputs[:, :, None]
+        r_inputs = r_inputs * training_mask_inputs[:, :, None]
         z_pred, r_pred, d_pred = self.dynamic_model(
             z_inputs, a_inputs, r_inputs,
         )
-        dynamic_loss = cross_entropy_loss_fn(z_pred, next_z_dist)
+
+        training_mask_targets = training_mask[:, 1:].detach()
+        r_pred = r_pred * training_mask_targets[:, :, None]
+        d_pred = d_pred * training_mask_targets[:, :, None]
+        dynamic_loss = cross_entropy_loss_fn(
+            z_pred, next_z_dist, training_mask_targets
+        )
         reward_loss = reward_loss_fn(r_targets, r_pred)
         done_loss = done_loss_fn(d_pred, d_targets.float())
 
