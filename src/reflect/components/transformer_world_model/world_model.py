@@ -105,7 +105,8 @@ class WorldModel(Base):
             d: torch.Tensor,
             training_mask: Optional[torch.Tensor] = None,
             params: Optional[WorldModelTrainingParams] = None,
-            return_init_states: bool=False
+            return_init_states: bool=False,
+            no_update: bool=False
         ):
         if params is None:
             params = self.params
@@ -173,8 +174,14 @@ class WorldModel(Base):
 
         dynamic_grad_norm = self.dynamic_model_opt.backward(dyn_loss, retain_graph=False)
         observation_grad_norm = self.observation_model_opt.backward(obs_loss, retain_graph=False)
-        self.dynamic_model_opt.update_parameters()
-        self.observation_model_opt.update_parameters()
+        
+        if no_update:
+            self.dynamic_model_opt.zero_grad()
+            self.observation_model_opt.zero_grad()
+        else:
+            self.dynamic_model_opt.update_parameters()
+            self.observation_model_opt.update_parameters()
+
         losses = WorldModelLosses(
             recon_loss=recon_loss.detach().cpu().item(),
             reg_loss= reg_loss.detach().cpu().item(),
