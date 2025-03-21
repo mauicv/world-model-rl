@@ -24,6 +24,9 @@ class AdamOptim:
     def update_parameters(self):
         self.optimizer.step()
 
+    def zero_grad(self):
+        self.optimizer.zero_grad()
+
     def load_state_dict(self, state_dict):
         self.optimizer.load_state_dict(state_dict)
 
