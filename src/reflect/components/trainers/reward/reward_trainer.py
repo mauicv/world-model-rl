@@ -7,7 +7,7 @@ import torch
 class RewardGradTrainerLosses:
     actor_loss: float
     entropy_loss: float
-    grad_norm: float
+    actor_grad_norm: float
 
 
 class RewardGradTrainer:
