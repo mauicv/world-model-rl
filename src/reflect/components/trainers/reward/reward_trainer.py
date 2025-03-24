@@ -49,7 +49,7 @@ class RewardGradTrainer:
         return RewardGradTrainerLosses(
             actor_loss=actor_loss.item(),
             entropy_loss=entropy_loss,
-            grad_norm=grad_norm.item()
+            actor_grad_norm=grad_norm.item()
         )
 
     def to(self, device):
