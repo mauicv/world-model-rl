@@ -15,8 +15,9 @@ class RewardGradTrainer:
             actor: Actor,
             lr: float=8e-05,
             grad_clip: float=1,
+            eta: float=0.001
         ):
-
+        self.eta = eta
         self.lr = lr
         self.grad_clip = grad_clip
         self.actor = actor
