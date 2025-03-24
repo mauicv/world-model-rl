@@ -6,6 +6,7 @@ import torch
 @dataclass
 class RewardGradTrainerLosses:
     actor_loss: float
+    entropy_loss: float
     grad_norm: float
 
 
@@ -28,14 +29,25 @@ class RewardGradTrainer:
     def update(
         self,
         reward_samples,
-        done_samples
+        done_samples,
+        entropy=None
     ) -> RewardGradTrainerLosses:
         batch_size = reward_samples.shape[0]
-        loss = - ((1 - done_samples.detach()) * reward_samples).sum()/batch_size
-        grad_norm = self.actor_optim.backward(loss)
+
+        actor_loss = - ((1 - done_samples.detach()) * reward_samples).sum()/batch_size
+        if entropy is not None:
+            entropy = entropy.mean()
+            total_loss = actor_loss - self.eta * entropy
+            entropy_loss = entropy.item()
+        else:
+            total_loss = actor_loss
+            entropy_loss = 0.0        
+        
+        grad_norm = self.actor_optim.backward(total_loss)
         self.actor_optim.update_parameters()
         return RewardGradTrainerLosses(
-            actor_loss=loss.item(),
+            actor_loss=actor_loss.item(),
+            entropy_loss=entropy_loss,
             grad_norm=grad_norm.item()
         )
 
