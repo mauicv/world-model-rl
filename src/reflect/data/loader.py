@@ -80,7 +80,8 @@ class EnvDataLoader:
             seed=None,
             noise_size=0.05,
             weight_perturbation_size=0.01,
-            use_imgs_as_states=True
+            use_imgs_as_states=True,
+            priority_sampling_temperature=None
         ):
 
         if processing is None:
@@ -115,6 +116,7 @@ class EnvDataLoader:
         self.state_shape = state_shape
         self.policy = policy
         self.noise_generator = noise_generator
+        self.priority_sampling_temperature = priority_sampling_temperature
 
         self.rollout_ind = 0
         self.state_buffer = torch.zeros(
@@ -140,6 +142,11 @@ class EnvDataLoader:
         self.end_index = torch.zeros(
             self.num_runs,
             dtype=torch.int
+        )
+
+        self.reward_sums = torch.zeros(
+            self.num_runs,
+            dtype=torch.float32
         )
 
         self.current_index = 0
@@ -196,6 +203,7 @@ class EnvDataLoader:
             state, reward, done = self.step(action)
             if done and index > self.num_time_steps:
                 break
+        self.reward_sums[run_index] = self.reward_buffer[run_index].sum()
         self.end_index[run_index] = index
         self.rollout_ind += 1
 
@@ -218,12 +226,23 @@ class EnvDataLoader:
 
     def postprocess(self, x):
         return self.processing.postprocess(x)
+    
+    def _sample_indices(self, batch_size, temperature=None, max_index=None):
+        rewards_tensor = torch.tensor(self.reward_sums, dtype=torch.float32)
+        if temperature is None:
+            indices = torch.randint(0, max_index, (batch_size, 1))
+        else:
+            probs = torch.softmax(rewards_tensor[:max_index] / temperature, dim=0)
+            indices = torch.multinomial(probs, batch_size, replacement=True)
+            indices = indices.unsqueeze(1)
+        return indices
 
     def sample(
             self,
             batch_size=None,
             num_time_steps=None,
-            from_start=False
+            from_start=False,
+            use_priority_sampling=None
         ):
         """Sample a batch of data from the buffer.
 
@@ -234,14 +253,28 @@ class EnvDataLoader:
                 The number of time steps to sample.
             from_start: bool, optional
                 If True, sample from the start of the rollout.
+            use_priority_sampling: bool, optional
+                Can be used to disable priority sampling if
+                priority_sampling_temperature in __init__ is
+                not None. Otherwise has no effect.
         """
         if not batch_size:
             batch_size = self.batch_size
         if not num_time_steps:
             num_time_steps = self.num_time_steps
 
+        if use_priority_sampling is None:
+            use_priority_sampling = self.priority_sampling_temperature is not None
+
         max_index = min(self.rollout_ind, self.num_runs)
-        b_inds = torch.randint(0, max_index, (batch_size, 1))
+        priority_sampling_temperature = self.priority_sampling_temperature \
+            if use_priority_sampling else None
+        b_inds = self._sample_indices(
+            batch_size,
+            temperature=priority_sampling_temperature,
+            max_index=max_index
+        )
+
         end_inds = self.end_index[b_inds]
         t_inds = []
         if from_start:
