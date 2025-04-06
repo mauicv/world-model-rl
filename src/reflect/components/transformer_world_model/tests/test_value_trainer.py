@@ -3,7 +3,7 @@ from reflect.components.trainers.value.value_trainer import ValueGradTrainer
 from reflect.components.models.actor import Actor
 from reflect.components.trainers.value.critic import ValueCritic
 from reflect.components.transformer_world_model.tests.conftest import make_dynamic_model
-from reflect.data.loader import EnvDataLoader, GymRenderImgProcessing
+from reflect.data.basic_loader import EnvDataLoader, GymRenderImgProcessing
 from reflect.components.transformer_world_model import WorldModel
 from reflect.components.transformer_world_model.environment import Environment
 from torchvision.transforms import Resize, Compose

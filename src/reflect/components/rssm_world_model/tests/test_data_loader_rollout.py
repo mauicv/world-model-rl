@@ -1,6 +1,6 @@
 import torch
 from reflect.components.rssm_world_model.memory_actor import WorldModelActor
-from reflect.data.loader import EnvDataLoader
+from reflect.data.basic_loader import EnvDataLoader
 
 def test_actor_with_world_model(world_model_actor: WorldModelActor):
     world_model_actor.reset()
