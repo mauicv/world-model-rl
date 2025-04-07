@@ -1,6 +1,7 @@
 import pytest
 import gymnasium as gym
 from reflect.components.transformer_world_model.transformer import PytfexTransformer
+from reflect.components.transformer_world_model.steered_transformer import SteeredPytfexTransformer
 from reflect.data.basic_loader import EnvDataLoader, GymRenderImgProcessing
 
 from reflect.components.models import ConvEncoder, ConvDecoder
@@ -132,7 +133,7 @@ def dynamic_model_1d_action():
 def dynamic_model_8d_action():
     return make_dynamic_model(8)
 
-def make_dynamic_model(a_size):
+def make_dynamic_model(a_size, steered=False):
     hdn_dim=32
     num_heads=8
     latent_dim=32
@@ -140,15 +141,29 @@ def make_dynamic_model(a_size):
     t_dim=16
     layers=2
     dropout=0.05
+    
 
-    dynamic_model = PytfexTransformer(
-        dropout=dropout,
-        hdn_dim=hdn_dim,
-        num_heads=num_heads,
-        num_ts=t_dim,
-        num_cat=num_cat,
-        latent_dim=latent_dim,
-        action_size=a_size,
-        num_layers=layers
-    )
+    if not steered: 
+        dynamic_model = PytfexTransformer(
+            dropout=dropout,
+            hdn_dim=hdn_dim,
+            num_heads=num_heads,
+            num_ts=t_dim,
+            num_cat=num_cat,
+            latent_dim=latent_dim,
+            action_size=a_size,
+            num_layers=layers,
+        )
+    if steered:
+        dynamic_model = SteeredPytfexTransformer(
+            dropout=dropout,
+            hdn_dim=hdn_dim,
+            num_heads=num_heads,
+            num_ts=t_dim,
+            num_cat=num_cat,
+            latent_dim=latent_dim,
+            action_size=a_size,
+            num_layers=layers,
+            embedding_type='stack'
+        )
     return dynamic_model
