@@ -1,4 +1,4 @@
-from reflect.data.loader import EnvDataLoader, GymRenderImgProcessing
+from reflect.data.basic_loader import EnvDataLoader, GymRenderImgProcessing
 from reflect.components.transformer_world_model import WorldModel
 from reflect.components.transformer_world_model.environment import Environment
 from reflect.components.transformer_world_model.tests.conftest import make_dynamic_model

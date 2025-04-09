@@ -1,5 +1,5 @@
 from reflect.examples.simple_rl_env import SimpleRLEnvironment
-from reflect.data.loader import EnvDataLoader
+from reflect.data.basic_loader import EnvDataLoader
 from reflect.components.transformer_world_model.environment import Environment
 from reflect.components.transformer_world_model import WorldModel
 import torch
