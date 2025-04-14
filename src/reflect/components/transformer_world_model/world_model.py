@@ -142,7 +142,7 @@ class WorldModel(Base):
             a[:, :-1].detach(),
             training_mask[:, :-1].detach()
         )
-        z_inputs = z_inputs * training_mask_inputs[:, :, None]
+        # z_inputs = z_inputs * training_mask_inputs[:, :, None]
         r_inputs = r_inputs * training_mask_inputs[:, :, None]
         z_pred, r_pred, d_pred = self.dynamic_model(
             z_inputs, a_inputs, r_inputs,
