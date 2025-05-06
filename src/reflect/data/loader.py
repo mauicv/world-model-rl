@@ -78,7 +78,8 @@ class EnvDataLoader:
             ),
             noise_generator=None,
             seed=None,
-            noise_size=0.05,
+            noise_size=0.3,
+            noise_prob=0.2,
             weight_perturbation_size=0.01,
             use_imgs_as_states=True,
             priority_sampling_temperature=None
@@ -94,6 +95,7 @@ class EnvDataLoader:
         self.env = env
         self.seed = seed
         self.noise_size = noise_size
+        self.noise_prob = noise_prob
         self.use_imgs_as_states = use_imgs_as_states
         _ = self.env.reset()
         self.action_dim = self.env.action_space.shape[0]
@@ -210,7 +212,8 @@ class EnvDataLoader:
     def compute_action(self, observation):
         if self.policy:
             action = self.policy(observation)
-            action = action + torch.normal(torch.zeros_like(action), self.noise_size)
+            if torch.rand(1) < self.noise_prob:
+                action = action + torch.normal(torch.zeros_like(action), self.noise_size)
             # action = action.squeeze(0)
             action = action.squeeze()
         else:
