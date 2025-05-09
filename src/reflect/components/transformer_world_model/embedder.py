@@ -1,6 +1,29 @@
 import torch
 
 
+class StateActionBaseEmbedder(torch.nn.Module):
+    def __init__(
+            self,
+            z_dim: int=None,
+            a_size: int=None,
+            hidden_dim: int=None,
+        ):
+        super(StateActionBaseEmbedder, self).__init__()
+        self.hidden_dim = hidden_dim
+
+        self.a_emb = torch.nn.Sequential(
+            torch.nn.Linear(a_size, hidden_dim),
+            torch.nn.ELU(),
+            torch.nn.Linear(hidden_dim, hidden_dim),
+        )
+
+        self.z_emb = torch.nn.Sequential(
+            torch.nn.Linear(z_dim, hidden_dim),
+            torch.nn.ELU(),
+            torch.nn.Linear(hidden_dim, hidden_dim),
+        )
+
+
 class BaseEmbedder(torch.nn.Module):
     def __init__(
             self,
@@ -44,6 +67,7 @@ class StackEmbedder(BaseEmbedder):
         a_emb = self.a_emb(a)
         r_emb = self.r_emb(r.type(torch.float))
         s_emb = self.z_emb(s)
+        # should -1 be the time dimension?
         return (
             torch.stack([s_emb, a_emb, r_emb], dim=2)
             .view(b, -1, self.hidden_dim)
@@ -92,3 +116,27 @@ class ConcatEmbedder(BaseEmbedder):
         r_emb = self.r_emb(r.type(torch.float))
         s_emb = self.z_emb(s)
         return torch.concat([s_emb, a_emb, r_emb], dim=-1)
+
+
+class StateActionStackEmbedder(StateActionBaseEmbedder):
+    def __init__(
+            self,
+            z_dim: int=None,
+            a_size: int=None,
+            hidden_dim: int=None,
+        ):
+        super(StateActionStackEmbedder, self).__init__(
+            z_dim=z_dim,
+            a_size=a_size,
+            hidden_dim=hidden_dim,
+        )
+
+    def forward(self, x):
+        s, a = x
+        b, *_ = s.shape
+        a_emb = self.a_emb(a)
+        s_emb = self.z_emb(s)
+        return (
+            torch.stack([s_emb, a_emb], dim=2)
+            .view(b, -1, self.hidden_dim)
+        )    

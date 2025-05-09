@@ -122,3 +122,35 @@ class ConcatHead(BaseHead):
         s = s.reshape(b, t, self.latent_dim, self.num_cat)
         z_dist = self.create_z_dist(s)
         return z_dist, r, d
+
+
+class StateActionStackHead(BaseHead):
+    def __init__(
+            self,
+            latent_dim: int=None,
+            num_cat: int=None,
+            hidden_dim: int=None,
+        ):
+        super(StateActionStackHead, self).__init__(
+            latent_dim=latent_dim,
+            num_cat=num_cat,
+            hidden_dim=hidden_dim
+        )
+
+    def forward(self, x):
+        b, t, _ = x.shape
+        reshaped_x = x.view(b, -1, 2, self.hidden_dim)
+        s_emb, a_emb = reshaped_x.unbind(dim=2)
+        d = self.done_output_activation(self.done(s_emb))
+        r = self.reward(s_emb)
+        s = self.predictor(a_emb)
+        s = s.reshape(b, int(t/2), self.latent_dim, self.num_cat)
+        z_dist = self.create_z_dist(s)
+        return z_dist, r, d
+    
+    def compute_reward(self, x):
+        b, t, _ = x.shape
+        reshaped_x = x.view(b, -1, 2, self.hidden_dim)
+        s_emb, a_emb = reshaped_x.unbind(dim=2)
+        r = self.reward(s_emb)
+        return r

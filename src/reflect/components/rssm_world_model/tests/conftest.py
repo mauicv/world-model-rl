@@ -1,6 +1,6 @@
 import pytest
 import gymnasium as gym
-from reflect.data.loader import EnvDataLoader, GymRenderImgProcessing
+from reflect.data.basic_loader import EnvDataLoader, GymRenderImgProcessing
 
 from reflect.components.models import ConvEncoder, ConvDecoder
 from reflect.components.rssm_world_model.models import DenseModel

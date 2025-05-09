@@ -100,6 +100,10 @@ def reward_loss_fn(r, r_pred):
     return - r_pred_dist.log_prob(r).mean()
 
 
+def steer_loss_fn(r, r_pred):
+    return F.binary_cross_entropy(torch.sigmoid(r_pred), r)
+
+
 class CSVLogger:
     def __init__(self, fieldnames, path='results.csv'):
         self.fieldnames = fieldnames

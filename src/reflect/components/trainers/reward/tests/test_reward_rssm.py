@@ -1,4 +1,4 @@
-from reflect.data.loader import EnvDataLoader, GymRenderImgProcessing
+from reflect.data.basic_loader import EnvDataLoader, GymRenderImgProcessing
 from reflect.components.rssm_world_model.world_model import WorldModel
 from reflect.components.models.actor import Actor
 from reflect.components.trainers.reward.reward_trainer import RewardGradTrainer
