@@ -29,7 +29,7 @@ class ValueCritic(torch.nn.Module):
     def _init_weights(self):
         for m in self.modules():
             if isinstance(m, torch.nn.Linear):
-                torch.nn.init.orthogonal_(m.weight, gain=torch.nn.init.calculate_gain('elu'))
+                torch.nn.init.orthogonal_(m.weight, gain=torch.nn.init.calculate_gain('relu'))
                 torch.nn.init.constant_(m.bias, 0)
 
     def forward(self, x):
