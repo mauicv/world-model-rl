@@ -11,13 +11,14 @@ class Actor(torch.nn.Module):
             bound,
             num_layers=3,
             hidden_dim=512,
+            action_scale=5.0,
         ):
         super().__init__()
         self.input_dim = input_dim
         self.output_dim = output_dim
         self.count = 0
         self.action = None
-
+        self.action_scale = action_scale
         self.bound = torch.tensor(bound, dtype=torch.float32)
         self.num_layers=num_layers
         self.hidden_dim=hidden_dim
@@ -49,7 +50,7 @@ class Actor(torch.nn.Module):
     def forward(self, x, deterministic=False):
         x = self.layers(x)
         mu = self.mu(x)
-        mu = torch.tanh(mu) * self.bound
+        mu = torch.tanh(mu / self.action_scale) * (self.action_scale * self.bound)
         if deterministic:
             return mu
 
