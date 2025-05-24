@@ -50,7 +50,7 @@ class Actor(torch.nn.Module):
     def forward(self, x, deterministic=False):
         x = self.layers(x)
         mu = self.mu(x)
-        mu = torch.tanh(mu / self.action_scale) * (self.action_scale * self.bound)
+        mu = torch.tanh(mu / self.action_scale) * self.bound
         if deterministic:
             return mu
 
