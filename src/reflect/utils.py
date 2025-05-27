@@ -51,13 +51,12 @@ class AdamOptim:
 
 def recon_loss_fn(x, y):
     if len(x.shape) == 4:
-        # do we need to permute?
         x, y = x.permute(0, 2, 3, 1), y.permute(0, 2, 3, 1)
         y_dist = D.Independent(D.Normal(y, torch.ones_like(y)), 3)
     elif len(x.shape) == 2:
         y_dist = D.Independent(D.Normal(y, torch.ones_like(y)), 1)
     else:
-        raise ValueError(f"Expected input shape to be 3 or 4, got {len(x.shape)}")
+        raise ValueError(f"Expected input shape to be 2 or 4, got {len(x.shape)}")
     return - y_dist.log_prob(x).mean()
 
 
@@ -73,6 +72,7 @@ def create_z_dist(logits, temperature=1):
     assert temperature > 0
     dist = D.OneHotCategoricalStraightThrough(logits=logits / temperature)
     return D.Independent(dist, 1)
+
 
 def cross_entropy_loss_fn(z, z_hat, training_mask=None):
     """
@@ -137,7 +137,6 @@ class CSVLogger:
                 axs[i].set_title(fields)
                 axs[i].legend()
         plt.show()
-
 
 
 # see https://github.com/juliusfrost/dreamer-pytorch/blob/main/dreamer/utils/module.py
