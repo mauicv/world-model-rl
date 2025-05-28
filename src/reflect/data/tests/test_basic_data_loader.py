@@ -1,4 +1,4 @@
-from reflect.data.loader import EnvDataLoader
+from reflect.data.basic_loader import EnvDataLoader
 from reflect.components.transformer_world_model.world_model_actor import EncoderActor
 from reflect.components.models import ConvEncoder
 from reflect.components.models import Actor
