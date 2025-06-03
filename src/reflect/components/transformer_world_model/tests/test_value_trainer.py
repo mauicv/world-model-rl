@@ -5,7 +5,6 @@ from reflect.components.trainers.value.critic import ValueCritic
 from reflect.components.transformer_world_model.tests.conftest import make_dynamic_model
 from reflect.data.loader import EnvDataLoader, GymRenderImgProcessing
 from reflect.components.transformer_world_model import WorldModel
-from reflect.components.transformer_world_model.environment import Environment
 from torchvision.transforms import Resize, Compose
 from dataclasses import asdict
 
@@ -48,7 +47,7 @@ def test_update(encoder, decoder, actor):
         critic=critic,
     )
 
-    o, a, r, d = dl.sample(batch_size=2)
+    _, _, o, a, r, d = dl.sample(batch_size=2)
     _, (z, a, r, d) = wm.update(o, a, r, d, return_init_states=True)
 
     z, a, r, d = wm.imagine_rollout(
@@ -106,7 +105,7 @@ def test_update_state(state_encoder, state_decoder, actor):
         critic=critic,
     )
 
-    o, a, r, d = dl.sample(batch_size=2)
+    _, _, o, a, r, d = dl.sample(batch_size=2)
     _, (z, a, r, d) = wm.update(o, a, r, d, return_init_states=True)
 
     z, a, r, d = wm.imagine_rollout(

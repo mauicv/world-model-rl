@@ -5,7 +5,6 @@ See also: https://colab.research.google.com/drive/10-QQlnSFZeWBC7JCm0mPraGBPLVU2
 
 import gymnasium as gym
 from reflect.data.noise import NoNoise
-from reflect.utils import FreezeParameters
 from torchvision.transforms import Resize, Compose
 import torch
 import numpy as np
@@ -81,7 +80,8 @@ class EnvDataLoader:
             noise_size=0.05,
             weight_perturbation_size=0.01,
             use_imgs_as_states=True,
-            priority_sampling_temperature=None
+            priority_sampling_temperature=None,
+            use_custom_priorities=False
         ):
 
         if processing is None:
@@ -117,6 +117,7 @@ class EnvDataLoader:
         self.policy = policy
         self.noise_generator = noise_generator
         self.priority_sampling_temperature = priority_sampling_temperature
+        self.use_custom_priorities = use_custom_priorities
 
         self.rollout_ind = 0
         self.state_buffer = torch.zeros(
@@ -149,6 +150,12 @@ class EnvDataLoader:
             dtype=torch.float32
         )
 
+        self.priorities = torch.ones(
+            self.num_runs,
+            self.rollout_length,
+            dtype=torch.float32
+        )
+
         self.current_index = 0
 
         if noise_generator is None:
@@ -175,6 +182,9 @@ class EnvDataLoader:
         state = to_tensor(state)
         state = self.processing.preprocess(state)
         return state
+    
+    def update_priorities(self, b_inds, t_inds, values):
+        self.priorities[b_inds, t_inds] = values
 
     def perform_rollout(self):
         """Performs a rollout of the environment.
@@ -204,6 +214,8 @@ class EnvDataLoader:
             if done and index > self.num_time_steps:
                 break
         self.reward_sums[run_index] = self.reward_buffer[run_index].sum()
+        self.priorities[run_index] = torch.ones(self.rollout_length)
+        self.priorities[run_index, index-self.num_time_steps:] = 0
         self.end_index[run_index] = index
         self.rollout_ind += 1
 
@@ -227,21 +239,50 @@ class EnvDataLoader:
     def postprocess(self, x):
         return self.processing.postprocess(x)
     
-    def _sample_indices(self, batch_size, temperature=None, max_index=None):
-        rewards_tensor = torch.tensor(self.reward_sums, dtype=torch.float32)
+    def _sample_batch_indices(
+            self,
+            batch_size,
+            temperature=None,
+            max_index=None,
+        ):
+
         if temperature is None:
             indices = torch.randint(0, max_index, (batch_size, 1))
         else:
-            probs = torch.softmax(rewards_tensor[:max_index] / temperature, dim=0)
+            if self.use_custom_priorities:
+                priorities = torch.tensor(self.priorities, dtype=torch.float32).sum(dim=1)
+            else:
+                priorities = torch.tensor(self.reward_sums, dtype=torch.float32)
+            probs = torch.softmax(priorities[:max_index] / temperature, dim=0)
             indices = torch.multinomial(probs, batch_size, replacement=True)
             indices = indices.unsqueeze(1)
         return indices
+    
+    def _sample_step_indices(
+            self,
+            b_inds,
+            num_time_steps,
+            temperature=None,
+        ):
+        end_inds = self.end_index[b_inds]
+        t_inds = []
+        if self.use_custom_priorities:
+            priorities = torch.tensor(self.priorities[b_inds[:, 0]], dtype=torch.float32)
+            for i, end_ind in enumerate(end_inds):
+                probs = torch.softmax(priorities[i, :end_ind - num_time_steps] / temperature, dim=0)
+                t_ind = torch.multinomial(probs, 1, replacement=True)
+                t_inds.append(t_ind)
+        else:
+            for end_ind in end_inds:
+                t_ind = torch.randint(0, (end_ind - num_time_steps), (1, ))
+                t_inds.append(t_ind)
+        t_inds = torch.cat(t_inds, dim=0)
+        return t_inds
 
     def sample(
             self,
             batch_size=None,
             num_time_steps=None,
-            from_start=False,
             use_priority_sampling=None
         ):
         """Sample a batch of data from the buffer.
@@ -251,8 +292,6 @@ class EnvDataLoader:
                 The number of samples to return.
             num_time_steps: int, optional
                 The number of time steps to sample.
-            from_start: bool, optional
-                If True, sample from the start of the rollout.
             use_priority_sampling: bool, optional
                 Can be used to disable priority sampling if
                 priority_sampling_temperature in __init__ is
@@ -269,23 +308,19 @@ class EnvDataLoader:
         max_index = min(self.rollout_ind, self.num_runs)
         priority_sampling_temperature = self.priority_sampling_temperature \
             if use_priority_sampling else None
-        b_inds = self._sample_indices(
+        b_inds = self._sample_batch_indices(
             batch_size,
             temperature=priority_sampling_temperature,
             max_index=max_index
         )
-
-        end_inds = self.end_index[b_inds]
-        t_inds = []
-        if from_start:
-            t_inds = torch.zeros(batch_size, dtype=torch.int)
-        else:
-            for end_ind in end_inds:
-                t_ind = torch.randint(0, (end_ind - num_time_steps), (1, ))
-                t_inds.append(t_ind)
-            t_inds = torch.cat(t_inds, dim=0)
+        t_inds = self._sample_step_indices(
+            b_inds,
+            num_time_steps,
+            temperature=priority_sampling_temperature,
+        )
         t_inds = t_inds[:, None] + torch.arange(0, num_time_steps)
         return (
+            b_inds, t_inds,
             self.state_buffer[b_inds, t_inds].detach(),
             self.action_buffer[b_inds, t_inds].detach(),
             self.reward_buffer[b_inds, t_inds].unsqueeze(-1).detach(),
