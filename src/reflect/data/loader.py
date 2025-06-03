@@ -273,7 +273,7 @@ class EnvDataLoader:
             for i, end_ind in enumerate(end_inds):
                 probs = torch.softmax(priorities[i, sample_offset:end_ind - (num_time_steps - sample_offset)] / temperature, dim=0)
                 t_ind = torch.multinomial(probs, 1, replacement=True)
-                t_inds.append(t_ind + sample_offset)
+                t_inds.append(t_ind - sample_offset)
         else:
             for end_ind in end_inds:
                 t_ind = torch.randint(0, (end_ind - num_time_steps), (1, ))
