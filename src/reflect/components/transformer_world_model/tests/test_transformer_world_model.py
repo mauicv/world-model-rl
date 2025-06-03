@@ -169,6 +169,10 @@ def test_state_world_model(return_init_states, training_mask, state_encoder, sta
                 'reward_loss', 'done_loss']:
         assert key in asdict(results)
 
+    assert results.recon_loss_per_timestep.shape == (2, timesteps+1)
+    assert results.dynamic_loss_per_timestep.shape == (2, timesteps)
+    assert results.reward_loss_per_timestep.shape == (2, timesteps)
+
 
 def test_save_load(tmp_path, encoder, decoder, dynamic_model_8d_action):
     dm = dynamic_model_8d_action

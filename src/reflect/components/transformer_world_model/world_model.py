@@ -195,7 +195,7 @@ class WorldModel(Base):
             done_loss= done_loss.detach().cpu().item(),
             dynamic_grad_norm=dynamic_grad_norm.cpu().item(),
             observation_grad_norm=observation_grad_norm.cpu().item(),
-            recon_loss_per_timestep=recon_loss_per_timestep.detach().cpu(),
+            recon_loss_per_timestep=recon_loss_per_timestep.reshape(b, t).detach().cpu(),
             dynamic_loss_per_timestep=dynamic_loss_per_timestep.detach().cpu(),
             reward_loss_per_timestep=reward_loss_per_timestep.detach().cpu(),
         )
