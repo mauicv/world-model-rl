@@ -49,7 +49,7 @@ class AdamOptim:
                     state[k] = v.to(device)
 
 
-def recon_loss_fn(x, y):
+def recon_loss_fn(x, y, return_per_timestep=False):
     if len(x.shape) == 4:
         x, y = x.permute(0, 2, 3, 1), y.permute(0, 2, 3, 1)
         y_dist = D.Independent(D.Normal(y, torch.ones_like(y)), 3)
@@ -57,7 +57,10 @@ def recon_loss_fn(x, y):
         y_dist = D.Independent(D.Normal(y, torch.ones_like(y)), 1)
     else:
         raise ValueError(f"Expected input shape to be 2 or 4, got {len(x.shape)}")
-    return - y_dist.log_prob(x).mean()
+    ts_loss = - y_dist.log_prob(x)
+    if return_per_timestep:
+        return ts_loss.mean(), ts_loss.detach()
+    return ts_loss.mean()
 
 
 def reg_loss_fn(z_logits, temperature=1):
@@ -74,7 +77,7 @@ def create_z_dist(logits, temperature=1):
     return D.Independent(dist, 1)
 
 
-def cross_entropy_loss_fn(z, z_hat, training_mask=None):
+def cross_entropy_loss_fn(z, z_hat, training_mask=None, return_per_timestep=False):
     """
     In the case of the observational model, the cross_entropy_loss_fn is the
     consistency loss. In that case the z is the output of the observational
@@ -92,12 +95,17 @@ def cross_entropy_loss_fn(z, z_hat, training_mask=None):
     cross_entropy = (
         a * b
     ).sum(-1)
+    if return_per_timestep:
+        return - cross_entropy.sum(), - cross_entropy.detach().sum(-1)
     return - cross_entropy.sum()
 
 
-def reward_loss_fn(r, r_pred):
+def reward_loss_fn(r, r_pred, return_per_timestep=False):
     r_pred_dist = D.Independent(D.Normal(r_pred, torch.ones_like(r_pred)), 1)
-    return - r_pred_dist.log_prob(r).mean()
+    ts_loss = - r_pred_dist.log_prob(r)
+    if return_per_timestep:
+        return ts_loss.mean(), ts_loss.detach()
+    return ts_loss.mean()
 
 
 class CSVLogger:
