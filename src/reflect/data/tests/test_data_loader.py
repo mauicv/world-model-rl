@@ -131,7 +131,12 @@ def test_data_loader_custom_priority_sampling(env_name):
         assert torch.all(data_loader.action_buffer[i, data_loader.end_index[i]+1:] == 0)
         assert torch.all(data_loader.reward_buffer[i, data_loader.end_index[i]+1:] == 0)
 
-    b_inds, t_inds, s, a, r, d = data_loader.sample(batch_size=3, num_time_steps=10, use_priority_sampling=True)
+    b_inds, t_inds, s, a, r, d = data_loader.sample(
+        batch_size=3,
+        num_time_steps=10,
+        use_priority_sampling=True,
+        sample_offset=5
+    )
     assert b_inds.shape == (3, 1)
     assert t_inds.shape == (3, 10)
     assert s.shape == (3, 10, 27)

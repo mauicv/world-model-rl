@@ -263,15 +263,17 @@ class EnvDataLoader:
             b_inds,
             num_time_steps,
             temperature=None,
+            sample_offset=0,
         ):
+        assert sample_offset < num_time_steps, f'{sample_offset=}, {num_time_steps=}'
         end_inds = self.end_index[b_inds]
         t_inds = []
         if self.use_custom_priorities:
             priorities = torch.tensor(self.priorities[b_inds[:, 0]], dtype=torch.float32)
             for i, end_ind in enumerate(end_inds):
-                probs = torch.softmax(priorities[i, :end_ind - num_time_steps] / temperature, dim=0)
+                probs = torch.softmax(priorities[i, sample_offset:end_ind - (num_time_steps - sample_offset)] / temperature, dim=0)
                 t_ind = torch.multinomial(probs, 1, replacement=True)
-                t_inds.append(t_ind)
+                t_inds.append(t_ind + sample_offset)
         else:
             for end_ind in end_inds:
                 t_ind = torch.randint(0, (end_ind - num_time_steps), (1, ))
@@ -283,7 +285,8 @@ class EnvDataLoader:
             self,
             batch_size=None,
             num_time_steps=None,
-            use_priority_sampling=None
+            use_priority_sampling=None,
+            sample_offset=0,
         ):
         """Sample a batch of data from the buffer.
 
@@ -296,6 +299,11 @@ class EnvDataLoader:
                 Can be used to disable priority sampling if
                 priority_sampling_temperature in __init__ is
                 not None. Otherwise has no effect.
+            sample_offset: int, optional
+                The number of time steps to offset the sample 
+                by. For use with priority sampling to choose
+                portions of the rollout that contain the most
+                information.
         """
         if not batch_size:
             batch_size = self.batch_size
@@ -317,6 +325,7 @@ class EnvDataLoader:
             b_inds,
             num_time_steps,
             temperature=priority_sampling_temperature,
+            sample_offset=sample_offset,
         )
         t_inds = t_inds[:, None] + torch.arange(0, num_time_steps)
         return (
