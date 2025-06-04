@@ -85,15 +85,13 @@ def cross_entropy_loss_fn(z, z_hat, training_mask=None):
     the output of the dynamic model given z_(i-1) and z_hat is the output of the
     observational model given o_(i).
     """
-    a = z.base_dist.logits
+    a = z.base_dist.probs
     b = z_hat.base_dist.probs.detach()
     if training_mask is not None:
         a = a * training_mask[:, :, None, None]
         b = b
-    cross_entropy = (
-        a * b
-    ).sum(-1)
-    return - cross_entropy.sum(), - cross_entropy.detach().sum(-1)
+    per_ts_cross_entropy = -(torch.log(a + 1e-9) * b).sum(-1).mean(-1)
+    return per_ts_cross_entropy.mean(), per_ts_cross_entropy.detach()
 
 
 def reward_loss_fn(r, r_pred):
