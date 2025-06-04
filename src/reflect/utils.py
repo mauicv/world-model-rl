@@ -57,7 +57,8 @@ def recon_loss_fn(x, y):
         y_dist = D.Independent(D.Normal(y, torch.ones_like(y)), 1)
     else:
         raise ValueError(f"Expected input shape to be 2 or 4, got {len(x.shape)}")
-    return - y_dist.log_prob(x).mean()
+    ts_loss = - y_dist.log_prob(x)
+    return ts_loss.mean(), ts_loss.detach()
 
 
 def reg_loss_fn(z_logits, temperature=1):
@@ -92,12 +93,13 @@ def cross_entropy_loss_fn(z, z_hat, training_mask=None):
     cross_entropy = (
         a * b
     ).sum(-1)
-    return - cross_entropy.sum()
+    return - cross_entropy.sum(), - cross_entropy.detach().sum(-1)
 
 
 def reward_loss_fn(r, r_pred):
     r_pred_dist = D.Independent(D.Normal(r_pred, torch.ones_like(r_pred)), 1)
-    return - r_pred_dist.log_prob(r).mean()
+    ts_loss = - r_pred_dist.log_prob(r)
+    return ts_loss.mean(), ts_loss.detach()
 
 
 class CSVLogger:

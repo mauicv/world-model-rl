@@ -11,7 +11,7 @@ def test_world_model_reward_trainer(
         reward_grad_trainer: RewardGradTrainer
     ):
     env_data_loader.perform_rollout()
-    o, a, r, d = env_data_loader.sample(batch_size=32)
+    _, _, o, a, r, d = env_data_loader.sample(batch_size=32)
     o_emb, prior_sequence, posterior_sequence \
         = world_model.observe_rollout(o, a)
 
