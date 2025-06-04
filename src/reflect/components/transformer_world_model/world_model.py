@@ -42,6 +42,10 @@ class WorldModelLosses:
     dynamic_grad_norm: float
     observation_grad_norm: float
 
+    recon_loss_per_timestep: Optional[torch.Tensor] = None
+    dynamic_loss_per_timestep: Optional[torch.Tensor] = None
+    reward_loss_per_timestep: Optional[torch.Tensor] = None
+
 
 class WorldModel(Base):
     model_list = [
@@ -106,7 +110,7 @@ class WorldModel(Base):
             training_mask: Optional[torch.Tensor] = None,
             params: Optional[WorldModelTrainingParams] = None,
             return_init_states: bool=False,
-            no_update: bool=False
+            no_update: bool=False,
         ):
         if params is None:
             params = self.params
@@ -121,7 +125,7 @@ class WorldModel(Base):
         # Observational Model
         t_o = o.reshape(-1, *o.shape[2:])
         r_o = r_o.reshape(-1, *r_o.shape[2:])
-        recon_loss = recon_loss_fn(t_o, r_o)
+        recon_loss, recon_loss_per_timestep = recon_loss_fn(t_o, r_o)
         reg_loss = reg_loss_fn(z_logits)
 
         # Dynamic Models
@@ -151,10 +155,10 @@ class WorldModel(Base):
         training_mask_targets = training_mask[:, 1:].detach()
         r_pred = r_pred * training_mask_targets[:, :, None]
         d_pred = d_pred * training_mask_targets[:, :, None]
-        dynamic_loss = cross_entropy_loss_fn(
+        dynamic_loss, dynamic_loss_per_timestep = cross_entropy_loss_fn(
             z_pred, next_z_dist, training_mask_targets
         )
-        reward_loss = reward_loss_fn(r_targets, r_pred)
+        reward_loss, reward_loss_per_timestep = reward_loss_fn(r_targets, r_pred)
         done_loss = done_loss_fn(d_pred, d_targets.float())
 
         # Update observation_model and dynamic_model
@@ -163,7 +167,7 @@ class WorldModel(Base):
             + params.reward_coeff * reward_loss
             + params.done_coeff * done_loss
         )
-        consistency_loss = cross_entropy_loss_fn(c_z_dist, z_pred)
+        consistency_loss, _ = cross_entropy_loss_fn(c_z_dist, z_pred)
         # TODO: Consistency loss seems to penalize both the observation 
         # model and the dynamic model? Why?
         obs_loss = (
@@ -191,6 +195,9 @@ class WorldModel(Base):
             done_loss= done_loss.detach().cpu().item(),
             dynamic_grad_norm=dynamic_grad_norm.cpu().item(),
             observation_grad_norm=observation_grad_norm.cpu().item(),
+            recon_loss_per_timestep=recon_loss_per_timestep.reshape(b, t).detach().cpu(),
+            dynamic_loss_per_timestep=dynamic_loss_per_timestep.detach().cpu(),
+            reward_loss_per_timestep=reward_loss_per_timestep.detach().cpu(),
         )
         if return_init_states:
             return losses, self.flatten_batch_time(z=z, a=a, r=r, d=d)

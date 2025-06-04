@@ -10,7 +10,7 @@ def test_world_model_update(
         world_model: WorldModel,
     ):
     env_data_loader.perform_rollout()
-    o, a, r, d = env_data_loader.sample(batch_size=32)
+    _, _, o, a, r, d = env_data_loader.sample(batch_size=32)
     _, prior_sequence, posterior_sequence \
         = world_model.observe_rollout(o, a)
 
@@ -29,7 +29,7 @@ def test_world_model_update_state(
         state_world_model: WorldModel,
     ):
     env_state_data_loader.perform_rollout()
-    o, a, r, d = env_state_data_loader.sample(batch_size=32)
+    _, _, o, a, r, d = env_state_data_loader.sample(batch_size=32)
     _, prior_sequence, posterior_sequence \
         = state_world_model.observe_rollout(o, a)
 
@@ -48,7 +48,7 @@ def test_discrete_world_model_update(
         discrete_world_model: WorldModel,
     ):
     env_data_loader.perform_rollout()
-    o, a, r, d = env_data_loader.sample(batch_size=32)
+    _, _, o, a, r, d = env_data_loader.sample(batch_size=32)
     _, prior_sequence, posterior_sequence \
         = discrete_world_model.observe_rollout(o, a)
 
@@ -68,7 +68,7 @@ def test_world_model_imagine_rollout(
         actor: Actor
     ):
     env_data_loader.perform_rollout()
-    o, a, *_ = env_data_loader.sample(batch_size=32)
+    _, _, o, a, *_ = env_data_loader.sample(batch_size=32)
     o_emb, _, posterior_sequence \
         = world_model.observe_rollout(o, a)
 
@@ -89,7 +89,7 @@ def test_state_world_model_imagine_rollout(
         actor: Actor
     ):
     env_state_data_loader.perform_rollout()
-    o, a, *_ = env_state_data_loader.sample(batch_size=32)
+    _, _, o, a, *_ = env_state_data_loader.sample(batch_size=32)
     o_emb, _, posterior_sequence \
         = state_world_model.observe_rollout(o, a)
 
@@ -110,7 +110,7 @@ def test_discrete_world_model_imagine_rollout(
         actor: Actor
     ):
     env_data_loader.perform_rollout()
-    o, a, *_ = env_data_loader.sample(batch_size=32)
+    _, _, o, a, *_ = env_data_loader.sample(batch_size=32)
     o_emb, _, posterior_sequence \
         = discrete_world_model.observe_rollout(o, a)
 
@@ -131,7 +131,7 @@ def test_discrete_state_world_model_imagine_rollout(
         actor: Actor
     ):
     env_state_data_loader.perform_rollout()
-    o, a, *_ = env_state_data_loader.sample(batch_size=32)
+    _, _, o, a, *_ = env_state_data_loader.sample(batch_size=32)
     o_emb, _, posterior_sequence \
         = discrete_state_world_model.observe_rollout(o, a)
 
