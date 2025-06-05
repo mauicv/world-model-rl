@@ -71,7 +71,12 @@ def reg_loss_fn(z_logits, temperature=1):
 
 def create_z_dist(logits, temperature=1):
     assert temperature > 0
-    dist = D.OneHotCategoricalStraightThrough(logits=logits / temperature)
+    # Add small epsilon to prevent numerical instability
+    logits = logits / (temperature + 1e-6)
+    # Add small epsilon to prevent exactly zero probabilities
+    probs = torch.softmax(logits, dim=-1)
+    probs = (probs + 1e-6) / (1.0 + 1e-6 * probs.shape[-1])
+    dist = D.OneHotCategoricalStraightThrough(probs=probs)
     return D.Independent(dist, 1)
 
 

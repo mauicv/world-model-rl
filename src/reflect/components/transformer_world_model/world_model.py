@@ -146,7 +146,7 @@ class WorldModel(Base):
         training_mask_targets = training_mask[:, 1:].detach()
         r_pred = r_pred * training_mask_targets[:, :, None]
         d_pred = d_pred * training_mask_targets[:, :, None]
-        dynamic_loss, dynamic_loss_per_timestep = kl_divergence_loss_fn(z_pred, next_z_dist)
+        dynamic_loss, dynamic_loss_per_timestep = kl_divergence_loss_fn(next_z_dist, z_pred)
 
         reward_loss, reward_loss_per_timestep = reward_loss_fn(r_targets, r_pred)
         done_loss = done_loss_fn(d_pred, d_targets.float())
