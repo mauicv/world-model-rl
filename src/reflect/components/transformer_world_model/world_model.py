@@ -227,7 +227,6 @@ class WorldModel(Base):
             for i in range(num_timesteps):
                 h, new_z, new_r, new_d = self \
                     .dynamic_model.rstep(z=z, a=a, r=r, d=d, h=h)
-                print(z.shape, a.shape, r.shape, d.shape, h.shape)
                 if with_entropies:
                     action_dist = actor(
                         new_z[:, -1, :].detach(),
