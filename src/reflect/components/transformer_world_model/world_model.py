@@ -27,7 +27,6 @@ class WorldModelTrainingParams:
     reg_coeff: float = 0.0
     recon_coeff: float = 1.0
     dynamic_coeff: float = 1.0
-    # consistency_coeff: float = 0.0
     reward_coeff: float = 10.0
     done_coeff: float = 1.0
 
@@ -36,7 +35,6 @@ class WorldModelTrainingParams:
 class WorldModelLosses:
     recon_loss: float
     reg_loss: float
-    # consistency_loss: float
     dynamic_loss: float
     reward_loss: float
     done_loss: float
@@ -141,7 +139,6 @@ class WorldModel(Base):
         )
         # z_inputs = z_inputs * training_mask_inputs[:, :, None]
         r_inputs = r_inputs * training_mask_inputs[:, :, None]
-        print(z_inputs.shape, a_inputs.shape, r_inputs.shape)
         h, z_pred, r_pred, d_pred = self.dynamic_model(
             z_inputs, a_inputs, r_inputs,
         )
@@ -254,7 +251,6 @@ class WorldModel(Base):
                 b, t, *_ = z.shape
                 _z = z[:, 1:].reshape(b*(t-1), -1)
                 _h = h.reshape(b*(t-1), -1)
-                print(_z.shape, _h.shape)
                 o = self.decode(_z, _h)
                 o = o.reshape(b, t - 1, *o.shape[1:])
                 to_return.append(o)
