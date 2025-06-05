@@ -9,7 +9,8 @@ def test_stack_head():
         hidden_dim=256,
     )
     z = torch.zeros((2, 48, 256))
-    z_dist, r, d = head(z)
+    h, z_dist, r, d = head(z)
+    assert h.shape == (2, 16, 3*256)
     assert z_dist.base_dist.probs.shape == (2, 16, 32, 32)
     assert r.shape == (2, 16, 1)
     assert d.shape == (2, 16, 1)
@@ -22,7 +23,8 @@ def test_concat_head():
         hidden_dim=256,
     )
     z = torch.zeros((2, 48, 3*256))
-    z_dist, r, d = head(z)
+    h, z_dist, r, d = head(z)
+    assert h.shape == (2, 48, 3*256)
     assert z_dist.base_dist.probs.shape == (2, 48, 32, 32)
     assert r.shape == (2, 48, 1)
     assert d.shape == (2, 48, 1)
@@ -35,7 +37,8 @@ def test_add_head():
         hidden_dim=256,
     )
     z = torch.zeros((2, 48, 256))
-    z_dist, r, d = head(z)
+    h, z_dist, r, d = head(z)
+    assert h.shape == (2, 48, 256)
     assert z_dist.base_dist.probs.shape == (2, 48, 32, 32)
     assert r.shape == (2, 48, 1)
     assert d.shape == (2, 48, 1)

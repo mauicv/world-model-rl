@@ -75,25 +75,9 @@ def create_z_dist(logits, temperature=1):
     return D.Independent(dist, 1)
 
 
-def cross_entropy_loss_fn(z, z_hat, training_mask=None):
-    """
-    In the case of the observational model, the cross_entropy_loss_fn is the
-    consistency loss. In that case the z is the output of the observational
-    model for o_(i) and z_hat is the output of the dynamic model from z_(i-1)
-
-    In the case of the dynamic loss, these are the otherway around. So z is
-    the output of the dynamic model given z_(i-1) and z_hat is the output of the
-    observational model given o_(i).
-    """
-    a = z.base_dist.logits
-    b = z_hat.base_dist.probs.detach()
-    if training_mask is not None:
-        a = a * training_mask[:, :, None, None]
-        b = b
-    cross_entropy = (
-        a * b
-    ).sum(-1)
-    return - cross_entropy.sum(), - cross_entropy.detach().sum(-1)
+def kl_divergence_loss_fn(z, z_hat):
+    kl = D.kl_divergence(z, z_hat)
+    return kl.mean(), kl.detach()
 
 
 def reward_loss_fn(r, r_pred):

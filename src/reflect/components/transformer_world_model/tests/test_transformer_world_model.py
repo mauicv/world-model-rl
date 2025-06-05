@@ -23,7 +23,7 @@ def test_world_model_step(timesteps, encoder, decoder, dynamic_model_8d_action):
     z = z.reshape(2, timesteps, 1024)
     assert z.shape == (2, timesteps, 1024)
 
-    z, r, d = wm.dynamic_model.step(z=z, a=a, r=r, d=d)
+    _, z, r, d = wm.dynamic_model.step(z=z, a=a, r=r, d=d)
     assert z.shape == (2, timesteps+1, 1024)
     assert r.shape == (2, timesteps+1, 1)
     assert d.shape == (2, timesteps+1, 1)
@@ -47,7 +47,7 @@ def test_state_world_model_step(timesteps, state_encoder, state_decoder, dynamic
     z = z.reshape(2, timesteps, 1024)
     assert z.shape == (2, timesteps, 1024)
 
-    z, r, d = wm.dynamic_model.step(z=z, a=a, r=r, d=d)
+    _, z, r, d = wm.dynamic_model.step(z=z, a=a, r=r, d=d)
     assert z.shape == (2, timesteps+1, 1024)
     assert r.shape == (2, timesteps+1, 1)
     assert d.shape == (2, timesteps+1, 1)
@@ -126,9 +126,7 @@ def test_world_model(return_init_states, training_mask, encoder, decoder, dynami
     else:
         results = wm.update(o, a, r, d, training_mask=training_mask,)
 
-    for key in ['recon_loss', 'reg_loss',
-                'consistency_loss', 'dynamic_loss',
-                'reward_loss', 'done_loss']:
+    for key in ['recon_loss', 'reg_loss', 'dynamic_loss', 'reward_loss', 'done_loss']:
         assert key in asdict(results)
 
 
@@ -164,12 +162,10 @@ def test_state_world_model(return_init_states, training_mask, state_encoder, sta
             training_mask=training_mask,
         )
 
-    for key in ['recon_loss', 'reg_loss',
-                'consistency_loss', 'dynamic_loss',
-                'reward_loss', 'done_loss']:
+    for key in ['recon_loss', 'reg_loss', 'dynamic_loss', 'reward_loss', 'done_loss']:
         assert key in asdict(results)
 
-    assert results.recon_loss_per_timestep.shape == (2, timesteps+1)
+    assert results.recon_loss_per_timestep.shape == (2, timesteps)
     assert results.dynamic_loss_per_timestep.shape == (2, timesteps)
     assert results.reward_loss_per_timestep.shape == (2, timesteps)
 
@@ -225,7 +221,7 @@ def test_world_model_imagine_rollout(
             actor=actor,
             with_observations=with_observations
         )
-        assert o.shape == (34, 26, 3, 64, 64)
+        assert o.shape == (34, 25, 3, 64, 64)
     assert z.shape == (34, 26, 1024)
     assert a.shape == (34, 26, 8)
     assert r.shape == (34, 26, 1)
@@ -261,7 +257,7 @@ def test_state_world_model_imagine_rollout(
             actor=actor,
             with_observations=with_observations
         )
-        assert o.shape == (34, 26, 27)
+        assert o.shape == (34, 25, 27)
     assert z.shape == (34, 26, 1024)
     assert a.shape == (34, 26, 8)
     assert r.shape == (34, 26, 1)
