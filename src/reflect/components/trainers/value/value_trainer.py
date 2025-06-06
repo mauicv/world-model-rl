@@ -186,7 +186,8 @@ class ValueGradTrainer:
         torch.save(state_dict, f'{path}/agent.pth')
 
     def load(self, path):
-        checkpoint = torch.load(f'{path}/agent.pth')
+        device = next(self.actor.parameters()).device
+        checkpoint = torch.load(f'{path}/agent.pth', map_location=torch.device(device))
         self.actor.load_state_dict(checkpoint['actor'])
         self.actor_optim.optimizer \
             .load_state_dict(checkpoint['actor_optim'])
