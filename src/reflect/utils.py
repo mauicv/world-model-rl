@@ -80,10 +80,13 @@ def create_z_dist(logits, temperature=1):
     return D.Independent(dist, 1)
 
 
-def kl_divergence_loss_fn(z, z_hat):
-    kl = D.kl_divergence(z, z_hat)
-    return kl.mean(), kl.detach()
-
+def kl_divergence_loss_fn(z, z_hat, eps=1e-6):
+    p_probs = torch.clamp(z.base_dist.probs, min=eps)
+    q_probs = torch.clamp(z_hat.base_dist.probs, min=eps)
+    p_probs /= p_probs.sum(dim=-1, keepdim=True)
+    q_probs /= q_probs.sum(dim=-1, keepdim=True)
+    kl_div = (p_probs * (p_probs.log() - q_probs.log())).sum((-1, -2))
+    return kl_div.mean(), kl_div.detach()
 
 def reward_loss_fn(r, r_pred):
     r_pred_dist = D.Independent(D.Normal(r_pred, torch.ones_like(r_pred)), 1)
