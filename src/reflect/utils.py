@@ -92,8 +92,8 @@ def cross_entropy_loss_fn(z, z_hat, training_mask=None):
         b = b
     cross_entropy = (
         a * b
-    ).sum(-1)
-    return - cross_entropy.sum(), - cross_entropy.detach().sum(-1)
+    ).sum((-1, -2))
+    return - cross_entropy.mean(), - cross_entropy.detach()
 
 
 def reward_loss_fn(r, r_pred):
