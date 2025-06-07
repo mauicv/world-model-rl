@@ -6,7 +6,7 @@ from reflect.components.transformer_world_model.head import StackHead, ConcatHea
 from reflect.components.transformer_world_model.embedder import StackEmbedder, ConcatEmbedder, AddEmbedder
 from pytfex.transformer.gpt import GPT
 import torch
-from typing import Literal
+from typing import Literal, Optional
 
 
 
@@ -82,12 +82,16 @@ class PytfexTransformer(torch.nn.Module):
             a: torch.Tensor,
             r: torch.Tensor,
             d: torch.Tensor,
+            h: Optional[torch.Tensor] = None,
         ):
-        z_dist, new_r, new_d = self.dynamic_model((
+        new_h, z_dist, new_r, new_d = self.dynamic_model((
             z[:, -self.num_ts:],
             a[:, -self.num_ts:],
             r[:, -self.num_ts:]
         ))
+
+        if h is not None:
+            new_h = torch.cat([h, new_h[:, [-1]]], dim=1)
 
         new_r = new_r[:, -1].reshape(-1, 1, 1)
         r = torch.cat([r, new_r], dim=1)
@@ -95,7 +99,7 @@ class PytfexTransformer(torch.nn.Module):
         new_d = new_d[:, -1].reshape(-1, 1, 1)
         d = torch.cat([d, new_d], dim=1)
 
-        return z_dist, r, d
+        return new_h, z_dist, r, d
 
     def step(
             self,
@@ -103,12 +107,13 @@ class PytfexTransformer(torch.nn.Module):
             a: torch.Tensor,
             r: torch.Tensor,
             d: torch.Tensor,
+            h: Optional[torch.Tensor] = None,
         ):
-        z_dist, new_r, new_d = self._step(z, a, r, d)
+        h, z_dist, new_r, new_d = self._step(z, a, r, d, h)
         new_z = z_dist.sample()
         new_z = new_z[:, -1].reshape(-1, 1, self.num_cat * self.latent_dim)
         new_z = torch.cat([z, new_z], dim=1)
-        return new_z, new_r, new_d
+        return h, new_z, new_r, new_d
 
     def rstep(
             self,
@@ -116,12 +121,13 @@ class PytfexTransformer(torch.nn.Module):
             a: torch.Tensor,
             r: torch.Tensor,
             d: torch.Tensor,
+            h: Optional[torch.Tensor] = None,
         ):
-        z_dist, new_r, new_d = self._step(z, a, r, d)
+        h, z_dist, new_r, new_d = self._step(z, a, r, d, h)
         new_z = z_dist.rsample()
         new_z = new_z[:, -1].reshape(-1, 1, self.num_cat * self.latent_dim)
         new_z = torch.cat([z, new_z], dim=1)
-        return new_z, new_r, new_d
+        return h, new_z, new_r, new_d
 
     def forward(self, z, a, r):
         self.mask = self.mask.to(z.device)

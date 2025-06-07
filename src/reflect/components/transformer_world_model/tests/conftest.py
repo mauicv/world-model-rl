@@ -5,7 +5,6 @@ from reflect.data.loader import EnvDataLoader, GymRenderImgProcessing
 
 from reflect.components.models import ConvEncoder, ConvDecoder
 from reflect.components.rssm_world_model.models import DenseModel
-from reflect.components.rssm_world_model.world_model import WorldModel
 from reflect.components.rssm_world_model.memory_actor import WorldModelActor
 from reflect.components.models.actor import Actor
 from reflect.components.trainers.reward.reward_trainer import RewardGradTrainer
@@ -38,7 +37,7 @@ def state_encoder():
 def decoder():
     return ConvDecoder(
         output_shape=(3, 64, 64),
-        input_size=1024,
+        input_size=1024 + 3*32,
         activation=torch.nn.ReLU(),
         depth=32
     )
@@ -47,7 +46,7 @@ def decoder():
 def state_decoder():
     return DenseModel(
         depth=1,
-        input_dim=1024,
+        input_dim=1024 + 3*32,
         hidden_dim=256,
         output_dim=27,
     )

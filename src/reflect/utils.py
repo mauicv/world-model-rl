@@ -71,30 +71,22 @@ def reg_loss_fn(z_logits, temperature=1):
 
 def create_z_dist(logits, temperature=1):
     assert temperature > 0
-    dist = D.OneHotCategoricalStraightThrough(logits=logits / temperature)
+    # Add small epsilon to prevent numerical instability
+    logits = logits / (temperature + 1e-6)
+    # Add small epsilon to prevent exactly zero probabilities
+    probs = torch.softmax(logits, dim=-1)
+    probs = (probs + 1e-6) / (1.0 + 1e-6 * probs.shape[-1])
+    dist = D.OneHotCategoricalStraightThrough(probs=probs)
     return D.Independent(dist, 1)
 
 
-def cross_entropy_loss_fn(z, z_hat, training_mask=None):
-    """
-    In the case of the observational model, the cross_entropy_loss_fn is the
-    consistency loss. In that case the z is the output of the observational
-    model for o_(i) and z_hat is the output of the dynamic model from z_(i-1)
-
-    In the case of the dynamic loss, these are the otherway around. So z is
-    the output of the dynamic model given z_(i-1) and z_hat is the output of the
-    observational model given o_(i).
-    """
-    a = z.base_dist.logits
-    b = z_hat.base_dist.probs.detach()
-    if training_mask is not None:
-        a = a * training_mask[:, :, None, None]
-        b = b
-    cross_entropy = (
-        a * b
-    ).sum(-1)
-    return - cross_entropy.sum(), - cross_entropy.detach().sum(-1)
-
+def kl_divergence_loss_fn(z, z_hat, eps=1e-6):
+    p_probs = torch.clamp(z.base_dist.probs, min=eps)
+    q_probs = torch.clamp(z_hat.base_dist.probs, min=eps)
+    p_probs /= p_probs.sum(dim=-1, keepdim=True)
+    q_probs /= q_probs.sum(dim=-1, keepdim=True)
+    kl_div = (p_probs * (p_probs.log() - q_probs.log())).sum((-1, -2))
+    return kl_div.mean(), kl_div.detach()
 
 def reward_loss_fn(r, r_pred):
     r_pred_dist = D.Independent(D.Normal(r_pred, torch.ones_like(r_pred)), 1)

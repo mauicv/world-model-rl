@@ -1,4 +1,4 @@
-from reflect.utils import recon_loss_fn, reward_loss_fn, cross_entropy_loss_fn, create_z_dist
+from reflect.utils import recon_loss_fn, reward_loss_fn, create_z_dist, kl_divergence_loss_fn
 import torch
 
 
@@ -21,6 +21,6 @@ def test_cross_entropy_loss_fn_per_timestep():
     z_hat = torch.randn(2, 16, 32, 32)
     z_dist = create_z_dist(z)
     z_hat_dist = create_z_dist(z_hat)
-    loss, ts_loss = cross_entropy_loss_fn(z_dist, z_hat_dist)
+    loss, ts_loss = kl_divergence_loss_fn(z_dist, z_hat_dist)
     assert loss.shape == ()
     assert ts_loss.shape == (2, 16)
