@@ -23,7 +23,7 @@ def test_world_model_step(timesteps, encoder, decoder, dynamic_model_8d_action):
     z = z.reshape(2, timesteps, 1024)
     assert z.shape == (2, timesteps, 1024)
 
-    z, r, d = wm.dynamic_model.step(z=z, a=a, r=r, d=d)
+    z, (r, _), d = wm.dynamic_model.step(z=z, a=a, r=r, d=d)
     assert z.shape == (2, timesteps+1, 1024)
     assert r.shape == (2, timesteps+1, 1)
     assert d.shape == (2, timesteps+1, 1)
@@ -47,7 +47,7 @@ def test_state_world_model_step(timesteps, state_encoder, state_decoder, dynamic
     z = z.reshape(2, timesteps, 1024)
     assert z.shape == (2, timesteps, 1024)
 
-    z, r, d = wm.dynamic_model.step(z=z, a=a, r=r, d=d)
+    z, (r, _), d = wm.dynamic_model.step(z=z, a=a, r=r, d=d)
     assert z.shape == (2, timesteps+1, 1024)
     assert r.shape == (2, timesteps+1, 1)
     assert d.shape == (2, timesteps+1, 1)
@@ -297,3 +297,34 @@ def test_world_model_imagine_rollout_non_deterministic(
     assert r.shape == (34, 26, 1)
     assert d.shape == (34, 26, 1)
     assert entropy.shape == (34, 26, 1)
+
+
+@pytest.mark.parametrize("timesteps", [16])
+def test_world_model_imagine_rollout_uncertainties(
+        timesteps,
+        state_encoder,
+        state_decoder,
+        dynamic_model_8d_action_ensemble,
+        actor
+    ):
+    dm = dynamic_model_8d_action_ensemble
+    wm = WorldModel(
+        encoder=state_encoder, 
+        decoder=state_decoder,
+        dynamic_model=dm,
+    )
+    o = torch.zeros((4, timesteps+1, 27))
+    a = torch.zeros((4, timesteps+1, 8))
+    r = torch.zeros((4, timesteps+1, 1))
+    d = torch.zeros((4, timesteps+1, 1))
+    _, (z, a, r, d) = wm.update(o, a, r, d, return_init_states=True)
+    z, a, r, d, u = wm.imagine_rollout(
+        z=z, a=a, r=r, d=d,
+        actor=actor,
+        with_uncertainties=True
+    )
+    assert z.shape == (68, 26, 1024)
+    assert a.shape == (68, 26, 8)
+    assert r.shape == (68, 26, 1)
+    assert d.shape == (68, 26, 1)
+    assert u.shape == (68, 26, 1)

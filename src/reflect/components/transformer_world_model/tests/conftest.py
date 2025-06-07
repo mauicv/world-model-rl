@@ -132,7 +132,13 @@ def dynamic_model_1d_action():
 def dynamic_model_8d_action():
     return make_dynamic_model(8)
 
-def make_dynamic_model(a_size):
+
+@pytest.fixture
+def dynamic_model_8d_action_ensemble():
+    return make_dynamic_model(8, ensemble_size=2)
+
+
+def make_dynamic_model(a_size, ensemble_size=1):
     hdn_dim=32
     num_heads=8
     latent_dim=32
@@ -149,6 +155,8 @@ def make_dynamic_model(a_size):
         num_cat=num_cat,
         latent_dim=latent_dim,
         action_size=a_size,
-        num_layers=layers
+        num_layers=layers,
+        ensemble_size=ensemble_size,
+        pessimism=1.0
     )
     return dynamic_model

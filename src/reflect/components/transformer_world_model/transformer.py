@@ -6,7 +6,7 @@ from reflect.components.transformer_world_model.head import StackHead, ConcatHea
 from reflect.components.transformer_world_model.embedder import StackEmbedder, ConcatEmbedder, AddEmbedder
 from pytfex.transformer.gpt import GPT
 import torch
-from typing import Literal
+from typing import Literal, Optional
 
 
 
@@ -34,7 +34,9 @@ class PytfexTransformer(torch.nn.Module):
             action_size: int=6,
             num_layers: int=12,
             hdn_dim: int=512,
-            embedding_type: Literal['stack', 'add', 'concat']='stack'
+            embedding_type: Literal['stack', 'add', 'concat']='stack',
+            ensemble_size: int=1,
+            pessimism: float=1.0
         ):
         super().__init__()
         self.num_ts = num_ts
@@ -54,11 +56,7 @@ class PytfexTransformer(torch.nn.Module):
                 a_size=action_size,
                 hidden_dim=hdn_dim
             ),
-            head=head_cls(
-                latent_dim=latent_dim,
-                num_cat=num_cat,
-                hidden_dim=hdn_dim
-            ),
+            head=None,
             layers=[
                 TransformerLayer(
                     hidden_dim=internal_hdn_dim,
@@ -76,6 +74,14 @@ class PytfexTransformer(torch.nn.Module):
             ]
         )
 
+        self.head = head_cls(
+            latent_dim=latent_dim,
+            num_cat=num_cat,
+            hidden_dim=hdn_dim,
+            ensemble_size=ensemble_size,
+            pessimism=pessimism
+        )
+
     def _step(
             self,
             z: torch.Tensor,
@@ -83,11 +89,14 @@ class PytfexTransformer(torch.nn.Module):
             r: torch.Tensor,
             d: torch.Tensor,
         ):
-        z_dist, new_r, new_d = self.dynamic_model((
+        h = self.dynamic_model((
             z[:, -self.num_ts:],
             a[:, -self.num_ts:],
             r[:, -self.num_ts:]
         ))
+
+        z_dist, (new_r, new_u), new_d = self.head(h, discount=True)
+        u = new_u[:, -1] if new_u is not None else None
 
         new_r = new_r[:, -1].reshape(-1, 1, 1)
         r = torch.cat([r, new_r], dim=1)
@@ -95,7 +104,7 @@ class PytfexTransformer(torch.nn.Module):
         new_d = new_d[:, -1].reshape(-1, 1, 1)
         d = torch.cat([d, new_d], dim=1)
 
-        return z_dist, r, d
+        return z_dist, (r, u), d
 
     def step(
             self,
@@ -104,11 +113,11 @@ class PytfexTransformer(torch.nn.Module):
             r: torch.Tensor,
             d: torch.Tensor,
         ):
-        z_dist, new_r, new_d = self._step(z, a, r, d)
+        z_dist, (new_r, new_u), new_d = self._step(z, a, r, d)
         new_z = z_dist.sample()
         new_z = new_z[:, -1].reshape(-1, 1, self.num_cat * self.latent_dim)
         new_z = torch.cat([z, new_z], dim=1)
-        return new_z, new_r, new_d
+        return new_z, (new_r, new_u), new_d
 
     def rstep(
             self,
@@ -117,15 +126,17 @@ class PytfexTransformer(torch.nn.Module):
             r: torch.Tensor,
             d: torch.Tensor,
         ):
-        z_dist, new_r, new_d = self._step(z, a, r, d)
+        z_dist, (new_r, new_u), new_d = self._step(z, a, r, d)
         new_z = z_dist.rsample()
         new_z = new_z[:, -1].reshape(-1, 1, self.num_cat * self.latent_dim)
         new_z = torch.cat([z, new_z], dim=1)
-        return new_z, new_r, new_d
+        return new_z, (new_r, new_u), new_d
 
     def forward(self, z, a, r):
         self.mask = self.mask.to(z.device)
-        return self.dynamic_model(
+        h = self.dynamic_model(
             (z, a, r),
             mask=self.mask
         )
+        z_dist, (r, _), d = self.head(h)
+        return z_dist, r, d
