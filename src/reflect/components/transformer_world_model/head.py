@@ -1,15 +1,27 @@
 import torch
 import torch.distributions as D
+import random
+
 
 class MLP(torch.nn.Module):
-    def __init__(self, input_dim: int, hidden_dim: int, output_dim: int, num_layers: int=3):
+    def __init__(
+            self,
+            input_dim: int,
+            hidden_dim: int,
+            output_dim: int,
+            num_layers: int=3,
+            dropout: float=0.0
+        ):
         super(MLP, self).__init__()
         self.layers = torch.nn.Sequential(
             torch.nn.Linear(input_dim, hidden_dim),
+            torch.nn.Dropout(dropout),
             torch.nn.ELU(),
             torch.nn.Linear(hidden_dim, hidden_dim),
+            torch.nn.Dropout(dropout),
             torch.nn.ELU(),
             torch.nn.Linear(hidden_dim, hidden_dim),
+            torch.nn.Dropout(dropout),
             torch.nn.ELU(),
             torch.nn.Linear(hidden_dim, output_dim)
         )
@@ -26,11 +38,18 @@ class EnsembleMLP(torch.nn.Module):
             output_dim: int,
             ensemble_size: int=1,
             num_layers: int=3,
+            dropout: float=0.0
         ):
         super(EnsembleMLP, self).__init__()
         self.ensemble_size = ensemble_size
         self.layers = torch.nn.ModuleList([
-            MLP(input_dim, hidden_dim, output_dim, num_layers=num_layers) for _ in range(ensemble_size)
+            MLP(
+                input_dim,
+                hidden_dim + random.randint(0, 16),
+                output_dim,
+                num_layers=num_layers,
+                dropout=dropout
+            ) for _ in range(ensemble_size)
         ])
 
     def forward(self, x):
@@ -40,7 +59,7 @@ class EnsembleMLP(torch.nn.Module):
         x = x.split(int_b, dim=0)
         y = torch.cat([layer(x[i]) for i, layer in enumerate(self.layers)], dim=0)
         return y
-    
+
     def sample(self, x):
         y = torch.stack([layer(x) for layer in self.layers], dim=0)
         mu = y.mean(dim=0)
@@ -56,6 +75,7 @@ class BaseHead(torch.nn.Module):
             hidden_dim: int=None,
             pessimism: float=None,
             ensemble_size: int=1,
+            dropout: float=0.0
         ):
         super(BaseHead, self).__init__()
         self.hidden_dim = hidden_dim
@@ -65,10 +85,10 @@ class BaseHead(torch.nn.Module):
         self.done = MLP(hidden_dim, hidden_dim * 2, 1)
         self.pessimism = pessimism
         if ensemble_size == 1:
-            self.reward = MLP(hidden_dim, hidden_dim * 2, 1)
+            self.reward = MLP(hidden_dim, hidden_dim * 2, 1, dropout=dropout)
             self.is_ensemble = False
         else:
-            self.reward = EnsembleMLP(hidden_dim, hidden_dim * 2, 1, ensemble_size)
+            self.reward = EnsembleMLP(hidden_dim, hidden_dim * 2, 1, ensemble_size, dropout=dropout)
             self.is_ensemble = True
         self.done_output_activation = torch.nn.Sigmoid()
 
@@ -79,7 +99,7 @@ class BaseHead(torch.nn.Module):
             logits=logits / temperature
         )
         return D.Independent(dist, 1)
-    
+
     def _get_rd(self, r_emb, s_emb, discount=False):
         d = self.done_output_activation(self.done(s_emb))
         if self.is_ensemble and discount:
@@ -99,13 +119,15 @@ class StackHead(BaseHead):
             hidden_dim: int=None,
             pessimism: float=None,
             ensemble_size: int=1,
+            dropout: float=0.0
         ):
         super(StackHead, self).__init__(
             latent_dim=latent_dim,
             num_cat=num_cat,
             hidden_dim=hidden_dim,
             ensemble_size=ensemble_size,
-            pessimism=pessimism
+            pessimism=pessimism,
+            dropout=dropout
         )
 
     def forward(self, x, discount=False):
@@ -127,13 +149,15 @@ class AddHead(BaseHead):
             hidden_dim: int=None,
             pessimism: float=None,
             ensemble_size: int=1,
+            dropout: float=0.0
         ):
         super(AddHead, self).__init__(
             latent_dim=latent_dim,
             num_cat=num_cat,
             hidden_dim=hidden_dim,
             ensemble_size=ensemble_size,
-            pessimism=pessimism
+            pessimism=pessimism,
+            dropout=dropout
         )
 
     def forward(self, x, discount=False):
@@ -153,13 +177,15 @@ class ConcatHead(BaseHead):
             hidden_dim: int=None,
             pessimism: float=None,
             ensemble_size: int=1,
+            dropout: float=0.0
         ):
         super(ConcatHead, self).__init__(
             latent_dim=latent_dim,
             num_cat=num_cat,
             hidden_dim=hidden_dim,
             ensemble_size=ensemble_size,
-            pessimism=pessimism
+            pessimism=pessimism,
+            dropout=dropout
         )
 
     def forward(self, x, discount=False):
