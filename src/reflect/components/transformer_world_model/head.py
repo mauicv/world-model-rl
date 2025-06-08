@@ -38,10 +38,12 @@ class EnsembleMLP(torch.nn.Module):
             output_dim: int,
             ensemble_size: int=1,
             num_layers: int=3,
-            dropout: float=0.0
+            dropout: float=0.0,
+            sample_iterations: int=2
         ):
         super(EnsembleMLP, self).__init__()
         self.ensemble_size = ensemble_size
+        self.sample_iterations = sample_iterations
         self.layers = torch.nn.ModuleList([
             MLP(
                 input_dim,
@@ -61,7 +63,18 @@ class EnsembleMLP(torch.nn.Module):
         return y
 
     def sample(self, x):
-        y = torch.stack([layer(x) for layer in self.layers], dim=0)
+        was_training = self.training
+        self.train()
+
+        it = []
+        for _ in range(self.sample_iterations):
+            it.extend([layer(x) for layer in self.layers])
+        y = torch.stack(it, dim=0)
+
+        # Restore original mode
+        if not was_training:
+            self.eval()
+
         mu = y.mean(dim=0)
         var = y.detach().std(dim=0)
         return mu, var
