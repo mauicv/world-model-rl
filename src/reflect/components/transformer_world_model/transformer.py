@@ -36,7 +36,8 @@ class PytfexTransformer(torch.nn.Module):
             hdn_dim: int=512,
             embedding_type: Literal['stack', 'add', 'concat']='stack',
             ensemble_size: int=1,
-            pessimism: float=1.0
+            pessimism: float=1.0,
+            reward_dropout: float=0.0,
         ):
         super().__init__()
         self.num_ts = num_ts
@@ -79,7 +80,8 @@ class PytfexTransformer(torch.nn.Module):
             num_cat=num_cat,
             hidden_dim=hdn_dim,
             ensemble_size=ensemble_size,
-            pessimism=pessimism
+            pessimism=pessimism,
+            dropout=reward_dropout
         )
 
     def _step(

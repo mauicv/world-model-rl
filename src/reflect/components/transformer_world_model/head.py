@@ -71,7 +71,6 @@ class EnsembleMLP(torch.nn.Module):
             it.extend([layer(x) for layer in self.layers])
         y = torch.stack(it, dim=0)
 
-        # Restore original mode
         if not was_training:
             self.eval()
 
