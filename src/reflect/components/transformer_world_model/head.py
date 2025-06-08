@@ -39,11 +39,15 @@ class EnsembleMLP(torch.nn.Module):
             ensemble_size: int=1,
             num_layers: int=3,
             dropout: float=0.0,
-            sample_iterations: int=2
+            sample_iterations: int=2,
+            seed: int=0
         ):
         super(EnsembleMLP, self).__init__()
         self.ensemble_size = ensemble_size
         self.sample_iterations = sample_iterations
+
+        # make model creation deterministic
+        random.seed(seed)
         self.layers = torch.nn.ModuleList([
             MLP(
                 input_dim,
