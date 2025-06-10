@@ -227,7 +227,8 @@ class WorldModel(Base):
         with FreezeParameters([self.dynamic_model, self.decoder]):
             if with_uncertainties:
                 assert self.dynamic_model.head.is_ensemble, "Uncertainties are only supported for ensemble models"
-                u = [torch.zeros_like(r[:, -1, :])]
+                r_u = [torch.zeros_like(r[:, -1, :])]
+                z_u = [torch.zeros_like(r[:, -1, :])]
 
             if with_entropies:
                 entropies = []  # Use a list to collect entropies
@@ -236,10 +237,11 @@ class WorldModel(Base):
                 entropies.append(action_dist.entropy()[:, None])
 
             for i in range(num_timesteps):
-                new_z, (new_r, new_u), new_d = self \
+                (new_z, new_z_u), (new_r, new_r_u), new_d = self \
                     .dynamic_model.rstep(z=z, a=a, r=r, d=d)
                 if with_uncertainties:
-                    u.append(new_u)
+                    z_u.append(new_z_u)
+                    r_u.append(new_r_u)
                 if with_entropies:
                     action_dist = actor(
                         new_z[:, -1, :].detach(),
@@ -265,6 +267,8 @@ class WorldModel(Base):
                 o = o.reshape(b, t, *o.shape[1:])
                 to_return.append(o)
             if with_uncertainties:
-                u = torch.stack(u, dim=1)
-                to_return.append(u)
+                z_u = torch.stack(z_u, dim=1)
+                r_u = torch.stack(r_u, dim=1)
+                to_return.append(z_u)
+                to_return.append(r_u)
             return to_return

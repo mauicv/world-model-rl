@@ -9,7 +9,6 @@ class MLP(torch.nn.Module):
             input_dim: int,
             hidden_dim: int,
             output_dim: int,
-            num_layers: int=3,
             dropout: float=0.0
         ):
         super(MLP, self).__init__()
@@ -37,7 +36,6 @@ class EnsembleMLP(torch.nn.Module):
             hidden_dim: int,
             output_dim: int,
             ensemble_size: int=1,
-            num_layers: int=3,
             dropout: float=0.0,
             sample_iterations: int=2,
             seed: int=0
@@ -53,7 +51,6 @@ class EnsembleMLP(torch.nn.Module):
                 input_dim,
                 hidden_dim + random.randint(0, 16),
                 output_dim,
-                num_layers=num_layers,
                 dropout=dropout
             ) for _ in range(ensemble_size)
         ])
@@ -89,7 +86,8 @@ class BaseHead(torch.nn.Module):
             latent_dim: int=None,
             num_cat: int=None,
             hidden_dim: int=None,
-            pessimism: float=None,
+            b_r: float=None,
+            b_u: float=None,
             ensemble_size: int=1,
             dropout: float=0.0
         ):
@@ -97,14 +95,28 @@ class BaseHead(torch.nn.Module):
         self.hidden_dim = hidden_dim
         self.latent_dim = latent_dim
         self.num_cat = num_cat
-        self.predictor = MLP(hidden_dim, hidden_dim * 2, latent_dim * num_cat)
         self.done = MLP(hidden_dim, hidden_dim * 2, 1)
-        self.pessimism = pessimism
+        self.b_r = b_r
+        self.b_u = b_u
         if ensemble_size == 1:
             self.reward = MLP(hidden_dim, hidden_dim * 2, 1, dropout=dropout)
+            self.predictor = MLP(hidden_dim, hidden_dim * 2, latent_dim * num_cat)
             self.is_ensemble = False
         else:
-            self.reward = EnsembleMLP(hidden_dim, hidden_dim * 2, 1, ensemble_size, dropout=dropout)
+            self.predictor = EnsembleMLP(
+                hidden_dim,
+                hidden_dim * 2,
+                latent_dim * num_cat,
+                ensemble_size,
+                dropout=dropout
+            )
+            self.reward = EnsembleMLP(
+                hidden_dim,
+                hidden_dim * 2,
+                1,
+                ensemble_size,
+                dropout=dropout
+            )
             self.is_ensemble = True
         self.done_output_activation = torch.nn.Sigmoid()
 
@@ -116,16 +128,6 @@ class BaseHead(torch.nn.Module):
         )
         return D.Independent(dist, 1)
 
-    def _get_rd(self, r_emb, s_emb, discount=False):
-        d = self.done_output_activation(self.done(s_emb))
-        if self.is_ensemble and discount:
-            r, u = self.reward.sample(r_emb)
-            r = r - self.pessimism * u
-            return (r, u), d
-        else:
-            r = self.reward(r_emb)
-            return (r, None), d
-
 
 class StackHead(BaseHead):
     def __init__(
@@ -133,7 +135,8 @@ class StackHead(BaseHead):
             latent_dim: int=None,
             num_cat: int=None,
             hidden_dim: int=None,
-            pessimism: float=None,
+            b_r: float=None,
+            b_u: float=None,
             ensemble_size: int=1,
             dropout: float=0.0
         ):
@@ -142,7 +145,8 @@ class StackHead(BaseHead):
             num_cat=num_cat,
             hidden_dim=hidden_dim,
             ensemble_size=ensemble_size,
-            pessimism=pessimism,
+            b_r=b_r,
+            b_u=b_u,
             dropout=dropout
         )
 
@@ -150,11 +154,19 @@ class StackHead(BaseHead):
         b, t, _ = x.shape
         reshaped_x = x.view(b, -1, 3, self.hidden_dim)
         s_emb, a_emb, r_emb = reshaped_x.unbind(dim=2)
-        s = self.predictor(a_emb)
+        s_u, r_u = None, None
+        if self.is_ensemble and discount:
+            s, s_u = self.predictor.sample(a_emb)
+            r, r_u = self.reward.sample(r_emb)
+            s_u = s_u.mean(dim=-1, keepdim=True)
+            r = r - self.b_r * r_u - self.b_u * s_u
+        else:
+            s = self.predictor(a_emb)
+            r = self.reward(r_emb)
         s = s.reshape(b, int(t/3), self.latent_dim, self.num_cat)
         z_dist = self.create_z_dist(s)
-        r, d = self._get_rd(r_emb, s_emb, discount)
-        return z_dist, r, d
+        d = self.done_output_activation(self.done(s_emb))
+        return (z_dist, s_u), (r, r_u), d
 
 
 class AddHead(BaseHead):
@@ -163,7 +175,8 @@ class AddHead(BaseHead):
             latent_dim: int=None,
             num_cat: int=None,
             hidden_dim: int=None,
-            pessimism: float=None,
+            b_r: float=None,
+            b_u: float=None,
             ensemble_size: int=1,
             dropout: float=0.0
         ):
@@ -172,17 +185,28 @@ class AddHead(BaseHead):
             num_cat=num_cat,
             hidden_dim=hidden_dim,
             ensemble_size=ensemble_size,
-            pessimism=pessimism,
+            b_r=b_r,
+            b_u=b_u,
             dropout=dropout
         )
 
     def forward(self, x, discount=False):
         b, t, _ = x.shape
-        s = self.predictor(x)
+
+        s_u, r_u = None, None
+        if self.is_ensemble and discount:
+            s, s_u = self.predictor.sample(x)
+            r, r_u = self.reward.sample(x)
+            s_u = s_u.mean(dim=-1, keepdim=True)
+            r = r - self.b_r * r_u - self.b_u * s_u
+        else:
+            s = self.predictor(x)
+            r = self.reward(x)
+        d = self.done_output_activation(self.done(x))
+
         s = s.reshape(b, t, self.latent_dim, self.num_cat)
         z_dist = self.create_z_dist(s)
-        r, d = self._get_rd(x, x, discount)
-        return z_dist, r, d
+        return (z_dist, s_u), (r, r_u), d
 
 
 class ConcatHead(BaseHead):
@@ -191,7 +215,8 @@ class ConcatHead(BaseHead):
             latent_dim: int=None,
             num_cat: int=None,
             hidden_dim: int=None,
-            pessimism: float=None,
+            b_r: float=None,
+            b_u: float=None,
             ensemble_size: int=1,
             dropout: float=0.0
         ):
@@ -200,7 +225,8 @@ class ConcatHead(BaseHead):
             num_cat=num_cat,
             hidden_dim=hidden_dim,
             ensemble_size=ensemble_size,
-            pessimism=pessimism,
+            b_r=b_r,
+            b_u=b_u,
             dropout=dropout
         )
 
@@ -208,8 +234,16 @@ class ConcatHead(BaseHead):
         b, t, d = x.shape
         split_size = int(d/3)
         s_emb, a_emb, r_emb = torch.split(x, split_size, dim=-1)
-        s = self.predictor(a_emb)
+        s_u, r_u = None, None
+        if self.is_ensemble and discount:
+            s, s_u = self.predictor.sample(a_emb)
+            r, r_u = self.reward.sample(r_emb)
+            s_u = s_u.mean(dim=-1, keepdim=True)
+            r = r - self.b_r * r_u - self.b_u * s_u
+        else:
+            s = self.predictor(a_emb)
+            r = self.reward(r_emb)
         s = s.reshape(b, t, self.latent_dim, self.num_cat)
         z_dist = self.create_z_dist(s)
-        r, d = self._get_rd(r_emb, s_emb, discount)
-        return z_dist, r, d
+        d = self.done_output_activation(self.done(s_emb))
+        return (z_dist, s_u), (r, r_u), d

@@ -23,7 +23,7 @@ def test_world_model_step(timesteps, encoder, decoder, dynamic_model_8d_action):
     z = z.reshape(2, timesteps, 1024)
     assert z.shape == (2, timesteps, 1024)
 
-    z, (r, _), d = wm.dynamic_model.step(z=z, a=a, r=r, d=d)
+    (z, _), (r, _), d = wm.dynamic_model.step(z=z, a=a, r=r, d=d)
     assert z.shape == (2, timesteps+1, 1024)
     assert r.shape == (2, timesteps+1, 1)
     assert d.shape == (2, timesteps+1, 1)
@@ -47,7 +47,7 @@ def test_state_world_model_step(timesteps, state_encoder, state_decoder, dynamic
     z = z.reshape(2, timesteps, 1024)
     assert z.shape == (2, timesteps, 1024)
 
-    z, (r, _), d = wm.dynamic_model.step(z=z, a=a, r=r, d=d)
+    (z, _), (r, _), d = wm.dynamic_model.step(z=z, a=a, r=r, d=d)
     assert z.shape == (2, timesteps+1, 1024)
     assert r.shape == (2, timesteps+1, 1)
     assert d.shape == (2, timesteps+1, 1)
@@ -318,7 +318,7 @@ def test_world_model_imagine_rollout_uncertainties(
     r = torch.zeros((4, timesteps+1, 1))
     d = torch.zeros((4, timesteps+1, 1))
     _, (z, a, r, d) = wm.update(o, a, r, d, return_init_states=True)
-    z, a, r, d, u = wm.imagine_rollout(
+    z, a, r, d, z_u, r_u = wm.imagine_rollout(
         z=z, a=a, r=r, d=d,
         actor=actor,
         with_uncertainties=True
@@ -327,4 +327,5 @@ def test_world_model_imagine_rollout_uncertainties(
     assert a.shape == (68, 26, 8)
     assert r.shape == (68, 26, 1)
     assert d.shape == (68, 26, 1)
-    assert u.shape == (68, 26, 1)
+    assert z_u.shape == (68, 26, 1)
+    assert r_u.shape == (68, 26, 1)

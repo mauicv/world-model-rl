@@ -157,6 +157,7 @@ def make_dynamic_model(a_size, ensemble_size=1):
         action_size=a_size,
         num_layers=layers,
         ensemble_size=ensemble_size,
-        pessimism=1.0
+        b_r=1.0,
+        b_u=1.0
     )
     return dynamic_model
