@@ -278,4 +278,5 @@ class WorldModel(Base):
                     r = r \
                         - self.params.uncertainty_reward_penalty_b_r * r_u \
                         - self.params.uncertainty_reward_penalty_b_s * z_u.mean(dim=-1, keepdim=True)
+                    to_return[2] = r
             return to_return
