@@ -29,6 +29,8 @@ class WorldModelTrainingParams:
     consistency_coeff: float = 0.0
     reward_coeff: float = 10.0
     done_coeff: float = 1.0
+    uncertainty_reward_penalty_b_r: float = 1.0
+    uncertainty_reward_penalty_b_s: float = 1.0
 
 
 @dataclass
@@ -222,6 +224,7 @@ class WorldModel(Base):
             with_observations: bool=False,
             with_entropies: bool=False,
             with_uncertainties: bool=False,
+            apply_uncertainty_reward_penalty: bool=False,
         ):
         
         with FreezeParameters([self.dynamic_model, self.decoder]):
@@ -271,4 +274,8 @@ class WorldModel(Base):
                 r_u = torch.stack(r_u, dim=1)
                 to_return.append(z_u)
                 to_return.append(r_u)
+                if apply_uncertainty_reward_penalty:
+                    r = r \
+                        - self.params.uncertainty_reward_penalty_b_r * r_u \
+                        - self.params.uncertainty_reward_penalty_b_s * z_u.mean(dim=-1, keepdim=True)
             return to_return

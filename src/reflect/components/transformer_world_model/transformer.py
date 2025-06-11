@@ -36,9 +36,6 @@ class PytfexTransformer(torch.nn.Module):
             hdn_dim: int=512,
             embedding_type: Literal['stack', 'add', 'concat']='stack',
             ensemble_size: int=1,
-            b_r: float=1.0,
-            b_u: float=1.0,
-            apply_uncertainty_reward_penalty: bool=False,
             reward_dropout: float=0.0,
         ):
         super().__init__()
@@ -49,9 +46,6 @@ class PytfexTransformer(torch.nn.Module):
         num_ts = self.num_ts * ts_adjuster
         internal_hdn_dim = hdn_adj * hdn_dim
         self.mask = get_causal_mask(num_ts)
-        if apply_uncertainty_reward_penalty:
-            assert ensemble_size > 1, "Ensemble size must be greater than 1 to apply uncertainty reward penalty"
-        self.apply_uncertainty_reward_penalty = apply_uncertainty_reward_penalty
 
         self.dynamic_model = GPT(
             dropout=dropout,
@@ -85,8 +79,6 @@ class PytfexTransformer(torch.nn.Module):
             num_cat=num_cat,
             hidden_dim=hdn_dim,
             ensemble_size=ensemble_size,
-            b_r=b_r,
-            b_u=b_u,
             dropout=reward_dropout
         )
 
@@ -104,7 +96,7 @@ class PytfexTransformer(torch.nn.Module):
         ))
 
         (z_dist, new_z_u), (new_r, new_r_u), new_d = \
-            self.head(h, train=False, apply_uncertainty_reward_penalty=self.apply_uncertainty_reward_penalty)
+            self.head(h, train=False)
         z_u = new_z_u[:, -1] if new_z_u is not None else None
         r_u = new_r_u[:, -1] if new_r_u is not None else None
 

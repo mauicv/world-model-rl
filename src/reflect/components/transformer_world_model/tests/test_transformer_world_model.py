@@ -3,6 +3,7 @@ import gymnasium as gym
 from dataclasses import asdict
 import torch
 import pytest
+from reflect.components.transformer_world_model.world_model import WorldModelTrainingParams
 
 
 @pytest.mark.parametrize("timesteps", [5, 16, 18])
@@ -312,6 +313,10 @@ def test_world_model_imagine_rollout_uncertainties(
         encoder=state_encoder, 
         decoder=state_decoder,
         dynamic_model=dm,
+        params=WorldModelTrainingParams(
+            uncertainty_reward_penalty_b_r=1.0,
+            uncertainty_reward_penalty_b_s=1.0,
+        )
     )
     o = torch.zeros((4, timesteps+1, 27))
     a = torch.zeros((4, timesteps+1, 8))
@@ -321,7 +326,8 @@ def test_world_model_imagine_rollout_uncertainties(
     z, a, r, d, z_u, r_u = wm.imagine_rollout(
         z=z, a=a, r=r, d=d,
         actor=actor,
-        with_uncertainties=True
+        with_uncertainties=True,
+        apply_uncertainty_reward_penalty=True
     )
     assert z.shape == (68, 26, 1024)
     assert a.shape == (68, 26, 8)

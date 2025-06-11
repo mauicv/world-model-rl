@@ -150,7 +150,7 @@ class StackHead(BaseHead):
             dropout=dropout
         )
 
-    def forward(self, x, train=True, apply_uncertainty_reward_penalty=False):
+    def forward(self, x, train=True):
         b, t, _ = x.shape
         reshaped_x = x.view(b, -1, 3, self.hidden_dim)
         s_emb, a_emb, r_emb = reshaped_x.unbind(dim=2)
@@ -162,8 +162,6 @@ class StackHead(BaseHead):
             s_u, r_u = None, None
             s = self.predictor(a_emb)
             r = self.reward(r_emb)
-        if apply_uncertainty_reward_penalty and self.is_ensemble:
-            r = r - self.b_r * r_u - self.b_u * s_u
         s = s.reshape(b, int(t/3), self.latent_dim, self.num_cat)
         z_dist = self.create_z_dist(s)
         d = self.done_output_activation(self.done(s_emb))
@@ -191,7 +189,7 @@ class AddHead(BaseHead):
             dropout=dropout
         )
 
-    def forward(self, x, train=True, apply_uncertainty_reward_penalty=False):
+    def forward(self, x, train=True):
         b, t, _ = x.shape
         if self.is_ensemble and not train:
             s, s_u = self.predictor.sample(x)
@@ -201,10 +199,7 @@ class AddHead(BaseHead):
             s_u, r_u = None, None
             s = self.predictor(x)
             r = self.reward(x)
-        if apply_uncertainty_reward_penalty:
-            r = r - self.b_r * r_u - self.b_u * s_u
         d = self.done_output_activation(self.done(x))
-
         s = s.reshape(b, t, self.latent_dim, self.num_cat)
         z_dist = self.create_z_dist(s)
         return (z_dist, s_u), (r, r_u), d
@@ -231,7 +226,7 @@ class ConcatHead(BaseHead):
             dropout=dropout
         )
 
-    def forward(self, x, train=True, apply_uncertainty_reward_penalty=False):
+    def forward(self, x, train=True):
         b, t, d = x.shape
         split_size = int(d/3)
         s_emb, a_emb, r_emb = torch.split(x, split_size, dim=-1)
@@ -243,8 +238,6 @@ class ConcatHead(BaseHead):
             s_u, r_u = None, None
             s = self.predictor(a_emb)
             r = self.reward(r_emb)
-        if apply_uncertainty_reward_penalty and self.is_ensemble:
-            r = r - self.b_r * r_u - self.b_u * s_u
         s = s.reshape(b, t, self.latent_dim, self.num_cat)
         z_dist = self.create_z_dist(s)
         d = self.done_output_activation(self.done(s_emb))
