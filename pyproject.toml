@@ -16,7 +16,7 @@ classifiers = [
     "Programming Language :: Python :: 3",
 ]
 dependencies = [
-    "pytfex@git+https://github.com/mauicv/transformers.git",
+    "pytfex@git+https://github.com/mauicv/transformers.git@feature/gumbel-softmax-attention",
     "pygame",
     "click",
     "matplotlib",

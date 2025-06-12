@@ -1,7 +1,7 @@
 from pytfex.transformer.gpt import GPT
 from pytfex.transformer.layer import TransformerLayer
 from pytfex.transformer.mlp import MLP
-from pytfex.transformer.attention import RelativeAttention
+from pytfex.transformer.attention import GumbelSoftmaxRelativeAttention
 from reflect.components.transformer_world_model.head import StackHead, ConcatHead, AddHead
 from reflect.components.transformer_world_model.embedder import StackEmbedder, ConcatEmbedder, AddEmbedder
 from pytfex.transformer.gpt import GPT
@@ -62,7 +62,7 @@ class PytfexTransformer(torch.nn.Module):
             layers=[
                 TransformerLayer(
                     hidden_dim=internal_hdn_dim,
-                    attn=RelativeAttention(
+                    attn=GumbelSoftmaxRelativeAttention(
                         hidden_dim=internal_hdn_dim,
                         num_heads=num_heads,
                         num_positions=num_ts,
@@ -83,11 +83,17 @@ class PytfexTransformer(torch.nn.Module):
             r: torch.Tensor,
             d: torch.Tensor,
         ):
+        for layer in self.dynamic_model.layers:
+            layer.attn.set_hard(True)
+
         z_dist, new_r, new_d = self.dynamic_model((
             z[:, -self.num_ts:],
             a[:, -self.num_ts:],
             r[:, -self.num_ts:]
         ))
+
+        for layer in self.dynamic_model.layers:
+            layer.attn.set_hard(False)
 
         new_r = new_r[:, -1].reshape(-1, 1, 1)
         r = torch.cat([r, new_r], dim=1)
@@ -123,8 +129,12 @@ class PytfexTransformer(torch.nn.Module):
         new_z = torch.cat([z, new_z], dim=1)
         return new_z, new_r, new_d
 
-    def forward(self, z, a, r):
+    def forward(self, z, a, r, tau=1.0):
         self.mask = self.mask.to(z.device)
+
+        for layer in self.dynamic_model.layers:
+            layer.attn.set_tau(tau)
+
         return self.dynamic_model(
             (z, a, r),
             mask=self.mask
