@@ -3,6 +3,7 @@ from reflect.utils import AdamOptim
 from dataclasses import dataclass
 import torch
 import copy
+from typing import Optional
 
 def update_target_network(target_model, model, tau=5e-3):
     with FreezeParameters([target_model, model]):
@@ -19,11 +20,11 @@ def update_target_network(target_model, model, tau=5e-3):
 
 @dataclass
 class ValueGradTrainerLosses:
-    actor_loss: float
-    actor_grad_norm: float
     value_loss: float
     value_grad_norm: float
-    entropy_loss: float
+    actor_loss: Optional[float]
+    actor_grad_norm: Optional[float]
+    entropy_loss: Optional[float]
 
 
 class ValueGradTrainer:
@@ -139,7 +140,8 @@ class ValueGradTrainer:
             state_samples,
             reward_samples,
             done_samples,
-            entropy=None
+            entropy=None,
+            critic_only=False
         ):
         value_loss, target_values = self.value_loss(
             state_samples=state_samples,
@@ -148,27 +150,30 @@ class ValueGradTrainer:
         )
         value_gn = self.critic_optim.backward(
             value_loss, 
-            retain_graph=True
+            retain_graph=not critic_only
         )
         self.critic_optim.update_parameters()
 
-        if entropy is not None:
-            entropy = entropy.mean()
-            actor_loss = - target_values.mean() - self.eta * entropy
-            entropy_loss = entropy.item()
-        else:
-            actor_loss = - target_values.mean()
-            entropy_loss = 0.0
-        actor_gn = self.actor_optim.backward(actor_loss)
-        self.actor_optim.update_parameters()
+        actor_loss, actor_gn, entropy_loss = None, None, None
+
+        if not critic_only:
+            if entropy is not None:
+                entropy = entropy.mean()
+                actor_loss = - target_values.mean() - self.eta * entropy
+                entropy_loss = entropy.item()
+            else:
+                actor_loss = - target_values.mean()
+                entropy_loss = 0.0
+            actor_gn = self.actor_optim.backward(actor_loss)
+            self.actor_optim.update_parameters()
 
         update_target_network(self.target_critic, self.critic)
         return ValueGradTrainerLosses(
             value_loss=value_loss.item(),
             value_grad_norm=value_gn.item(),
-            actor_loss=actor_loss.item(),
-            entropy_loss=entropy_loss,
-            actor_grad_norm=actor_gn.item(),
+            actor_loss=actor_loss.item() if actor_loss is not None else None,
+            entropy_loss=entropy_loss if entropy_loss is not None else None,
+            actor_grad_norm=actor_gn.item() if actor_loss is not None else None,
         )
 
     def to(self, device):
