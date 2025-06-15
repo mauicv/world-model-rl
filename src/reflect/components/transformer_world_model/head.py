@@ -38,11 +38,13 @@ class EnsembleMLP(torch.nn.Module):
             ensemble_size: int=1,
             dropout: float=0.0,
             sample_iterations: int=2,
-            seed: int=0
+            seed: int=0,
+            pessimism: float=0.1
         ):
         super(EnsembleMLP, self).__init__()
         self.ensemble_size = ensemble_size
         self.sample_iterations = sample_iterations
+        self.pessimism = pessimism
 
         # make model creation deterministic
         random.seed(seed)
@@ -75,7 +77,8 @@ class EnsembleMLP(torch.nn.Module):
         if not was_training:
             self.eval()
 
-        mu = y.mean(dim=0)
+        mu = y.quantile(self.pessimism, dim=0)
+
         var = y.detach().std(dim=0)
         return mu, var
 
@@ -100,7 +103,7 @@ class BaseHead(torch.nn.Module):
         self.b_u = b_u
         if ensemble_size == 1:
             self.reward = MLP(hidden_dim, hidden_dim * 2, 1, dropout=dropout)
-            self.predictor = MLP(hidden_dim, hidden_dim * 2, latent_dim * num_cat)
+            self.predictor = MLP(hidden_dim, hidden_dim * 2, latent_dim * num_cat, dropout=dropout)
             self.is_ensemble = False
         else:
             self.predictor = EnsembleMLP(
@@ -108,14 +111,16 @@ class BaseHead(torch.nn.Module):
                 hidden_dim * 2,
                 latent_dim * num_cat,
                 ensemble_size,
-                dropout=dropout
+                dropout=dropout,
+                pessimism=0.5
             )
             self.reward = EnsembleMLP(
                 hidden_dim,
                 hidden_dim * 2,
                 1,
                 ensemble_size,
-                dropout=dropout
+                dropout=dropout,
+                pessimism=0.1
             )
             self.is_ensemble = True
         self.done_output_activation = torch.nn.Sigmoid()
