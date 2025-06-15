@@ -29,6 +29,8 @@ class WorldModelTrainingParams:
     consistency_coeff: float = 0.0
     reward_coeff: float = 10.0
     done_coeff: float = 1.0
+    uncertainty_reward_penalty_b_r: float = 1.0
+    uncertainty_reward_penalty_b_s: float = 1.0
 
 
 @dataclass
@@ -220,10 +222,17 @@ class WorldModel(Base):
             actor: Actor,
             num_timesteps: int=25,
             with_observations: bool=False,
-            with_entropies: bool=False
+            with_entropies: bool=False,
+            with_uncertainties: bool=False,
+            apply_uncertainty_reward_penalty: bool=False,
         ):
         
         with FreezeParameters([self.dynamic_model, self.decoder]):
+            if with_uncertainties:
+                assert self.dynamic_model.head.is_ensemble, "Uncertainties are only supported for ensemble models"
+                r_u = [torch.zeros_like(r[:, -1, :])]
+                z_u = [torch.zeros_like(r[:, -1, :])]
+
             if with_entropies:
                 entropies = []  # Use a list to collect entropies
                 # Calculate entropy for initial state
@@ -231,8 +240,11 @@ class WorldModel(Base):
                 entropies.append(action_dist.entropy()[:, None])
 
             for i in range(num_timesteps):
-                new_z, new_r, new_d = self \
+                (new_z, new_z_u), (new_r, new_r_u), new_d = self \
                     .dynamic_model.rstep(z=z, a=a, r=r, d=d)
+                if with_uncertainties:
+                    z_u.append(new_z_u)
+                    r_u.append(new_r_u)
                 if with_entropies:
                     action_dist = actor(
                         new_z[:, -1, :].detach(),
@@ -257,4 +269,14 @@ class WorldModel(Base):
                 o = self.decode(z.reshape(b*t, -1))
                 o = o.reshape(b, t, *o.shape[1:])
                 to_return.append(o)
+            if with_uncertainties:
+                z_u = torch.stack(z_u, dim=1)
+                r_u = torch.stack(r_u, dim=1)
+                to_return.append(z_u)
+                to_return.append(r_u)
+                if apply_uncertainty_reward_penalty:
+                    r = r \
+                        - self.params.uncertainty_reward_penalty_b_r * r_u \
+                        - self.params.uncertainty_reward_penalty_b_s * z_u.mean(dim=-1, keepdim=True)
+                    to_return[2] = r
             return to_return
