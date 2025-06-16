@@ -120,7 +120,7 @@ class BaseHead(torch.nn.Module):
                 1,
                 ensemble_size,
                 dropout=dropout,
-                pessimism=0.1
+                pessimism=0.25
             )
             self.is_ensemble = True
         self.done_output_activation = torch.nn.Sigmoid()
