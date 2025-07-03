@@ -11,6 +11,7 @@ from reflect.components.models.actor import Actor
 from reflect.components.trainers.reward.reward_trainer import RewardGradTrainer
 from reflect.components.trainers.value.value_trainer import ValueGradTrainer
 from reflect.components.trainers.value.critic import ValueCritic
+from reflect.components.trainers.ppo.ppo_trainer import PPOTrainer
 
 import torch
 from torchvision.transforms import Resize, Compose
@@ -119,6 +120,18 @@ def value_grad_trainer(actor, value_model):
         critic_lr=0.001,
         grad_clip=1.0
     )
+
+
+@pytest.fixture
+def ppo_trainer(actor, value_model):
+    return PPOTrainer(
+        actor=actor,
+        actor_lr=0.001,
+        critic=value_model,
+        critic_lr=0.001,
+        grad_clip=1.0
+    )
+
 
 @pytest.fixture
 def world_model_actor(world_model, actor):
