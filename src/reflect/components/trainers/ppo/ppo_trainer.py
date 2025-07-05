@@ -4,6 +4,7 @@ from dataclasses import dataclass
 import torch
 import copy
 from typing import Optional
+import numpy as np
 
 @dataclass
 class PPOTrainerLosses:
@@ -12,6 +13,8 @@ class PPOTrainerLosses:
     actor_loss: Optional[float]
     actor_grad_norm: Optional[float]
     entropy_loss: Optional[float]
+    clipfrac: Optional[float]
+    approxkl: Optional[float]
 
 
 class PPOTrainer:
@@ -130,6 +133,13 @@ class PPOTrainer:
         old_action_log_probs = old_action_dist.log_prob(action_samples)[:, None].detach()
 
         b, h, *l = state_samples.shape
+
+        actor_losses = []
+        entropy_losses = []
+        actor_gns = []
+        clipfracs = []
+        approxkls = []
+
         inds = torch.randperm(b)
         for i in range(0, b, self.minibatch_size):
             sample_inds = inds[i:i+self.minibatch_size]
@@ -140,14 +150,30 @@ class PPOTrainer:
             entropy_loss = action_dist.entropy().mean()
             action_log_probs = action_dist.log_prob(action_sample)
             ratio = torch.exp(action_log_probs - old_action_log_probs)
+
+            with torch.no_grad():
+                clipfrac = ((1 - ratio).abs() > self.clip_ratio).float().mean()
+                approxkl = ((ratio - 1) - torch.log(ratio)).mean()
+                clipfracs.append(clipfrac.item())
+                approxkls.append(approxkl.item())
+
             clipped_ratio = torch.clamp(ratio, 1 - self.clip_ratio, 1 + self.clip_ratio)
             clipped_surrogate_objective = torch.min(ratio * advantage, clipped_ratio * advantage)
             actor_loss = - clipped_surrogate_objective.mean() - self.eta * entropy_loss
             actor_gn = self.actor_optim.backward(actor_loss)
             self.actor_optim.update_parameters()
-        
-        # return means ... 
-        return actor_loss, actor_gn, entropy_loss
+
+            actor_losses.append(actor_loss.item())
+            entropy_losses.append(entropy_loss.item())
+            actor_gns.append(actor_gn.item())
+
+        return (
+            np.mean(actor_losses),
+            np.mean(actor_gns),
+            np.mean(entropy_losses),
+            np.mean(clipfracs),
+            np.mean(approxkls)
+        )
 
     def update(
             self,
@@ -171,7 +197,7 @@ class PPOTrainer:
         actor_loss, actor_gn, entropy_loss = None, None, None
 
         if not critic_only:
-            actor_loss, actor_gn, entropy_loss = self.actor_update(
+            actor_loss, actor_gn, entropy_loss, clipfrac, approxkl = self.actor_update(
                 advantages=advantages.detach(),
                 state_samples=state_samples.detach(),
                 action_samples=action_samples.detach()
@@ -183,6 +209,8 @@ class PPOTrainer:
             actor_loss=actor_loss.item() if actor_loss is not None else None,
             entropy_loss=entropy_loss.item() if entropy_loss is not None else None,
             actor_grad_norm=actor_gn.item() if actor_loss is not None else None,
+            clipfrac=clipfrac.item() if clipfrac is not None else None,
+            approxkl=approxkl.item() if approxkl is not None else None,
         )
 
     def to(self, device):
