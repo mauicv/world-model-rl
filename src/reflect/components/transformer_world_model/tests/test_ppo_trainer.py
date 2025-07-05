@@ -54,7 +54,8 @@ def test_update(encoder, decoder, actor):
     z, a, r, d = wm.imagine_rollout(
         z=z, a=a, r=r, d=d,
         actor=actor,
-        with_observations=False
+        with_observations=False,
+        disable_gradients=True
     )
 
     history = trainer.update(
@@ -117,7 +118,8 @@ def test_update_state(state_encoder, state_decoder, actor):
     z, a, r, d = wm.imagine_rollout(
         z=z, a=a, r=r, d=d,
         actor=actor,
-        with_observations=False
+        with_observations=False,
+        disable_gradients=True
     )
 
     history = trainer.update(
