@@ -28,7 +28,8 @@ class PPOTrainer:
             lam: float=0.95,
             eta: float=0.001,
             minibatch_size: int=32,
-            clip_ratio: float=0.2
+            clip_ratio: float=0.2,
+            target_kl: float=0.1
         ):
         self.gamma = gamma
         self.lam = lam
@@ -36,6 +37,7 @@ class PPOTrainer:
         self.gamma_rollout = None
         self.minibatch_size = minibatch_size
         self.clip_ratio = clip_ratio
+        self.target_kl = target_kl
 
         self.actor = actor
         self.actor_lr = actor_lr
@@ -156,6 +158,9 @@ class PPOTrainer:
                 approxkl = ((ratio - 1) - torch.log(ratio)).mean()
                 clipfracs.append(clipfrac.item())
                 approxkls.append(approxkl.item())
+                if approxkl > self.target_kl:
+                    print(f"Early stopping: KL too high ({approxkl.item()})")
+                    break
 
             clipped_ratio = torch.clamp(ratio, 1 - self.clip_ratio, 1 + self.clip_ratio)
             clipped_surrogate_objective = torch.min(ratio * advantage_minibatch, clipped_ratio * advantage_minibatch)
