@@ -21,9 +21,9 @@ class PPOTrainer:
     def __init__(self,
             actor,
             critic,
-            actor_lr: float=0.001,
-            critic_lr: float=0.001,
-            grad_clip: float=100,
+            actor_lr: float=1e-4,
+            critic_lr: float=1e-4,
+            grad_clip: float=0.5,
             gamma: float=0.99,
             lam: float=0.95,
             eta: float=0.001,
@@ -151,8 +151,6 @@ class PPOTrainer:
             entropy_loss = action_dist.entropy().mean()
             action_log_probs_minibatch = action_dist.log_prob(action_minibatch)[:, :, None]
             ratio = torch.exp(action_log_probs_minibatch - old_action_log_probs_minibatch)
-            ratio = torch.clamp(ratio, min=1e-10, max=10.0)
-
             with torch.no_grad():
                 clipfrac = ((1 - ratio).abs() > self.clip_ratio).float().mean()
                 approxkl = ((ratio - 1) - torch.log(ratio)).mean()
