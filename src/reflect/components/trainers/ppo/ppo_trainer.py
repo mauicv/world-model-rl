@@ -151,6 +151,7 @@ class PPOTrainer:
             entropy_loss = action_dist.entropy().mean()
             action_log_probs_minibatch = action_dist.log_prob(action_minibatch)[:, :, None]
             ratio = torch.exp(action_log_probs_minibatch - old_action_log_probs_minibatch)
+            ratio = torch.clamp(ratio, min=1e-10, max=10.0)
 
             with torch.no_grad():
                 clipfrac = ((1 - ratio).abs() > self.clip_ratio).float().mean()
