@@ -109,10 +109,10 @@ def test_update_state(state_encoder, state_decoder, actor):
     trainer = PPOTrainer(
         actor=actor,
         critic=critic,
-        minibatch_size=1
+        minibatch_size=2
     )
 
-    _, _, o, a, r, d = dl.sample(batch_size=2)
+    _, _, o, a, r, d = dl.sample(batch_size=4)
     _, (z, a, r, d) = wm.update(o, a, r, d, return_init_states=True)
 
     z, a, r, d = wm.imagine_rollout(
