@@ -181,7 +181,6 @@ class PPOTrainer:
             reward_samples,
             done_samples,
             action_samples,
-            critic_only=False
         ):
         value_loss, advantages = self.value_loss(
             state_samples=state_samples,
@@ -190,18 +189,17 @@ class PPOTrainer:
         )
         value_gn = self.critic_optim.backward(
             value_loss, 
-            retain_graph=not critic_only
+            retain_graph=True
         )
         self.critic_optim.update_parameters()
 
         actor_loss, actor_gn, entropy_loss = None, None, None
 
-        if not critic_only:
-            actor_loss, actor_gn, entropy_loss, clipfrac, approxkl = self.actor_update(
-                advantages=advantages.detach(),
-                state_samples=state_samples.detach(),
-                action_samples=action_samples.detach()
-            )
+        actor_loss, actor_gn, entropy_loss, clipfrac, approxkl = self.actor_update(
+            advantages=advantages.detach(),
+            state_samples=state_samples.detach(),
+            action_samples=action_samples.detach()
+        )
 
         return PPOTrainerLosses(
             value_loss=value_loss.item(),
