@@ -96,7 +96,6 @@ def test_update_state(state_encoder, state_decoder, actor):
         use_imgs_as_states=False,
     )
 
-    dl.perform_rollout()
 
     actor = Actor(
         input_dim=32*32,
@@ -111,7 +110,7 @@ def test_update_state(state_encoder, state_decoder, actor):
         critic=critic,
         minibatch_size=2
     )
-
+    dl.perform_rollout()
     _, _, o, a, r, d = dl.sample(batch_size=4)
     _, (z, a, r, d) = wm.update(o, a, r, d, return_init_states=True)
 
