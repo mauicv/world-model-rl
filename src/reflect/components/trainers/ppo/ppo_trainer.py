@@ -130,8 +130,7 @@ class PPOTrainer:
 
     def actor_update(self, advantages, state_samples, action_samples):
         old_action_dist = self.actor(state_samples)
-        old_action_log_probs = old_action_dist.log_prob(action_samples)[:, None].detach()
-
+        old_action_log_probs = old_action_dist.log_prob(action_samples)[:, :, None].detach()
         b, h, *l = state_samples.shape
 
         actor_losses = []
@@ -143,13 +142,15 @@ class PPOTrainer:
         inds = torch.randperm(b)
         for i in range(0, b, self.minibatch_size):
             sample_inds = inds[i:i+self.minibatch_size]
-            state_sample = state_samples[sample_inds]
-            action_sample = action_samples[sample_inds]
-            advantage = advantages[sample_inds]
-            action_dist = self.actor(state_sample)
+            state_minibatch = state_samples[sample_inds]
+            action_minibatch = action_samples[sample_inds]
+            old_action_log_probs_minibatch = old_action_log_probs[sample_inds]
+            advantage_minibatch = advantages[sample_inds]
+            
+            action_dist = self.actor(state_minibatch)
             entropy_loss = action_dist.entropy().mean()
-            action_log_probs = action_dist.log_prob(action_sample)
-            ratio = torch.exp(action_log_probs - old_action_log_probs)
+            action_log_probs_minibatch = action_dist.log_prob(action_minibatch)[:, :, None]
+            ratio = torch.exp(action_log_probs_minibatch - old_action_log_probs_minibatch)
 
             with torch.no_grad():
                 clipfrac = ((1 - ratio).abs() > self.clip_ratio).float().mean()
@@ -158,7 +159,7 @@ class PPOTrainer:
                 approxkls.append(approxkl.item())
 
             clipped_ratio = torch.clamp(ratio, 1 - self.clip_ratio, 1 + self.clip_ratio)
-            clipped_surrogate_objective = torch.min(ratio * advantage, clipped_ratio * advantage)
+            clipped_surrogate_objective = torch.min(ratio * advantage_minibatch, clipped_ratio * advantage_minibatch)
             actor_loss = - clipped_surrogate_objective.mean() - self.eta * entropy_loss
             actor_gn = self.actor_optim.backward(actor_loss)
             self.actor_optim.update_parameters()
