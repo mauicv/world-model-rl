@@ -108,7 +108,11 @@ def test_update_state(state_encoder, state_decoder, actor):
     trainer = PPOTrainer(
         actor=actor,
         critic=critic,
-        minibatch_size=2
+        minibatch_size=2,
+        clip_ratio=0.1,
+        target_kl=0.1,
+        eta=0.01,
+        grad_clip=0.5,
     )
     dl.perform_rollout()
     _, _, o, a, r, d = dl.sample(batch_size=4)
