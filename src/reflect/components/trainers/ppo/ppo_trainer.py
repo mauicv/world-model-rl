@@ -55,82 +55,36 @@ class PPOTrainer:
             grad_clip=grad_clip
         )
 
-    def compute_rollout_value(
-            self,
-            target_state_values,
-            rewards,
-            states,
-            dones,
-            k
-        ):
-        _, big_h, *_ = states.shape
-        if self.gamma_rollout is None:
-            self.gamma_rollout = torch.tensor([
-                self.gamma**i for i in range(big_h)
-            ]).to(states.device)
-        h = min(k, big_h - 1)
-        R = (
-            self.gamma_rollout[:h][None, :, None]
-            * rewards[:, :h]
-            * (1 - dones[:, :h])
-        )
-        final_values = (
-            self.gamma_rollout[h]
-            * target_state_values[:, [h]]
-            * (1 - dones[:, [h]])
-        )
-        return R.sum(1) + final_values[:, 0, :]
+    def compute_gae(self, rewards, values, dones, gamma=0.99, lam=0.95):
+        b, l, *_ = rewards.shape
+        advantages = torch.zeros_like(rewards)
+        last_advantage = 0
+        for t in reversed(range(l)):
+            if t == l - 1:
+                next_value = 0
+            else:
+                next_value = values[:, t + 1]
+            delta = rewards[:, t] + gamma * next_value * (1 - dones[:, t]) - values[:, t]
+            advantages[:, t] = delta + gamma * lam * (1 - dones[:, t]) * last_advantage
+            last_advantage = advantages[:, t]
+        return advantages
 
-    def compute_value_target(
-            self,
-            target_state_values,
-            rewards,
-            states,
-            dones
-        ):
-        val_sum = 0
-        _, big_h, *_ = states.shape
-        for k in range(1, big_h - 1):
-            val = self.compute_rollout_value(
-                target_state_values=target_state_values,
-                rewards=rewards,
-                states=states,
-                dones=dones,
-                k=k
-            )
-            val_sum = val_sum + self.lam**(k - 1) * val
-        final_val = self.compute_rollout_value(
-            target_state_values=target_state_values,
-            rewards=rewards,
-            states=states,
-            dones=dones,
-            k=big_h
-        )
-        return (1 - self.lam) * val_sum + self.lam**(big_h - 1) * final_val
-
-    def value_loss(
+    def compute_advantages(
             self,
             state_samples,
             reward_samples,
             done_samples,
         ):
-        b, h, *l = state_samples.shape
         state_sample_values = self.critic(state_samples)
-        targets = []
-        for i in range(h):
-            rollout_targets = self.compute_value_target(
-                target_state_values=state_sample_values[:, i:, :].detach(),
-                states=state_samples[:, i:, :],
-                rewards=reward_samples[:, i:, :],
-                dones=done_samples[:, i:, :],
-            )
-            targets.append(rollout_targets)
-        target_values = torch.stack(targets, dim=1)
-        advantages = (target_values - state_sample_values).detach()
-        loss = 0.5 * (advantages)**2
-        return loss.mean(), advantages, target_values.detach()
+        advantages = self.compute_gae(
+            rewards=reward_samples,
+            values=state_sample_values,
+            dones=done_samples
+        )
+        returns = state_sample_values + advantages
+        return advantages.detach(), returns.detach()
 
-    def actor_update(self, advantages, state_samples, action_samples, target_values):
+    def actor_update(self, advantages, returns, state_samples, action_samples):
         b, h, *l = state_samples.shape
 
         old_action_dist = self.actor(state_samples)
@@ -155,9 +109,8 @@ class PPOTrainer:
             old_action_log_probs_minibatch = old_action_log_probs[sample_inds]
             advantage_minibatch = advantages[sample_inds]
 
-            target_values_minibatch = target_values[sample_inds]
             values_minibatch = self.critic(state_minibatch)
-            value_loss = 0.5 * (values_minibatch - target_values_minibatch)**2
+            value_loss = 0.5 * (values_minibatch - returns[sample_inds])**2
             value_loss = value_loss.mean()
             value_gn = self.critic_optim.backward(value_loss)
             self.critic_optim.update_parameters()
@@ -172,6 +125,7 @@ class PPOTrainer:
             diff = action_log_probs_minibatch - old_action_log_probs_minibatch
             diff_clamped = torch.clamp(diff, min=-20, max=20)
             ratio = torch.exp(diff_clamped)
+
             with torch.no_grad():
                 clipfrac = ((1 - ratio).abs() > self.clip_ratio).float().mean()
                 approxkl = ((ratio - 1) - torch.log(ratio)).mean()
@@ -184,7 +138,7 @@ class PPOTrainer:
             pg_loss_1 = - advantage_minibatch * ratio
             pg_loss_2 = - advantage_minibatch * torch.clamp(ratio, 1 - self.clip_ratio, 1 + self.clip_ratio)
             pg_loss = torch.max(pg_loss_1, pg_loss_2).mean()
-            actor_loss = pg_loss - self.eta * entropy_loss   
+            actor_loss = pg_loss - self.eta * entropy_loss
             actor_gn = self.actor_optim.backward(actor_loss)
             self.actor_optim.update_parameters()
 
@@ -209,16 +163,16 @@ class PPOTrainer:
             done_samples,
             action_samples,
         ):
-        value_loss, advantages, target_values = self.value_loss(
+        advantages, returns = self.compute_advantages(
             state_samples=state_samples,
             reward_samples=reward_samples,
             done_samples=done_samples
         )
         actor_loss, actor_gn, entropy_loss, clipfrac, approxkl, value_loss, value_gn = self.actor_update(
             advantages=advantages.detach(),
+            returns=returns.detach(),
             state_samples=state_samples.detach(),
             action_samples=action_samples.detach(),
-            target_values=target_values.detach()
         )
 
         return PPOTrainerLosses(
@@ -252,4 +206,3 @@ class PPOTrainer:
         self.critic.load_state_dict(checkpoint['critic'])
         self.critic_optim.optimizer \
             .load_state_dict(checkpoint['critic_optim'])
-
