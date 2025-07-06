@@ -126,11 +126,11 @@ class PPOTrainer:
             )
             targets.append(rollout_targets)
         target_values = torch.stack(targets, dim=1)
-        advantages = target_values.detach() - state_sample_values
+        advantages = (target_values - state_sample_values).detach()
         loss = 0.5 * (advantages)**2
-        return loss.mean(), advantages
+        return loss.mean(), advantages, target_values.detach()
 
-    def actor_update(self, advantages, state_samples, action_samples):
+    def actor_update(self, advantages, state_samples, action_samples, target_values):
         b, h, *l = state_samples.shape
 
         old_action_dist = self.actor(state_samples)
@@ -144,6 +144,8 @@ class PPOTrainer:
         actor_gns = []
         clipfracs = []
         approxkls = []
+        value_losses = []
+        value_gns = []
 
         inds = torch.randperm(b)
         for i in range(0, b, self.minibatch_size):
@@ -152,7 +154,16 @@ class PPOTrainer:
             action_minibatch = action_samples[sample_inds]
             old_action_log_probs_minibatch = old_action_log_probs[sample_inds]
             advantage_minibatch = advantages[sample_inds]
-            
+
+            target_values_minibatch = target_values[sample_inds]
+            values_minibatch = self.critic(state_minibatch)
+            value_loss = 0.5 * (values_minibatch - target_values_minibatch)**2
+            value_loss = value_loss.mean()
+            value_gn = self.critic_optim.backward(value_loss)
+            self.critic_optim.update_parameters()
+            value_losses.append(value_loss.item())
+            value_gns.append(value_gn.item())
+
             action_dist = self.actor(state_minibatch)
             entropy_loss = action_dist.entropy().mean()
             action_log_probs_minibatch = action_dist.log_prob(action_minibatch)[:, :, None].mean(-1)
@@ -184,7 +195,9 @@ class PPOTrainer:
             np.mean(actor_gns),
             np.mean(entropy_losses),
             np.mean(clipfracs),
-            np.mean(approxkls)
+            np.mean(approxkls),
+            np.mean(value_losses),
+            np.mean(value_gns)
         )
 
     def update(
@@ -194,23 +207,16 @@ class PPOTrainer:
             done_samples,
             action_samples,
         ):
-        value_loss, advantages = self.value_loss(
+        value_loss, advantages, target_values = self.value_loss(
             state_samples=state_samples,
             reward_samples=reward_samples,
             done_samples=done_samples
         )
-        value_gn = self.critic_optim.backward(
-            value_loss, 
-            retain_graph=True
-        )
-        self.critic_optim.update_parameters()
-
-        actor_loss, actor_gn, entropy_loss = None, None, None
-
-        actor_loss, actor_gn, entropy_loss, clipfrac, approxkl = self.actor_update(
+        actor_loss, actor_gn, entropy_loss, clipfrac, approxkl, value_loss, value_gn = self.actor_update(
             advantages=advantages.detach(),
             state_samples=state_samples.detach(),
-            action_samples=action_samples.detach()
+            action_samples=action_samples.detach(),
+            target_values=target_values.detach()
         )
 
         return PPOTrainerLosses(
