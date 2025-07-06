@@ -137,7 +137,7 @@ class PPOTrainer:
         old_action_log_probs = old_action_dist \
             .log_prob(action_samples)[:, :, None] \
             .detach() \
-            .mean(-1)
+            .sum(-1)
 
         actor_losses = []
         entropy_losses = []
@@ -166,7 +166,9 @@ class PPOTrainer:
 
             action_dist = self.actor(state_minibatch)
             entropy_loss = action_dist.entropy().mean()
-            action_log_probs_minibatch = action_dist.log_prob(action_minibatch)[:, :, None].mean(-1)
+            action_log_probs_minibatch = action_dist \
+                .log_prob(action_minibatch)[:, :, None] \
+                .sum(-1)
             diff = action_log_probs_minibatch - old_action_log_probs_minibatch
             diff_clamped = torch.clamp(diff, min=-20, max=20)
             ratio = torch.exp(diff_clamped)
