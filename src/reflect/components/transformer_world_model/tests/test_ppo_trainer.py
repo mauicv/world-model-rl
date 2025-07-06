@@ -101,6 +101,7 @@ def test_update_state(state_encoder, state_decoder, actor):
         input_dim=32*32,
         output_dim=real_env.action_space.shape[0],
         bound=real_env.action_space.high,
+        independent_actions=False,
     )
     critic = ValueCritic(
         state_dim=32*32,
