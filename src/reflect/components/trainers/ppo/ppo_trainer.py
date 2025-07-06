@@ -28,7 +28,7 @@ class PPOTrainer:
             lam: float=0.95,
             eta: float=0.001,
             minibatch_size: int=32,
-            clip_ratio: float=0.2,
+            clip_ratio: float=0.1,
             target_kl: float=0.1
         ):
         self.gamma = gamma
@@ -152,7 +152,9 @@ class PPOTrainer:
             action_dist = self.actor(state_minibatch)
             entropy_loss = action_dist.entropy().mean()
             action_log_probs_minibatch = action_dist.log_prob(action_minibatch)[:, :, None]
-            ratio = torch.exp(action_log_probs_minibatch - old_action_log_probs_minibatch)
+            diff = action_log_probs_minibatch - old_action_log_probs_minibatch
+            diff_clamped = torch.clamp(diff, min=-20, max=20)
+            ratio = torch.exp(diff_clamped)
             with torch.no_grad():
                 clipfrac = ((1 - ratio).abs() > self.clip_ratio).float().mean()
                 approxkl = ((ratio - 1) - torch.log(ratio)).mean()
@@ -162,9 +164,10 @@ class PPOTrainer:
                     print(f"Early stopping: KL too high ({approxkl.item()})")
                     break
 
-            clipped_ratio = torch.clamp(ratio, 1 - self.clip_ratio, 1 + self.clip_ratio)
-            clipped_surrogate_objective = torch.min(ratio * advantage_minibatch, clipped_ratio * advantage_minibatch)
-            actor_loss = - clipped_surrogate_objective.mean() - self.eta * entropy_loss
+            pg_loss_1 = - advantage_minibatch * ratio
+            pg_loss_2 = - advantage_minibatch * torch.clamp(ratio, 1 - self.clip_ratio, 1 + self.clip_ratio)
+            pg_loss = torch.max(pg_loss_1, pg_loss_2).mean()
+            actor_loss = pg_loss - self.eta * entropy_loss
             actor_gn = self.actor_optim.backward(actor_loss)
             self.actor_optim.update_parameters()
 
