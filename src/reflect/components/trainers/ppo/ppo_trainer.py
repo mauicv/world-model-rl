@@ -131,9 +131,13 @@ class PPOTrainer:
         return loss.mean(), advantages
 
     def actor_update(self, advantages, state_samples, action_samples):
-        old_action_dist = self.actor(state_samples)
-        old_action_log_probs = old_action_dist.log_prob(action_samples)[:, :, None].detach()
         b, h, *l = state_samples.shape
+
+        old_action_dist = self.actor(state_samples)
+        old_action_log_probs = old_action_dist \
+            .log_prob(action_samples)[:, :, None] \
+            .detach() \
+            .mean(-1)
 
         actor_losses = []
         entropy_losses = []
@@ -151,7 +155,7 @@ class PPOTrainer:
             
             action_dist = self.actor(state_minibatch)
             entropy_loss = action_dist.entropy().mean()
-            action_log_probs_minibatch = action_dist.log_prob(action_minibatch)[:, :, None]
+            action_log_probs_minibatch = action_dist.log_prob(action_minibatch)[:, :, None].mean(-1)
             diff = action_log_probs_minibatch - old_action_log_probs_minibatch
             diff_clamped = torch.clamp(diff, min=-20, max=20)
             ratio = torch.exp(diff_clamped)
@@ -167,7 +171,7 @@ class PPOTrainer:
             pg_loss_1 = - advantage_minibatch * ratio
             pg_loss_2 = - advantage_minibatch * torch.clamp(ratio, 1 - self.clip_ratio, 1 + self.clip_ratio)
             pg_loss = torch.max(pg_loss_1, pg_loss_2).mean()
-            actor_loss = pg_loss - self.eta * entropy_loss
+            actor_loss = pg_loss - self.eta * entropy_loss   
             actor_gn = self.actor_optim.backward(actor_loss)
             self.actor_optim.update_parameters()
 
