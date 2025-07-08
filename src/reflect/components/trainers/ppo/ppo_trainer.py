@@ -30,7 +30,8 @@ class PPOTrainer:
             clip_ratio: float=0.1,
             target_kl: float=0.1,
             batch_size: int=512,
-            num_minibatch: int=16
+            num_minibatch: int=16,
+            update_epochs: int=10
         ):
         self.gamma = gamma
         self.lam = lam
@@ -41,6 +42,7 @@ class PPOTrainer:
         self.minibatch_size = int(batch_size / num_minibatch)
         self.clip_ratio = clip_ratio
         self.target_kl = target_kl
+        self.update_epochs = update_epochs
 
         self.actor = actor
         self.actor_lr = actor_lr
@@ -108,50 +110,51 @@ class PPOTrainer:
         old_action_log_probs = old_action_log_probs.reshape(-1, *old_action_log_probs.shape[2:])
         b, h, *_ = state_samples.shape
 
-        inds = torch.randperm(b)
-        for i in range(0, b, self.minibatch_size):
-            sample_inds = inds[i:i+self.minibatch_size]
-            state_minibatch = state_samples[sample_inds]
-            action_minibatch = action_samples[sample_inds]
-            old_action_log_probs_minibatch = old_action_log_probs[sample_inds]
-            advantage_minibatch = advantages[sample_inds]
+        for epoch in range(self.update_epochs):
+            inds = torch.randperm(b)
+            for i in range(0, b, self.minibatch_size):
+                sample_inds = inds[i:i+self.minibatch_size]
+                state_minibatch = state_samples[sample_inds]
+                action_minibatch = action_samples[sample_inds]
+                old_action_log_probs_minibatch = old_action_log_probs[sample_inds]
+                advantage_minibatch = advantages[sample_inds]
 
-            action_dist = self.actor(state_minibatch)
-            entropy_loss = action_dist.entropy().mean()
-            action_log_probs_minibatch = action_dist \
-                .log_prob(action_minibatch) \
-                .sum(-1)
-            diff = action_log_probs_minibatch - old_action_log_probs_minibatch
-            diff_clamped = torch.clamp(diff, min=-20, max=20)
-            ratio = torch.exp(diff_clamped)
+                action_dist = self.actor(state_minibatch)
+                entropy_loss = action_dist.entropy().mean()
+                action_log_probs_minibatch = action_dist \
+                    .log_prob(action_minibatch) \
+                    .sum(-1)
+                diff = action_log_probs_minibatch - old_action_log_probs_minibatch
+                diff_clamped = torch.clamp(diff, min=-20, max=20)
+                ratio = torch.exp(diff_clamped)
 
-            with torch.no_grad():
-                clipfrac = ((1 - ratio).abs() > self.clip_ratio).float().mean()
-                approxkl = ((ratio - 1) - torch.log(ratio)).mean()
-                clipfracs.append(clipfrac.item())
-                approxkls.append(approxkl.item())
-                if approxkl > self.target_kl:
-                    # print(f"Early stopping: KL too high ({approxkl.item()})")
-                    break
+                with torch.no_grad():
+                    clipfrac = ((1 - ratio).abs() > self.clip_ratio).float().mean()
+                    approxkl = ((ratio - 1) - torch.log(ratio)).mean()
+                    clipfracs.append(clipfrac.item())
+                    approxkls.append(approxkl.item())
+                    if approxkl > self.target_kl:
+                        # print(f"Early stopping: KL too high ({approxkl.item()})")
+                        break
 
-            pg_loss_1 = - advantage_minibatch * ratio
-            pg_loss_2 = - advantage_minibatch * torch.clamp(ratio, 1 - self.clip_ratio, 1 + self.clip_ratio)
-            pg_loss = torch.max(pg_loss_1, pg_loss_2).mean()
-            actor_loss = pg_loss - self.eta * entropy_loss
-            actor_gn = self.actor_optim.backward(actor_loss)
-            self.actor_optim.update_parameters()
+                pg_loss_1 = - advantage_minibatch * ratio
+                pg_loss_2 = - advantage_minibatch * torch.clamp(ratio, 1 - self.clip_ratio, 1 + self.clip_ratio)
+                pg_loss = torch.max(pg_loss_1, pg_loss_2).mean()
+                actor_loss = pg_loss - self.eta * entropy_loss
+                actor_gn = self.actor_optim.backward(actor_loss)
+                self.actor_optim.update_parameters()
 
-            values_minibatch = self.critic(state_minibatch)
-            value_loss = 0.5 * (values_minibatch - returns[sample_inds])**2
-            value_loss = value_loss.mean()
-            value_gn = self.critic_optim.backward(value_loss)
-            self.critic_optim.update_parameters()
-            
-            value_losses.append(value_loss.item())
-            value_gns.append(value_gn.item())
-            actor_losses.append(actor_loss.item())
-            entropy_losses.append(entropy_loss.item())
-            actor_gns.append(actor_gn.item())
+                values_minibatch = self.critic(state_minibatch)
+                value_loss = 0.5 * (values_minibatch - returns[sample_inds])**2
+                value_loss = value_loss.mean()
+                value_gn = self.critic_optim.backward(value_loss)
+                self.critic_optim.update_parameters()
+
+                value_losses.append(value_loss.item())
+                value_gns.append(value_gn.item())
+                actor_losses.append(actor_loss.item())
+                entropy_losses.append(entropy_loss.item())
+                actor_gns.append(actor_gn.item())
 
         return (
             np.mean(actor_losses),
