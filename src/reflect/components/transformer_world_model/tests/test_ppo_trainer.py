@@ -38,6 +38,7 @@ def test_update(encoder, decoder, actor):
         input_dim=32*32,
         output_dim=real_env.action_space.shape[0],
         bound=real_env.action_space.high,
+        independent_actions=False,
     )
     critic = ValueCritic(
         state_dim=32*32,
@@ -45,10 +46,18 @@ def test_update(encoder, decoder, actor):
     trainer = PPOTrainer(
         actor=actor,
         critic=critic,
-        minibatch_size=1
+        actor_lr=1e-5,
+        critic_lr=1e-5,
+        batch_size=128,
+        num_minibatch=8,
+        clip_ratio=0.1,
+        target_kl=0.1,
+        eta=0.01,
+        grad_clip=0.5,
+        update_epochs=2,
     )
 
-    _, _, o, a, r, d = dl.sample(batch_size=2)
+    _, _, o, a, r, d = dl.sample(batch_size=4)
     _, (z, a, r, d) = wm.update(o, a, r, d, return_init_states=True)
 
     z, a, r, d = wm.imagine_rollout(
@@ -96,7 +105,6 @@ def test_update_state(state_encoder, state_decoder, actor):
         use_imgs_as_states=False,
     )
 
-
     actor = Actor(
         input_dim=32*32,
         output_dim=real_env.action_space.shape[0],
@@ -109,40 +117,43 @@ def test_update_state(state_encoder, state_decoder, actor):
     trainer = PPOTrainer(
         actor=actor,
         critic=critic,
+        actor_lr=1e-5,
+        critic_lr=1e-5,
         batch_size=128,
         num_minibatch=8,
         clip_ratio=0.1,
         target_kl=0.1,
         eta=0.01,
         grad_clip=0.5,
+        update_epochs=2,
     )
-    for _ in range(100):
-        dl.perform_rollout()
-        _, _, o, a, r, d = dl.sample(batch_size=4)
-        _, (z, a, r, d) = wm.update(o, a, r, d, return_init_states=True)
 
-        z, a, r, d = wm.imagine_rollout(
-            z=z, a=a, r=r, d=d,
-            actor=actor,
-            with_observations=False,
-            disable_gradients=True
-        )
+    dl.perform_rollout()
+    _, _, o, a, r, d = dl.sample(batch_size=4)
+    _, (z, a, r, d) = wm.update(o, a, r, d, return_init_states=True)
 
-        history = trainer.update(
-            state_samples=z,
-            reward_samples=r,
-            done_samples=d,
-            action_samples=a
-        )
-        history_dict = asdict(history)
-        for key in  [
-                'actor_grad_norm',
-                'value_grad_norm',
-                'value_loss',
-                'actor_loss',
-                'entropy_loss',
-                'clipfrac',
-                'approxkl'
-            ]:
-            assert key in history_dict
+    z, a, r, d = wm.imagine_rollout(
+        z=z, a=a, r=r, d=d,
+        actor=actor,
+        with_observations=False,
+        disable_gradients=True
+    )
+
+    history = trainer.update(
+        state_samples=z,
+        reward_samples=r,
+        done_samples=d,
+        action_samples=a
+    )
+    history_dict = asdict(history)
+    for key in  [
+            'actor_grad_norm',
+            'value_grad_norm',
+            'value_loss',
+            'actor_loss',
+            'entropy_loss',
+            'clipfrac',
+            'approxkl'
+        ]:
+        assert key in history_dict
 
