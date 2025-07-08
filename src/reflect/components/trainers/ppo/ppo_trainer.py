@@ -31,7 +31,8 @@ class PPOTrainer:
             target_kl: float=0.1,
             batch_size: int=512,
             num_minibatch: int=16,
-            update_epochs: int=10
+            update_epochs: int=10,
+            value_clip: float=0.1
         ):
         self.gamma = gamma
         self.lam = lam
@@ -43,7 +44,8 @@ class PPOTrainer:
         self.clip_ratio = clip_ratio
         self.target_kl = target_kl
         self.update_epochs = update_epochs
-
+        self.value_clip = value_clip
+        
         self.actor = actor
         self.actor_lr = actor_lr
         self.actor_optim = AdamOptim(
@@ -137,6 +139,7 @@ class PPOTrainer:
                         # print(f"Early stopping: KL too high ({approxkl.item()})")
                         break
 
+                advantage_minibatch = (advantage_minibatch - advantage_minibatch.mean()) / (advantage_minibatch.std() + 1e-8)
                 pg_loss_1 = - advantage_minibatch * ratio
                 pg_loss_2 = - advantage_minibatch * torch.clamp(ratio, 1 - self.clip_ratio, 1 + self.clip_ratio)
                 pg_loss = torch.max(pg_loss_1, pg_loss_2).mean()
@@ -145,7 +148,15 @@ class PPOTrainer:
                 self.actor_optim.update_parameters()
 
                 values_minibatch = self.critic(state_minibatch)
-                value_loss = 0.5 * (values_minibatch - returns[sample_inds])**2
+                value_loss_unclipped = (values_minibatch - returns[sample_inds])**2
+                v_clipped = returns[sample_inds] + torch.clamp(
+                    values_minibatch - returns[sample_inds],
+                    -self.value_clip,
+                    self.value_clip,
+                )
+                value_loss_clipped = (v_clipped - returns[sample_inds]) ** 2
+                value_loss_max = torch.max(value_loss_unclipped, value_loss_clipped)
+                value_loss = 0.5 * value_loss_max.mean()
                 value_loss = value_loss.mean()
                 value_gn = self.critic_optim.backward(value_loss)
                 self.critic_optim.update_parameters()
