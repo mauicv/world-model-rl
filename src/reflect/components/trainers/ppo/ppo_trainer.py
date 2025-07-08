@@ -27,15 +27,18 @@ class PPOTrainer:
             gamma: float=0.99,
             lam: float=0.95,
             eta: float=0.001,
-            minibatch_size: int=32,
             clip_ratio: float=0.1,
-            target_kl: float=0.1
+            target_kl: float=0.1,
+            batch_size: int=512,
+            num_minibatch: int=16
         ):
         self.gamma = gamma
         self.lam = lam
         self.eta = eta
         self.gamma_rollout = None
-        self.minibatch_size = minibatch_size
+        self.batch_size = batch_size
+        self.num_minibatch = num_minibatch
+        self.minibatch_size = int(batch_size / num_minibatch)
         self.clip_ratio = clip_ratio
         self.target_kl = target_kl
 
@@ -44,7 +47,8 @@ class PPOTrainer:
         self.actor_optim = AdamOptim(
             self.actor.parameters(),
             lr=self.actor_lr,
-            grad_clip=grad_clip
+            grad_clip=grad_clip,
+            eps=1e-5
         )
 
         self.critic = critic
@@ -52,44 +56,40 @@ class PPOTrainer:
         self.critic_optim = AdamOptim(
             self.critic.parameters(),
             lr=self.critic_lr,
-            grad_clip=grad_clip
+            grad_clip=grad_clip,
+            eps=1e-5
         )
 
-    def compute_gae(self, rewards, values, dones, gamma=0.99, lam=0.95):
-        b, l, *_ = rewards.shape
+    def compute_gae(
+            self,
+            states,
+            rewards,
+            dones
+        ):
+        _, l, *_ = rewards.shape
+        values = self.critic(states)
         advantages = torch.zeros_like(rewards)
         last_advantage = 0
-        for t in reversed(range(l)):
-            if t == l - 1:
-                next_value = 0
-            else:
-                next_value = values[:, t + 1]
-            delta = rewards[:, t] + gamma * next_value * (1 - dones[:, t]) - values[:, t]
-            advantages[:, t] = delta + gamma * lam * (1 - dones[:, t]) * last_advantage
+        for t in reversed(range(l-1)):
+            next_value = values[:, t + 1]
+            nextnonterminal = 1.0 - dones[:, t + 1]
+            delta = rewards[:, t] + self.gamma * next_value * nextnonterminal - values[:, t]
+            advantages[:, t] = delta + self.gamma * self.lam * nextnonterminal * last_advantage
             last_advantage = advantages[:, t]
-        return advantages
+        returns = advantages + values
+        return advantages, returns
 
-    def compute_advantages(
+    def actor_update(
             self,
+            advantages,
+            returns,
             state_samples,
-            reward_samples,
-            done_samples,
+            action_samples
         ):
-        state_sample_values = self.critic(state_samples)
-        advantages = self.compute_gae(
-            rewards=reward_samples,
-            values=state_sample_values,
-            dones=done_samples
-        )
-        returns = state_sample_values + advantages
-        return advantages.detach(), returns.detach()
-
-    def actor_update(self, advantages, returns, state_samples, action_samples):
-        b, h, *l = state_samples.shape
 
         old_action_dist = self.actor(state_samples)
         old_action_log_probs = old_action_dist \
-            .log_prob(action_samples)[:, :, None] \
+            .log_prob(action_samples) \
             .detach() \
             .sum(-1)
 
@@ -101,6 +101,13 @@ class PPOTrainer:
         value_losses = []
         value_gns = []
 
+        state_samples = state_samples.reshape(-1, *state_samples.shape[2:])
+        action_samples = action_samples.reshape(-1, *action_samples.shape[2:])
+        advantages = advantages.reshape(-1, *advantages.shape[2:])
+        returns = returns.reshape(-1, *returns.shape[2:])
+        old_action_log_probs = old_action_log_probs.reshape(-1, *old_action_log_probs.shape[2:])
+        b, h, *_ = state_samples.shape
+
         inds = torch.randperm(b)
         for i in range(0, b, self.minibatch_size):
             sample_inds = inds[i:i+self.minibatch_size]
@@ -109,18 +116,10 @@ class PPOTrainer:
             old_action_log_probs_minibatch = old_action_log_probs[sample_inds]
             advantage_minibatch = advantages[sample_inds]
 
-            values_minibatch = self.critic(state_minibatch)
-            value_loss = 0.5 * (values_minibatch - returns[sample_inds])**2
-            value_loss = value_loss.mean()
-            value_gn = self.critic_optim.backward(value_loss)
-            self.critic_optim.update_parameters()
-            value_losses.append(value_loss.item())
-            value_gns.append(value_gn.item())
-
             action_dist = self.actor(state_minibatch)
             entropy_loss = action_dist.entropy().mean()
             action_log_probs_minibatch = action_dist \
-                .log_prob(action_minibatch)[:, :, None] \
+                .log_prob(action_minibatch) \
                 .sum(-1)
             diff = action_log_probs_minibatch - old_action_log_probs_minibatch
             diff_clamped = torch.clamp(diff, min=-20, max=20)
@@ -132,7 +131,7 @@ class PPOTrainer:
                 clipfracs.append(clipfrac.item())
                 approxkls.append(approxkl.item())
                 if approxkl > self.target_kl:
-                    print(f"Early stopping: KL too high ({approxkl.item()})")
+                    # print(f"Early stopping: KL too high ({approxkl.item()})")
                     break
 
             pg_loss_1 = - advantage_minibatch * ratio
@@ -142,6 +141,14 @@ class PPOTrainer:
             actor_gn = self.actor_optim.backward(actor_loss)
             self.actor_optim.update_parameters()
 
+            values_minibatch = self.critic(state_minibatch)
+            value_loss = 0.5 * (values_minibatch - returns[sample_inds])**2
+            value_loss = value_loss.mean()
+            value_gn = self.critic_optim.backward(value_loss)
+            self.critic_optim.update_parameters()
+            
+            value_losses.append(value_loss.item())
+            value_gns.append(value_gn.item())
             actor_losses.append(actor_loss.item())
             entropy_losses.append(entropy_loss.item())
             actor_gns.append(actor_gn.item())
@@ -163,10 +170,10 @@ class PPOTrainer:
             done_samples,
             action_samples,
         ):
-        advantages, returns = self.compute_advantages(
-            state_samples=state_samples,
-            reward_samples=reward_samples,
-            done_samples=done_samples
+        advantages, returns = self.compute_gae(
+            states=state_samples,
+            rewards=reward_samples,
+            dones=done_samples
         )
         actor_loss, actor_gn, entropy_loss, clipfrac, approxkl, value_loss, value_gn = self.actor_update(
             advantages=advantages.detach(),
