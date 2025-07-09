@@ -29,7 +29,6 @@ class PPOTrainer:
             eta: float=0.001,
             clip_ratio: float=0.1,
             target_kl: float=0.2,
-            batch_size: int=512,
             num_minibatch: int=16,
             update_epochs: int=10,
             value_clip: float=0.1
@@ -38,9 +37,7 @@ class PPOTrainer:
         self.lam = lam
         self.eta = eta
         self.gamma_rollout = None
-        self.batch_size = batch_size
         self.num_minibatch = num_minibatch
-        self.minibatch_size = int(batch_size / num_minibatch)
         self.clip_ratio = clip_ratio
         self.target_kl = target_kl
         self.update_epochs = update_epochs
@@ -91,11 +88,12 @@ class PPOTrainer:
             action_samples
         ):
 
-        old_action_dist = self.actor(state_samples)
-        old_action_log_probs = old_action_dist \
-            .log_prob(action_samples) \
-            .detach() \
-            .sum(-1)
+        with torch.no_grad():
+            old_action_dist = self.actor(state_samples)
+            old_action_log_probs = old_action_dist \
+                .log_prob(action_samples) \
+                .detach() \
+                .sum(-1)
 
         actor_losses = []
         entropy_losses = []
@@ -110,12 +108,13 @@ class PPOTrainer:
         advantages = advantages.reshape(-1, *advantages.shape[2:])
         returns = returns.reshape(-1, *returns.shape[2:])
         old_action_log_probs = old_action_log_probs.reshape(-1, *old_action_log_probs.shape[2:])
-        b, h, *_ = state_samples.shape
+        b, *_ = state_samples.shape
+        minibatch_size = int(b / self.num_minibatch)
 
         for epoch in range(self.update_epochs):
             inds = torch.randperm(b)
-            for i in range(0, b, self.minibatch_size):
-                sample_inds = inds[i:i+self.minibatch_size]
+            for i in range(0, b, minibatch_size):
+                sample_inds = inds[i:i+minibatch_size]
                 state_minibatch = state_samples[sample_inds]
                 action_minibatch = action_samples[sample_inds]
                 old_action_log_probs_minibatch = old_action_log_probs[sample_inds]
@@ -135,9 +134,9 @@ class PPOTrainer:
                     approxkl = ((ratio - 1) - torch.log(ratio)).mean()
                     clipfracs.append(clipfrac.item())
                     approxkls.append(approxkl.item())
-                    if approxkl > self.target_kl:
-                        # print(f"Early stopping: KL too high ({approxkl.item()})")
-                        break
+                    # if approxkl > self.target_kl:
+                    #     # print(f"Early stopping: KL too high ({approxkl.item()})")
+                    #     break
 
                 advantage_minibatch = (advantage_minibatch - advantage_minibatch.mean()) / (advantage_minibatch.std() + 1e-8)
                 assert advantage_minibatch.shape == ratio.shape
