@@ -147,7 +147,8 @@ class PPOTrainer:
                 actor_gn = self.actor_optim.backward(actor_loss)
                 self.actor_optim.update_parameters()
 
-                values_minibatch = self.critic(state_minibatch)
+                values_minibatch = self.critic(state_minibatch).view(-1)
+                assert values_minibatch.shape == returns[sample_inds].shape
                 value_loss_unclipped = (values_minibatch - returns[sample_inds])**2
                 v_clipped = returns[sample_inds] + torch.clamp(
                     values_minibatch - returns[sample_inds],
