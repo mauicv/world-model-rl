@@ -28,7 +28,7 @@ class PPOTrainer:
             lam: float=0.95,
             eta: float=0.001,
             clip_ratio: float=0.1,
-            target_kl: float=0.1,
+            target_kl: float=0.2,
             batch_size: int=512,
             num_minibatch: int=16,
             update_epochs: int=10,
@@ -72,7 +72,7 @@ class PPOTrainer:
         ):
         _, l, *_ = rewards.shape
         values = self.critic(states)
-        advantages = torch.zeros_like(rewards)
+        advantages = torch.zeros_like(rewards) # this and the logic below mean the final advantage is 0? 
         last_advantage = 0
         for t in reversed(range(l-1)):
             next_value = values[:, t + 1]
@@ -81,7 +81,7 @@ class PPOTrainer:
             advantages[:, t] = delta + self.gamma * self.lam * nextnonterminal * last_advantage
             last_advantage = advantages[:, t]
         returns = advantages + values
-        return advantages, returns
+        return advantages.squeeze(-1), returns.squeeze(-1)
 
     def actor_update(
             self,
@@ -140,6 +140,7 @@ class PPOTrainer:
                         break
 
                 advantage_minibatch = (advantage_minibatch - advantage_minibatch.mean()) / (advantage_minibatch.std() + 1e-8)
+                assert advantage_minibatch.shape == ratio.shape
                 pg_loss_1 = - advantage_minibatch * ratio
                 pg_loss_2 = - advantage_minibatch * torch.clamp(ratio, 1 - self.clip_ratio, 1 + self.clip_ratio)
                 pg_loss = torch.max(pg_loss_1, pg_loss_2).mean()
@@ -157,7 +158,6 @@ class PPOTrainer:
                 value_loss_clipped = (v_clipped - returns[sample_inds]) ** 2
                 value_loss_max = torch.max(value_loss_unclipped, value_loss_clipped)
                 value_loss = 0.5 * value_loss_max.mean()
-                value_loss = value_loss.mean()
                 value_gn = self.critic_optim.backward(value_loss)
                 self.critic_optim.update_parameters()
 
