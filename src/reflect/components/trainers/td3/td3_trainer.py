@@ -24,12 +24,16 @@ class TD3Trainer:
             lam: float=0.95,
             eta: float=0.001,
             actor_udpate_frequency: int=2,
-            tau: float=5e-3
+            tau: float=5e-3,
+            action_reg_sig: float=0.05,
+            action_reg_clip: float=0.2,
         ):
         self.gamma = gamma
         self.lam = lam
         self.eta = eta
         self.tau = tau
+        self.action_reg_sig = action_reg_sig
+        self.action_reg_clip = action_reg_clip
         self.gamma_rollout = None
         self.num_critics = num_critics
         self.actor_udpate_frequency = actor_udpate_frequency
@@ -154,6 +158,14 @@ class TD3Trainer:
                     + (1 - self.tau) * target_weights.data
                 )
 
+    def perturb_actions(self, action_samples):
+        noise = torch.randn_like(action_samples) * self.action_reg_sig
+        return action_samples + torch.clamp(
+            noise,
+            -self.action_reg_clip,
+            self.action_reg_clip
+        )
+
     def update(
             self,
             state_samples,
@@ -161,11 +173,13 @@ class TD3Trainer:
             done_samples,
             action_samples,
         ):
+            
             for i in range(self.actor_udpate_frequency):
+                perturbed_actions = self.perturb_actions(action_samples[:, :-1])
                 value_losses, value_gns = self.update_critics(
                     current_states=state_samples[:, :-1],
                     next_states=state_samples[:, 1:],
-                    current_actions=action_samples[:, :-1],
+                    current_actions=perturbed_actions,
                     rewards=reward_samples[:, :-1],
                     dones=done_samples[:, :-1],
                 )
