@@ -1,7 +1,7 @@
 import gymnasium as gym
-from reflect.components.trainers.ppo.ppo_trainer import PPOTrainer
-from reflect.components.models.actor import Actor
-from reflect.components.trainers.value.critic import ValueCritic
+from reflect.components.trainers.td3.td3_trainer import TD3Trainer
+from reflect.components.trainers.td3.actor import TD3Actor
+from reflect.components.trainers.td3.critic import TD3Critic
 from reflect.components.transformer_world_model.tests.conftest import make_dynamic_model
 from reflect.data.loader import EnvDataLoader, GymRenderImgProcessing
 from reflect.components.transformer_world_model import WorldModel
@@ -34,26 +34,25 @@ def test_update(encoder, decoder, actor):
 
     dl.perform_rollout()
 
-    actor = Actor(
+    actor = TD3Actor(
         input_dim=32*32,
         output_dim=real_env.action_space.shape[0],
         bound=real_env.action_space.high,
-        independent_actions=False,
     )
-    critic = ValueCritic(
+    critic = TD3Critic(
         state_dim=32*32,
+        action_dim=real_env.action_space.shape[0],
     )
-    trainer = PPOTrainer(
+    trainer = TD3Trainer(
         actor=actor,
         critic=critic,
         actor_lr=1e-5,
         critic_lr=1e-5,
-        num_minibatch=8,
-        clip_ratio=0.1,
-        target_kl=0.1,
+        num_critics=2,
         eta=0.01,
         grad_clip=0.5,
-        update_epochs=2,
+        actor_udpate_frequency=2,
+        tau=5e-3,
     )
 
     _, _, o, a, r, d = dl.sample(batch_size=4)
@@ -75,12 +74,9 @@ def test_update(encoder, decoder, actor):
     history_dict = asdict(history)
     for key in  [
             'actor_grad_norm',
-            'value_grad_norm',
-            'value_loss',
+            'value_grad_norms',
+            'value_losses',
             'actor_loss',
-            'entropy_loss',
-            'clipfrac',
-            'approxkl'
         ]:
         assert key in history_dict
 
@@ -104,26 +100,25 @@ def test_update_state(state_encoder, state_decoder, actor):
         use_imgs_as_states=False,
     )
 
-    actor = Actor(
+    actor = TD3Actor(
         input_dim=32*32,
         output_dim=real_env.action_space.shape[0],
         bound=real_env.action_space.high,
-        independent_actions=False,
     )
-    critic = ValueCritic(
+    critic = TD3Critic(
         state_dim=32*32,
+        action_dim=real_env.action_space.shape[0],
     )
-    trainer = PPOTrainer(
+    trainer = TD3Trainer(
         actor=actor,
         critic=critic,
         actor_lr=1e-5,
         critic_lr=1e-5,
-        num_minibatch=8,
-        clip_ratio=0.1,
-        target_kl=0.1,
+        num_critics=2,
         eta=0.01,
         grad_clip=0.5,
-        update_epochs=2,
+        actor_udpate_frequency=2,
+        tau=5e-3,
     )
 
     dl.perform_rollout()
@@ -146,37 +141,33 @@ def test_update_state(state_encoder, state_decoder, actor):
     history_dict = asdict(history)
     for key in  [
             'actor_grad_norm',
-            'value_grad_norm',
-            'value_loss',
-            'actor_loss',
-            'entropy_loss',
-            'clipfrac',
-            'approxkl'
+            'value_grad_norms',
+            'value_losses',
+            'actor_loss'
         ]:
         assert key in history_dict
 
 
 def test_save_load(tmp_path):
-    actor = Actor(
+    actor = TD3Actor(
         input_dim=32*32,
         output_dim=8,
         bound=1.0,
-        independent_actions=False,
     )
-    critic = ValueCritic(
+    critic = TD3Critic(
         state_dim=32*32,
+        action_dim=8,
     )
-    trainer = PPOTrainer(
+    trainer = TD3Trainer(
         actor=actor,
         critic=critic,
         actor_lr=1e-5,
         critic_lr=1e-5,
-        num_minibatch=8,
-        clip_ratio=0.1,
-        target_kl=0.1,
+        num_critics=2,
         eta=0.01,
         grad_clip=0.5,
-        update_epochs=2,
+        actor_udpate_frequency=2,
+        tau=5e-3,
     )
     trainer.save(tmp_path)
     trainer.load(tmp_path)
