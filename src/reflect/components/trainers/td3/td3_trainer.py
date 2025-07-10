@@ -43,7 +43,6 @@ class TD3Trainer:
             self.actor.parameters(),
             lr=self.actor_lr,
             grad_clip=grad_clip,
-            eps=1e-5
         )
         target_actor = copy.deepcopy(actor)
         target_actor.requires_grad_(False)
@@ -63,7 +62,6 @@ class TD3Trainer:
                 new_critic.parameters(),
                 lr=critic_lr,
                 grad_clip=grad_clip,
-                eps=1e-5
             )
             self.critic_optimizers.append(critic_optim)
 
