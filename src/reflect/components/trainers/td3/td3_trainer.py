@@ -34,7 +34,6 @@ class TD3Trainer:
         self.tau = tau
         self.action_reg_sig = action_reg_sig
         self.action_reg_clip = action_reg_clip
-        self.gamma_rollout = None
         self.num_critics = num_critics
         self.actor_udpate_frequency = actor_udpate_frequency
 
@@ -125,15 +124,15 @@ class TD3Trainer:
 
         losses = []
         value_gns = []
-        for critic in self.critics:
+        for critic, optimizer in zip(self.critics, self.critic_optimizers):
             current_state_action_value = critic(
                 b_current_states,
                 b_current_actions
             ).squeeze(-1)
             loss = 0.5*(targets.detach() - current_state_action_value)**2
             loss = loss.mean()
-            value_gn = self.critic_optimizers[i].backward(loss)
-            self.critic_optimizers[i].update_parameters()
+            value_gn = optimizer.backward(loss)
+            optimizer.update_parameters()
             losses.append(loss.item())
             value_gns.append(value_gn.item())
         return losses, value_gns
@@ -173,7 +172,6 @@ class TD3Trainer:
             done_samples,
             action_samples,
         ):
-            
             for i in range(self.actor_udpate_frequency):
                 perturbed_actions = self.perturb_actions(action_samples[:, :-1])
                 value_losses, value_gns = self.update_critics(
