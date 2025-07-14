@@ -15,26 +15,21 @@ class TD3TrainerLosses:
 class TD3Trainer:
     def __init__(self,
             actor,
-            critic,
+            critics,
             actor_lr: float=1e-4,
             critic_lr: float=1e-4,
-            num_critics: int=2,
-            grad_clip: float=0.5,
+            grad_clip: float=100,
             gamma: float=0.99,
-            lam: float=0.95,
-            eta: float=0.001,
             actor_udpate_frequency: int=2,
             tau: float=5e-3,
             action_reg_sig: float=0.05,
             action_reg_clip: float=0.2,
         ):
-        self.gamma = gamma
-        self.lam = lam
-        self.eta = eta
         self.tau = tau
+        self.gamma = gamma
         self.action_reg_sig = action_reg_sig
         self.action_reg_clip = action_reg_clip
-        self.num_critics = num_critics
+        self.num_critics = len(critics)
         self.actor_udpate_frequency = actor_udpate_frequency
 
         self.actor = actor
@@ -51,25 +46,17 @@ class TD3Trainer:
         self.critics = []
         self.target_critics = []
         self.critic_optimizers = []
-        for i in range(num_critics):
-            new_critic = copy.deepcopy(critic)
-            new_critic = self.randomize_critic(new_critic)
-            self.critics.append(new_critic)
+        for critic in critics:
+            self.critics.append(critic)
             target_critic = copy.deepcopy(critic)
             target_critic.requires_grad_(False)
             self.target_critics.append(target_critic)
             critic_optim = AdamOptim(
-                new_critic.parameters(),
+                critic.parameters(),
                 lr=critic_lr,
                 grad_clip=grad_clip,
             )
             self.critic_optimizers.append(critic_optim)
-
-    def randomize_critic(self, critic):
-        # reinitialize the critic by adding noise to the parameters
-        for param in critic.parameters():
-            param.data = torch.randn_like(param.data) * 0.1
-        return critic
 
     def compute_TD_target(
             self,
@@ -88,7 +75,7 @@ class TD3Trainer:
             next_state_action_values = target_critic(
                 next_states,
                 next_state_actions
-            )
+            ).squeeze(-1)
         targets = rewards + self.gamma * (1 - dones) * next_state_action_values
         return targets.detach()
 
@@ -109,7 +96,8 @@ class TD3Trainer:
                 dones,
                 self.target_critics[i]
             )
-            b_targets.append(targets.view(-1, targets.shape[-1]))
+            b_targets.append(targets.view(-1, 1))
+            # print('targets.view(-1, 1).mean()', targets.view(-1, 1).mean())
 
         b_current_states = current_states.reshape(-1, current_states.shape[-1])
         b_current_actions = current_actions.reshape(-1, current_actions.shape[-1])
@@ -119,7 +107,6 @@ class TD3Trainer:
             cat_targets,
             dim=-1
         ).values
-
         losses = []
         value_gns = []
         for critic, optimizer in zip(self.critics, self.critic_optimizers):
@@ -127,7 +114,7 @@ class TD3Trainer:
                 b_current_states,
                 b_current_actions
             ).squeeze(-1)
-            loss = 0.5*(targets.detach() - current_state_action_value)**2
+            loss = (targets.detach() - current_state_action_value)**2
             loss = loss.mean()
             value_gn = optimizer.backward(loss)
             optimizer.update_parameters()
@@ -176,8 +163,8 @@ class TD3Trainer:
                     current_states=state_samples[:, :-1],
                     next_states=state_samples[:, 1:],
                     current_actions=perturbed_actions,
-                    rewards=reward_samples[:, :-1],
-                    dones=done_samples[:, :-1],
+                    rewards=reward_samples[:, :-1].squeeze(-1),
+                    dones=done_samples[:, :-1].squeeze(-1),
                 )
 
             actor_loss, actor_gn = self.update_actor(
