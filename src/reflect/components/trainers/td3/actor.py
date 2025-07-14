@@ -1,43 +1,32 @@
+
 import torch
+import torch.nn.functional as F
+WEIGHTS_FINAL_INIT = 3e-3
+BIAS_FINAL_INIT = 3e-4
 
 
 class TD3Actor(torch.nn.Module):
-    def __init__(
-            self,
-            input_dim,
-            output_dim,
-            num_layers=3,
-            hidden_dim=512,
-            bound=1.0,
-        ):
+    def __init__(self, input_dim, output_dim):
         super().__init__()
-        self.input_dim = input_dim
-        self.output_dim = output_dim
-        self.num_layers=num_layers
-        self.hidden_dim=hidden_dim
-        self.bound = torch.tensor(bound)
-        layers = []
-        layers.extend([
-            torch.nn.Linear(
-                self.input_dim, hidden_dim
-            ),
-            torch.nn.LayerNorm(hidden_dim),
-            torch.nn.ELU()
-        ])
-        for _ in range(num_layers - 1):
-            layers.extend([
-                torch.nn.Linear(hidden_dim, hidden_dim),
-                torch.nn.LayerNorm(hidden_dim),
-                torch.nn.ELU()
-            ])
+        self.fc1 = torch.nn.Linear(input_dim, 400)
+        self.fc2 = torch.nn.Linear(400, 300)
+        self.fc3 = torch.nn.Linear(300, output_dim)
 
-        layers.extend([
-            torch.nn.Linear(hidden_dim, self.output_dim),
-            torch.nn.Tanh()
-        ])
-        self.layers = torch.nn.Sequential(*layers)
+        torch.nn.init.uniform_(
+            self.fc3.weight,
+            -WEIGHTS_FINAL_INIT,
+            WEIGHTS_FINAL_INIT
+        )
+        torch.nn.init.uniform_(
+            self.fc3.bias,
+            -BIAS_FINAL_INIT,
+            BIAS_FINAL_INIT
+        )
 
-    def forward(self, x, deterministic=True):
-        x = self.layers(x)
-        action = x * self.bound
-        return action
+    def forward(self, x, deterministic=None):
+        x = self.fc1(x)
+        x = F.relu(x)
+        x = self.fc2(x)
+        x = F.relu(x)
+        x = self.fc3(x)
+        return torch.tanh(x)

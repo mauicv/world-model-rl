@@ -37,19 +37,21 @@ def test_update(encoder, decoder, actor):
     actor = TD3Actor(
         input_dim=32*32,
         output_dim=real_env.action_space.shape[0],
-        bound=real_env.action_space.high,
+        # bound=real_env.action_space.high,
     )
-    critic = TD3Critic(
+    critic_1 = TD3Critic(
+        state_dim=32*32,
+        action_dim=real_env.action_space.shape[0],
+    )
+    critic_2 = TD3Critic(
         state_dim=32*32,
         action_dim=real_env.action_space.shape[0],
     )
     trainer = TD3Trainer(
         actor=actor,
-        critic=critic,
+        critics=[critic_1, critic_2],
         actor_lr=1e-5,
         critic_lr=1e-5,
-        num_critics=2,
-        eta=0.01,
         grad_clip=0.5,
         actor_udpate_frequency=2,
         tau=5e-3,
@@ -103,19 +105,21 @@ def test_update_state(state_encoder, state_decoder, actor):
     actor = TD3Actor(
         input_dim=32*32,
         output_dim=real_env.action_space.shape[0],
-        bound=real_env.action_space.high,
+        # bound=real_env.action_space.high,
     )
-    critic = TD3Critic(
+    critic_1 = TD3Critic(
+        state_dim=32*32,
+        action_dim=real_env.action_space.shape[0],
+    )
+    critic_2 = TD3Critic(
         state_dim=32*32,
         action_dim=real_env.action_space.shape[0],
     )
     trainer = TD3Trainer(
         actor=actor,
-        critic=critic,
+        critics=[critic_1, critic_2],
         actor_lr=1e-5,
         critic_lr=1e-5,
-        num_critics=2,
-        eta=0.01,
         grad_clip=0.5,
         actor_udpate_frequency=2,
         tau=5e-3,
@@ -152,19 +156,21 @@ def test_save_load(tmp_path):
     actor = TD3Actor(
         input_dim=32*32,
         output_dim=8,
-        bound=1.0,
+        # bound=1.0,
     )
-    critic = TD3Critic(
+    critic_1 = TD3Critic(
+        state_dim=32*32,
+        action_dim=8,
+    )
+    critic_2 = TD3Critic(
         state_dim=32*32,
         action_dim=8,
     )
     trainer = TD3Trainer(
         actor=actor,
-        critic=critic,
+        critics=[critic_1, critic_2],
         actor_lr=1e-5,
         critic_lr=1e-5,
-        num_critics=2,
-        eta=0.01,
         grad_clip=0.5,
         actor_udpate_frequency=2,
         tau=5e-3,
