@@ -19,12 +19,12 @@ class TD3Trainer:
             critics,
             actor_lr: float=1e-4,
             critic_lr: float=1e-4,
-            grad_clip: float=torch.inf,
+            grad_clip: float=0.5,
             gamma: float=0.98,
             actor_update_frequency: int=1,
             tau: float=5e-3,
-            action_reg_sig: float=0.05,
-            action_reg_clip: float=0.2,
+            action_reg_sig: float=0.2,
+            action_reg_clip: float=0.5,
         ):
         self.tau = tau
         self.gamma = gamma
@@ -70,12 +70,12 @@ class TD3Trainer:
             next_state_actions = self.target_actor(
                 next_states
             )
-            next_state_actions = torch \
-                .clamp(next_state_actions, -1, 1) \
+            perturbed_actions = self.perturb_actions(next_state_actions) \
+                .clamp(-1, 1) \
                 .detach()
             next_state_action_values = target_critic(
                 next_states,
-                next_state_actions
+                perturbed_actions
             ).squeeze(-1)
             targets = rewards + self.gamma * (1 - dones) * next_state_action_values
         return targets.detach()
@@ -157,11 +157,10 @@ class TD3Trainer:
             action_samples,
         ):
         for i in range(self.actor_update_frequency):
-            perturbed_actions = self.perturb_actions(action_samples[:, :-1])
             value_losses, value_gns = self.update_critics(
                 current_states=state_samples[:, :-1],
                 next_states=state_samples[:, 1:],
-                current_actions=perturbed_actions,
+                current_actions=action_samples[:, :-1],
                 rewards=reward_samples[:, :-1].squeeze(-1),
                 dones=done_samples[:, :-1].squeeze(-1),
             )
