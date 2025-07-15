@@ -53,7 +53,7 @@ def test_update(encoder, decoder, actor):
         actor_lr=1e-5,
         critic_lr=1e-5,
         grad_clip=0.5,
-        actor_udpate_frequency=2,
+        actor_update_frequency=2,
         tau=5e-3,
     )
 
@@ -121,7 +121,7 @@ def test_update_state(state_encoder, state_decoder, actor):
         actor_lr=1e-5,
         critic_lr=1e-5,
         grad_clip=0.5,
-        actor_udpate_frequency=2,
+        actor_update_frequency=2,
         tau=5e-3,
     )
 
@@ -172,7 +172,7 @@ def test_save_load(tmp_path):
         actor_lr=1e-5,
         critic_lr=1e-5,
         grad_clip=0.5,
-        actor_udpate_frequency=2,
+        actor_update_frequency=2,
         tau=5e-3,
     )
     trainer.save(tmp_path)
