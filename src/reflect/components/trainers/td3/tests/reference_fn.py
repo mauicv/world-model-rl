@@ -1,6 +1,6 @@
 import torch
 
-GAMMA=0.99
+GAMMA=0.98
 
 
 def compute_action(actor, state, eps=0):

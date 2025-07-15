@@ -24,7 +24,10 @@ def test_target_computation(env, replay_buffer, trainer):
 
     targets_1 = compute_TD_target(nz, r, d, trainer.target_actor, trainer.target_critics[0])
     targets_2 = trainer.compute_TD_target(nz, r, d, trainer.target_critics[0])
+    print('targets_1', targets_1)
+    print('targets_2', targets_2)
     assert torch.allclose(targets_1, targets_2)
+
 
     
     

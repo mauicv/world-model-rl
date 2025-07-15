@@ -12,15 +12,16 @@ class TD3TrainerLosses:
     actor_grad_norm: float
 
 
+
 class TD3Trainer:
     def __init__(self,
             actor,
             critics,
             actor_lr: float=1e-4,
             critic_lr: float=1e-4,
-            grad_clip: float=100,
-            gamma: float=0.99,
-            actor_udpate_frequency: int=2,
+            grad_clip: float=torch.inf,
+            gamma: float=0.98,
+            actor_update_frequency: int=1,
             tau: float=5e-3,
             action_reg_sig: float=0.05,
             action_reg_clip: float=0.2,
@@ -30,24 +31,24 @@ class TD3Trainer:
         self.action_reg_sig = action_reg_sig
         self.action_reg_clip = action_reg_clip
         self.num_critics = len(critics)
-        self.actor_udpate_frequency = actor_udpate_frequency
+        self.actor_update_frequency = actor_update_frequency
 
-        self.actor = actor
         self.actor_lr = actor_lr
-        self.actor_optim = AdamOptim(
+        self.actor = actor
+
+        actor_optim = AdamOptim(
             self.actor.parameters(),
             lr=self.actor_lr,
             grad_clip=grad_clip,
         )
-        target_actor = copy.deepcopy(actor)
-        target_actor.requires_grad_(False)
-        self.target_actor = target_actor
+        self.actor_optim = actor_optim
+        self.target_actor = copy.deepcopy(actor)
+        self.target_actor.requires_grad_(False)
 
-        self.critics = []
+        self.critics = critics
         self.target_critics = []
         self.critic_optimizers = []
         for critic in critics:
-            self.critics.append(critic)
             target_critic = copy.deepcopy(critic)
             target_critic.requires_grad_(False)
             self.target_critics.append(target_critic)
@@ -76,7 +77,7 @@ class TD3Trainer:
                 next_states,
                 next_state_actions
             ).squeeze(-1)
-        targets = rewards + self.gamma * (1 - dones) * next_state_action_values
+            targets = rewards + self.gamma * (1 - dones) * next_state_action_values
         return targets.detach()
 
     def update_critics(
@@ -97,7 +98,6 @@ class TD3Trainer:
                 self.target_critics[i]
             )
             b_targets.append(targets.view(-1, 1))
-            # print('targets.view(-1, 1).mean()', targets.view(-1, 1).mean())
 
         b_current_states = current_states.reshape(-1, current_states.shape[-1])
         b_current_actions = current_actions.reshape(-1, current_actions.shape[-1])
@@ -121,16 +121,15 @@ class TD3Trainer:
             losses.append(loss.item())
             value_gns.append(value_gn.item())
         return losses, value_gns
-    
+
     def update_actor(self, states):
-        states = torch.tensor(states)
         actions = self.actor(states)
         action_values = - self.critics[0](states, actions)
         actor_loss = action_values.mean()
         actor_gn = self.actor_optim.backward(actor_loss)
         self.actor_optim.update_parameters()
         return actor_loss.item(), actor_gn.item()
-    
+
     def update_target_network(self, target_model, model):
         with torch.no_grad():
             for target_weights, weights in zip(
@@ -157,33 +156,29 @@ class TD3Trainer:
             done_samples,
             action_samples,
         ):
-            for i in range(self.actor_udpate_frequency):
-                perturbed_actions = self.perturb_actions(action_samples[:, :-1])
-                value_losses, value_gns = self.update_critics(
-                    current_states=state_samples[:, :-1],
-                    next_states=state_samples[:, 1:],
-                    current_actions=perturbed_actions,
-                    rewards=reward_samples[:, :-1].squeeze(-1),
-                    dones=done_samples[:, :-1].squeeze(-1),
-                )
-
-            actor_loss, actor_gn = self.update_actor(
-                states=state_samples.reshape(-1, state_samples.shape[-1])
-            )
-            self.update_target_network(self.target_actor, self.actor)
-            for target_critic, critic in zip(self.target_critics, self.critics):
-                self.update_target_network(target_critic, critic)
-
-            return TD3TrainerLosses(
-                value_losses=value_losses,
-                value_grad_norms=value_gns,
-                actor_loss=actor_loss,
-                actor_grad_norm=actor_gn,
+        for i in range(self.actor_update_frequency):
+            perturbed_actions = self.perturb_actions(action_samples[:, :-1])
+            value_losses, value_gns = self.update_critics(
+                current_states=state_samples[:, :-1],
+                next_states=state_samples[:, 1:],
+                current_actions=perturbed_actions,
+                rewards=reward_samples[:, :-1].squeeze(-1),
+                dones=done_samples[:, :-1].squeeze(-1),
             )
 
-    def to(self, device):
-        self.actor.to(device)
-        self.critic.to(device)
+        actor_loss, actor_gn = self.update_actor(
+            states=state_samples.reshape(-1, state_samples.shape[-1])
+        )
+        self.update_target_network(self.target_actor, self.actor)
+        for target_critic, critic in zip(self.target_critics, self.critics):
+            self.update_target_network(target_critic, critic)
+
+        return TD3TrainerLosses(
+            value_losses=value_losses,
+            value_grad_norms=value_gns,
+            actor_loss=actor_loss,
+            actor_grad_norm=actor_gn,
+        )
 
     def save(self, path):
         state_dict = {
