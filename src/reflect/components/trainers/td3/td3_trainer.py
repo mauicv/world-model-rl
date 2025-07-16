@@ -19,7 +19,7 @@ class TD3Trainer:
             critics,
             actor_lr: float=1e-4,
             critic_lr: float=1e-4,
-            grad_clip: float=0.5,
+            grad_clip: float=1,
             gamma: float=0.98,
             actor_update_frequency: int=1,
             tau: float=5e-3,
