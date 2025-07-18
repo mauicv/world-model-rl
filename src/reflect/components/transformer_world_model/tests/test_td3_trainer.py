@@ -105,7 +105,7 @@ def test_update_state(state_encoder, state_decoder, actor):
     actor = TD3Actor(
         input_dim=32*32,
         output_dim=real_env.action_space.shape[0],
-        # bound=real_env.action_space.high,
+        noise_std=0.2,
     )
     critic_1 = TD3Critic(
         state_dim=32*32,
@@ -129,11 +129,12 @@ def test_update_state(state_encoder, state_decoder, actor):
     _, _, o, a, r, d = dl.sample(batch_size=4)
     _, (z, a, r, d) = wm.update(o, a, r, d, return_init_states=True)
 
-    z, a, r, d = wm.imagine_rollout(
+    z, a, r, d, _ = wm.imagine_rollout(
         z=z, a=a, r=r, d=d,
         actor=actor,
         with_observations=False,
-        disable_gradients=True
+        disable_gradients=True,
+        with_entropies=True,
     )
 
     history = trainer.update(
