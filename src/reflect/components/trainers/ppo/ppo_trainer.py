@@ -110,7 +110,7 @@ class PPOTrainer:
         minibatch_size = int(b / self.num_minibatch)
 
         for epoch in range(self.update_epochs):
-            inds = torch.randperm(b)
+            inds = torch.randperm(b, device=advantages.device)
             for i in range(0, b, minibatch_size):
                 sample_inds = inds[i:i+minibatch_size]
                 state_minibatch = state_samples[sample_inds]
