@@ -10,7 +10,7 @@ class TD3TrainerLosses:
     value_grad_norms: list[float]
     actor_loss: float
     actor_grad_norm: float
-
+    bc_loss: float
 
 
 class TD3Trainer:
@@ -25,6 +25,8 @@ class TD3Trainer:
             tau: float=5e-3,
             action_reg_sig: float=0.2,
             action_reg_clip: float=0.5,
+            use_BC: bool=False,
+            alpha: float=0.0,
         ):
         self.tau = tau
         self.gamma = gamma
@@ -32,6 +34,10 @@ class TD3Trainer:
         self.action_reg_clip = action_reg_clip
         self.num_critics = len(critics)
         self.actor_update_frequency = actor_update_frequency
+        self.use_BC = use_BC
+        if use_BC:
+            assert alpha > 0.0, 'alpha must be positive if use_BC is True'
+        self.alpha = alpha
 
         self.actor_lr = actor_lr
         self.actor = actor
@@ -122,13 +128,23 @@ class TD3Trainer:
             value_gns.append(value_gn.item())
         return losses, value_gns
 
-    def update_actor(self, states):
-        actions = self.actor(states)
-        action_values = - self.critics[0](states, actions)
+    def update_actor(self, states, actions=None):
+        on_policy_actions = self.actor(states)
+        action_values = - self.critics[0](states, on_policy_actions)
         actor_loss = action_values.mean()
+
+        bc_loss = None
+        if self.use_BC:
+            assert actions is not None, 'actions must be provided if use_BC is True'
+            with torch.no_grad():
+                lambda_Q = self.alpha / self.critics[0](states, actions).mean()
+            bc_loss = ((on_policy_actions - actions)**2).mean()
+            actor_loss = lambda_Q * actor_loss + bc_loss
+            bc_loss = bc_loss.item()
+
         actor_gn = self.actor_optim.backward(actor_loss)
         self.actor_optim.update_parameters()
-        return actor_loss.item(), actor_gn.item()
+        return actor_loss.item(), actor_gn.item(), bc_loss
 
     def update_target_network(self, target_model, model):
         with torch.no_grad():
@@ -165,8 +181,9 @@ class TD3Trainer:
                 dones=done_samples[:, :-1].squeeze(-1),
             )
 
-        actor_loss, actor_gn = self.update_actor(
-            states=state_samples.reshape(-1, state_samples.shape[-1])
+        actor_loss, actor_gn, bc_loss = self.update_actor(
+            states=state_samples.reshape(-1, state_samples.shape[-1]),
+            actions=action_samples.reshape(-1, action_samples.shape[-1])
         )
         self.update_target_network(self.target_actor, self.actor)
         for target_critic, critic in zip(self.target_critics, self.critics):
@@ -177,6 +194,7 @@ class TD3Trainer:
             value_grad_norms=value_gns,
             actor_loss=actor_loss,
             actor_grad_norm=actor_gn,
+            bc_loss=bc_loss,
         )
 
     def save(self, path):
