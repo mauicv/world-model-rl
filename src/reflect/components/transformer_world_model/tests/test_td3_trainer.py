@@ -123,8 +123,8 @@ def test_update_state(state_encoder, state_decoder, actor):
         grad_clip=0.5,
         actor_update_frequency=2,
         tau=5e-3,
-        use_BC=True,
         alpha=2.5,
+        num_actor_updates=5,
     )
 
     dl.perform_rollout()
