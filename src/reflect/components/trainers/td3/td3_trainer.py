@@ -127,25 +127,33 @@ class TD3Trainer:
         return losses, value_gns
 
     def update_actor(self, states):
-        policy_diff = None
-        if self.num_actor_updates > 1:
-            with torch.no_grad():
-                old_actions = self.actor(states)
-                lambda_Q = self.alpha / self.critics[0](states, old_actions).abs().mean()
+        with torch.no_grad():
+            old_actions = self.actor(states)
+            lambda_Q = self.alpha / self.critics[0](states, old_actions).abs().mean()
 
-        actor_losses = []
-        actor_gns = []
-        for i in range(self.num_actor_updates):
-            actions = self.actor(states)
-            action_values = - self.critics[0](states, actions)
-            actor_loss = action_values.mean()
+        actions = self.actor(states)
+        action_values = - self.critics[0](states, actions)
+        actor_loss = action_values.mean()
+        actor_gn = self.actor_optim.backward(actor_loss)
+        self.actor_optim.update_parameters()
+        actor_losses = [actor_loss.item()]
+        actor_gns = [actor_gn.item()]
+
+        with torch.no_grad():
             policy_diff = (actions - old_actions).abs().mean()
-            actor_loss = lambda_Q * actor_loss + policy_diff
-            actor_gn = self.actor_optim.backward(actor_loss)
-            self.actor_optim.update_parameters()
-            actor_losses.append(actor_loss.item())
-            actor_gns.append(actor_gn.item())
-            policy_diff = policy_diff.item()
+
+        if self.num_actor_updates > 1:
+            for i in range(self.num_actor_updates-1):
+                actions = self.actor(states)
+                action_values = - self.critics[0](states, actions)
+                actor_loss = action_values.mean()
+                policy_diff = (actions - old_actions).abs().mean()
+                actor_loss = lambda_Q * actor_loss + policy_diff
+                actor_gn = self.actor_optim.backward(actor_loss)
+                self.actor_optim.update_parameters()
+                actor_losses.append(actor_loss.item())
+                actor_gns.append(actor_gn.item())
+                policy_diff = policy_diff.item()
 
         return np.mean(actor_losses), np.mean(actor_gns), policy_diff
 
