@@ -137,7 +137,7 @@ class TD3Trainer:
         if self.use_BC:
             assert actions is not None, 'actions must be provided if use_BC is True'
             with torch.no_grad():
-                lambda_Q = self.alpha / self.critics[0](states, actions).mean()
+                lambda_Q = self.alpha / self.critics[0](states, actions).abs().mean()
             bc_loss = ((on_policy_actions - actions)**2).mean()
             actor_loss = lambda_Q * actor_loss + bc_loss
             bc_loss = bc_loss.item()
