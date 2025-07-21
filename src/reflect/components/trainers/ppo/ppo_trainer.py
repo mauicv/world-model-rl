@@ -13,6 +13,7 @@ class PPOTrainerLosses:
     entropy_loss: Optional[float]
     clipfrac: Optional[float]
     approxkl: Optional[float]
+    num_epochs: int
 
 
 class PPOTrainer:
@@ -25,10 +26,10 @@ class PPOTrainer:
             gamma: float=0.99,
             lam: float=0.95,
             eta: float=0.001,
-            clip_ratio: float=0.1,
+            clip_ratio: float=0.05,
             target_kl: float=0.2,
             num_minibatch: int=16,
-            update_epochs: int=10,
+            update_epochs: int=3,
             value_clip: float=0.1
         ):
         self.gamma = gamma
@@ -132,9 +133,8 @@ class PPOTrainer:
                     approxkl = ((ratio - 1) - torch.log(ratio)).mean()
                     clipfracs.append(clipfrac.item())
                     approxkls.append(approxkl.item())
-                    # if approxkl > self.target_kl:
-                    #     # print(f"Early stopping: KL too high ({approxkl.item()})")
-                    #     break
+                    if approxkl > self.target_kl:
+                        break
 
                 advantage_minibatch = (advantage_minibatch - advantage_minibatch.mean()) / (advantage_minibatch.std() + 1e-8)
                 assert advantage_minibatch.shape == ratio.shape
@@ -164,6 +164,8 @@ class PPOTrainer:
                 actor_losses.append(actor_loss.item())
                 entropy_losses.append(entropy_loss.item())
                 actor_gns.append(actor_gn.item())
+            if approxkl > self.target_kl:
+                break
 
         return (
             np.mean(actor_losses),
@@ -172,7 +174,8 @@ class PPOTrainer:
             np.mean(clipfracs),
             np.mean(approxkls),
             np.mean(value_losses),
-            np.mean(value_gns)
+            np.mean(value_gns),
+            epoch
         )
 
     def update(
@@ -187,7 +190,7 @@ class PPOTrainer:
             rewards=reward_samples,
             dones=done_samples
         )
-        actor_loss, actor_gn, entropy_loss, clipfrac, approxkl, value_loss, value_gn = self.actor_update(
+        actor_loss, actor_gn, entropy_loss, clipfrac, approxkl, value_loss, value_gn, num_epochs = self.actor_update(
             advantages=advantages.detach(),
             returns=returns.detach(),
             state_samples=state_samples.detach(),
@@ -202,6 +205,7 @@ class PPOTrainer:
             actor_grad_norm=actor_gn.item() if actor_loss is not None else None,
             clipfrac=clipfrac.item() if clipfrac is not None else None,
             approxkl=approxkl.item() if approxkl is not None else None,
+            num_epochs=num_epochs
         )
 
     def to(self, device):
