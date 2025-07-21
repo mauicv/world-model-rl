@@ -84,8 +84,14 @@ class PPOTrainer:
             advantages,
             returns,
             state_samples,
-            action_samples
+            action_samples,
+            num_minibatch: Optional[int]=None,
+            update_epochs: Optional[int]=None,
         ):
+        if num_minibatch is None:
+            num_minibatch = self.num_minibatch
+        if update_epochs is None:
+            update_epochs = self.update_epochs
 
         with torch.no_grad():
             old_action_dist = self.actor(state_samples)
@@ -184,6 +190,8 @@ class PPOTrainer:
             reward_samples,
             done_samples,
             action_samples,
+            num_minibatch: Optional[int]=None,
+            update_epochs: Optional[int]=None,
         ):
         advantages, returns = self.compute_gae(
             states=state_samples,
@@ -195,6 +203,8 @@ class PPOTrainer:
             returns=returns.detach(),
             state_samples=state_samples.detach(),
             action_samples=action_samples.detach(),
+            num_minibatch=num_minibatch,
+            update_epochs=update_epochs
         )
 
         return PPOTrainerLosses(
