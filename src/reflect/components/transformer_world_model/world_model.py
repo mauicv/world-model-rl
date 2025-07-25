@@ -63,6 +63,7 @@ class WorldModel(Base):
             num_cat: int=32,
             num_latent: int=32,
             params: Optional[WorldModelTrainingParams] = None,
+            environment_action_bound: float = 1.0,
         ):
         super().__init__()
         if params is None:
@@ -73,6 +74,7 @@ class WorldModel(Base):
         self.dynamic_model = dynamic_model
         self.num_cat = num_cat
         self.num_latent = num_latent
+        self.environment_action_bound = environment_action_bound
         observation_parameters = chain(encoder.parameters(), decoder.parameters())
         self.observation_model_opt = AdamOptim(
             observation_parameters,
@@ -246,6 +248,12 @@ class WorldModel(Base):
                         action = actor(
                             new_z[:, -1, :].detach(),
                             deterministic=True
+                        )
+                    if self.environment_action_bound is not None:
+                        action = torch.clamp(
+                            action,
+                            min=-self.environment_action_bound,
+                            max=self.environment_action_bound
                         )
                     new_a = torch.cat((a, action[:, None, :]), dim=1)
                     z, a, r, d = new_z, new_a, new_r, new_d
