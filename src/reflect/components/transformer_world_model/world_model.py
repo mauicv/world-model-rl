@@ -63,6 +63,7 @@ class WorldModel(Base):
             num_cat: int=32,
             num_latent: int=32,
             params: Optional[WorldModelTrainingParams] = None,
+            environment_action_bound: float = 1.0,
         ):
         super().__init__()
         if params is None:
@@ -73,6 +74,7 @@ class WorldModel(Base):
         self.dynamic_model = dynamic_model
         self.num_cat = num_cat
         self.num_latent = num_latent
+        self.environment_action_bound = environment_action_bound
         observation_parameters = chain(encoder.parameters(), decoder.parameters())
         self.observation_model_opt = AdamOptim(
             observation_parameters,
@@ -220,41 +222,49 @@ class WorldModel(Base):
             actor: Actor,
             num_timesteps: int=25,
             with_observations: bool=False,
-            with_entropies: bool=False
+            with_entropies: bool=False,
+            disable_gradients: bool=False
         ):
-        
-        with FreezeParameters([self.dynamic_model, self.decoder]):
-            if with_entropies:
-                entropies = []  # Use a list to collect entropies
-                # Calculate entropy for initial state
-                action_dist = actor(z[:, -1, :].detach(), deterministic=False)
-                entropies.append(action_dist.entropy()[:, None])
 
-            for i in range(num_timesteps):
-                new_z, new_r, new_d = self \
-                    .dynamic_model.rstep(z=z, a=a, r=r, d=d)
+        with torch.set_grad_enabled(not disable_gradients):    
+            with FreezeParameters([self.dynamic_model, self.decoder]):
                 if with_entropies:
-                    action_dist = actor(
-                        new_z[:, -1, :].detach(),
-                        deterministic=False
-                    )
-                    action = action_dist.rsample()
+                    entropies = []  # Use a list to collect entropies
+                    # Calculate entropy for initial state
+                    action_dist = actor(z[:, -1, :].detach(), deterministic=False)
                     entropies.append(action_dist.entropy()[:, None])
-                else:
-                    action = actor(
-                        new_z[:, -1, :].detach(),
-                        deterministic=True
-                    )
-                new_a = torch.cat((a, action[:, None, :]), dim=1)
-                z, a, r, d = new_z, new_a, new_r, new_d
-            to_return = [z, a, r, d]
-            if with_entropies:
-                # Stack the entropies along time dimension
-                entropy = torch.stack(entropies, dim=1)  # [batch, time, 1]
-                to_return.append(entropy)
-            if with_observations:
-                b, t, *_ = z.shape
-                o = self.decode(z.reshape(b*t, -1))
-                o = o.reshape(b, t, *o.shape[1:])
-                to_return.append(o)
-            return to_return
+
+                for i in range(num_timesteps):
+                    new_z, new_r, new_d = self \
+                        .dynamic_model.rstep(z=z, a=a, r=r, d=d)
+                    if with_entropies:
+                        action_dist = actor(
+                            new_z[:, -1, :].detach(),
+                            deterministic=False
+                        )
+                        action = action_dist.rsample()
+                        entropies.append(action_dist.entropy()[:, None])
+                    else:
+                        action = actor(
+                            new_z[:, -1, :].detach(),
+                            deterministic=True
+                        )
+                    if self.environment_action_bound is not None:
+                        action = torch.clamp(
+                            action,
+                            min=-self.environment_action_bound,
+                            max=self.environment_action_bound
+                        )
+                    new_a = torch.cat((a, action[:, None, :]), dim=1)
+                    z, a, r, d = new_z, new_a, new_r, new_d
+                to_return = [z, a, r, d]
+                if with_entropies:
+                    # Stack the entropies along time dimension
+                    entropy = torch.stack(entropies, dim=1)  # [batch, time, 1]
+                    to_return.append(entropy)
+                if with_observations:
+                    b, t, *_ = z.shape
+                    o = self.decode(z.reshape(b*t, -1))
+                    o = o.reshape(b, t, *o.shape[1:])
+                    to_return.append(o)
+                return to_return

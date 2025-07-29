@@ -5,7 +5,6 @@ from reflect.data.loader import EnvDataLoader, GymRenderImgProcessing
 
 from reflect.components.models import ConvEncoder, ConvDecoder
 from reflect.components.rssm_world_model.models import DenseModel
-from reflect.components.rssm_world_model.world_model import WorldModel
 from reflect.components.rssm_world_model.memory_actor import WorldModelActor
 from reflect.components.models.actor import Actor
 from reflect.components.trainers.reward.reward_trainer import RewardGradTrainer
