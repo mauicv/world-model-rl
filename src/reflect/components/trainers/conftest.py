@@ -123,17 +123,6 @@ def value_grad_trainer(actor, value_model):
 
 
 @pytest.fixture
-def ppo_trainer(actor, value_model):
-    return PPOTrainer(
-        actor=actor,
-        actor_lr=0.001,
-        critic=value_model,
-        critic_lr=0.001,
-        grad_clip=1.0
-    )
-
-
-@pytest.fixture
 def world_model_actor(world_model, actor):
     return WorldModelActor(
         actor=actor,
