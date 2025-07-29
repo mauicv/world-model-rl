@@ -12,7 +12,6 @@ class Actor(torch.nn.Module):
             num_layers=3,
             hidden_dim=512,
             action_scale=5.0,
-            independent_actions=True
         ):
         super().__init__()
         self.input_dim = input_dim
@@ -21,7 +20,6 @@ class Actor(torch.nn.Module):
         self.bound = torch.tensor(bound, dtype=torch.float32)
         self.num_layers=num_layers
         self.hidden_dim=hidden_dim
-        self.independent_actions = independent_actions
         layers = []
         layers.extend([
             torch.nn.Linear(
@@ -58,9 +56,7 @@ class Actor(torch.nn.Module):
         std = self.stddev(x)
         std = max_std * torch.sigmoid(std) + min_std
         normal = D.normal.Normal(mu, std)
-        if self.independent_actions:
-            return D.independent.Independent(normal, 1)
-        return normal
+        return D.independent.Independent(normal, 1)
 
     def compute_action(self, state, deterministic=False):
         with FreezeParameters([self]):

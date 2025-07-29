@@ -1,6 +1,8 @@
 import gymnasium as gym
 from reflect.components.trainers.ppo.ppo_trainer import PPOTrainer
-from reflect.components.models.actor import Actor
+from reflect.components.trainers.ppo.actor import PPOActor
+from reflect.components.trainers.ppo.critic import PPOCritic
+
 from reflect.components.trainers.value.critic import ValueCritic
 from reflect.components.transformer_world_model.tests.conftest import make_dynamic_model
 from reflect.data.loader import EnvDataLoader, GymRenderImgProcessing
@@ -34,14 +36,14 @@ def test_update(encoder, decoder, actor):
 
     dl.perform_rollout()
 
-    actor = Actor(
+    actor = PPOActor(
         input_dim=32*32,
         output_dim=real_env.action_space.shape[0],
-        bound=real_env.action_space.high,
-        independent_actions=False,
+        num_layers=3,
     )
-    critic = ValueCritic(
-        state_dim=32*32,
+    critic = PPOCritic(
+        input_dim=32*32,
+        num_layers=3,
     )
     trainer = PPOTrainer(
         actor=actor,
@@ -104,14 +106,14 @@ def test_update_state(state_encoder, state_decoder, actor):
         use_imgs_as_states=False,
     )
 
-    actor = Actor(
+    actor = PPOActor(
         input_dim=32*32,
         output_dim=real_env.action_space.shape[0],
-        bound=real_env.action_space.high,
-        independent_actions=False,
+        num_layers=3,
     )
-    critic = ValueCritic(
-        state_dim=32*32,
+    critic = PPOCritic(
+        input_dim=32*32,
+        num_layers=3,
     )
     trainer = PPOTrainer(
         actor=actor,
@@ -157,14 +159,14 @@ def test_update_state(state_encoder, state_decoder, actor):
 
 
 def test_save_load(tmp_path):
-    actor = Actor(
+    actor = PPOActor(
         input_dim=32*32,
         output_dim=8,
-        bound=1.0,
-        independent_actions=False,
+        num_layers=3,
     )
-    critic = ValueCritic(
-        state_dim=32*32,
+    critic = PPOCritic(
+        input_dim=32*32,
+        num_layers=3,
     )
     trainer = PPOTrainer(
         actor=actor,
