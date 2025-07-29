@@ -1,4 +1,3 @@
-
 import torch
 import torch.nn.functional as F
 from torch.distributions import Normal
@@ -8,30 +7,35 @@ BIAS_FINAL_INIT = 3e-4
 
 
 class TD3Actor(torch.nn.Module):
-    def __init__(self, input_dim, output_dim, noise_std=0.0):
+    def __init__(self, input_dim, output_dim, noise_std=0.0, num_layers=3, hidden_dim=512):
         super().__init__()
-        self.fc1 = torch.nn.Linear(input_dim, 400)
-        self.fc2 = torch.nn.Linear(400, 300)
-        self.fc3 = torch.nn.Linear(300, output_dim)
-        self.noise_std = noise_std
-
+        layers = [
+            torch.nn.Linear(input_dim, hidden_dim),
+            torch.nn.LayerNorm(hidden_dim),
+            torch.nn.ELU(),
+            *[
+                torch.nn.Linear(hidden_dim, hidden_dim),
+                torch.nn.LayerNorm(hidden_dim),
+                torch.nn.ELU(),
+            ] * (num_layers - 1),
+        ]
+        output_layer = torch.nn.Linear(hidden_dim, output_dim)
         torch.nn.init.uniform_(
-            self.fc3.weight,
+            output_layer.weight,
             -WEIGHTS_FINAL_INIT,
             WEIGHTS_FINAL_INIT
         )
         torch.nn.init.uniform_(
-            self.fc3.bias,
+            output_layer.bias,
             -BIAS_FINAL_INIT,
             BIAS_FINAL_INIT
         )
+        self.noise_std = noise_std
+        self.layers = torch.nn.Sequential(*layers, output_layer)
+
 
     def forward(self, x, deterministic=True):
-        x = self.fc1(x)
-        x = F.relu(x)
-        x = self.fc2(x)
-        x = F.relu(x)
-        x = self.fc3(x)
+        x = self.layers(x)
         mean = torch.tanh(x)
         if deterministic:
             return mean
