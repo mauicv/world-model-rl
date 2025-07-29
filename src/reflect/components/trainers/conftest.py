@@ -11,7 +11,6 @@ from reflect.components.models.actor import Actor
 from reflect.components.trainers.reward.reward_trainer import RewardGradTrainer
 from reflect.components.trainers.value.value_trainer import ValueGradTrainer
 from reflect.components.trainers.value.critic import ValueCritic
-from reflect.components.trainers.ppo.ppo_trainer import PPOTrainer
 
 import torch
 from torchvision.transforms import Resize, Compose
