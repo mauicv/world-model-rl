@@ -120,6 +120,7 @@ def value_grad_trainer(actor, value_model):
         grad_clip=1.0
     )
 
+
 @pytest.fixture
 def world_model_actor(world_model, actor):
     return WorldModelActor(
