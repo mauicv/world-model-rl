@@ -85,9 +85,9 @@ class PytfexTransformer(torch.nn.Module):
             d: torch.Tensor,
         ):
         _, l, _ = z.shape
-        # embedder might be more complicated...
         mask_len = min(self.ts_adjuster*l, self.num_ts*self.ts_adjuster)
         mask = get_causal_mask(mask_len)
+        mask = mask.to(z.device)
         input = (
             z[:, -self.num_ts:],
             a[:, -self.num_ts:],
