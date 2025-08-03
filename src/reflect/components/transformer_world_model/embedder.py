@@ -38,7 +38,7 @@ class StackEmbedder(BaseEmbedder):
             hidden_dim=hidden_dim,
         )
 
-    def forward(self, x):
+    def forward(self, x, *args, **kwargs):
         s, a, r = x
         b, *_ = s.shape
         a_emb = self.a_emb(a)
@@ -63,7 +63,7 @@ class AddEmbedder(BaseEmbedder):
             hidden_dim=hidden_dim,
         )
 
-    def forward(self, x):
+    def forward(self, x, *args, **kwargs):
         s, a, r = x
         b, *_ = s.shape
         a_emb = self.a_emb(a)
@@ -85,7 +85,7 @@ class ConcatEmbedder(BaseEmbedder):
             hidden_dim=hidden_dim,
         )
 
-    def forward(self, x):
+    def forward(self, x, *args, **kwargs):
         s, a, r = x
         b, *_ = s.shape
         a_emb = self.a_emb(a)
