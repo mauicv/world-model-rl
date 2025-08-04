@@ -86,11 +86,6 @@ class PytfexTransformer(torch.nn.Module):
             kv_cache: Optional[KVCache]=None,
         ):
         _, l, _ = z.shape
-        # mask_len = min(self.ts_adjuster*l, self.num_ts*self.ts_adjuster)
-        # mask = get_causal_mask(mask_len)
-        # mask = mask.to(z.device)
-        
-        # TODO: should adjust for kv_cache lengthy???
         inputs = (
             z[:, -1:],
             a[:, -1:],
@@ -98,7 +93,6 @@ class PytfexTransformer(torch.nn.Module):
         )
         (z_dist, new_r, new_d), kv_cache = self.dynamic_model(
             inputs,
-            # mask=mask,
             use_kv_cache=True,
             kv_cache=kv_cache,
         )
