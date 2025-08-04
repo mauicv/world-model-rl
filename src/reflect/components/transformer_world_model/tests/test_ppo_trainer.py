@@ -65,7 +65,8 @@ def test_update(encoder, decoder, actor):
         z=z, a=a, r=r, d=d,
         actor=actor,
         with_observations=False,
-        disable_gradients=True
+        disable_gradients=True,
+        num_timesteps=16,
     )
 
     history = trainer.update(
@@ -136,7 +137,8 @@ def test_update_state(state_encoder, state_decoder, actor):
         z=z, a=a, r=r, d=d,
         actor=actor,
         with_observations=False,
-        disable_gradients=True
+        disable_gradients=True,
+        num_timesteps=16,
     )
 
     history = trainer.update(
