@@ -41,7 +41,8 @@ class PytfexTransformer(torch.nn.Module):
         self.num_cat = num_cat
         self.latent_dim = latent_dim
         head_cls, embedder_cls, ts_adjuster, hdn_adj = head_embedder_class_map[embedding_type]
-        num_ts = self.num_ts * ts_adjuster
+        self.ts_adjuster = ts_adjuster
+        num_ts = self.num_ts * self.ts_adjuster
         internal_hdn_dim = hdn_adj * hdn_dim
         self.mask = get_causal_mask(num_ts)
 
@@ -83,11 +84,19 @@ class PytfexTransformer(torch.nn.Module):
             r: torch.Tensor,
             d: torch.Tensor,
         ):
-        z_dist, new_r, new_d = self.dynamic_model((
+        _, l, _ = z.shape
+        mask_len = min(self.ts_adjuster*l, self.num_ts*self.ts_adjuster)
+        mask = get_causal_mask(mask_len)
+        mask = mask.to(z.device)
+        input = (
             z[:, -self.num_ts:],
             a[:, -self.num_ts:],
-            r[:, -self.num_ts:]
-        ))
+            r[:, -self.num_ts:],
+        )
+        z_dist, new_r, new_d = self.dynamic_model(
+            input,
+            mask=mask
+        )
 
         new_r = new_r[:, -1].reshape(-1, 1, 1)
         r = torch.cat([r, new_r], dim=1)
