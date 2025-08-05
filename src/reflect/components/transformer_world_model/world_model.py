@@ -223,7 +223,8 @@ class WorldModel(Base):
             num_timesteps: int=25,
             with_observations: bool=False,
             with_entropies: bool=False,
-            disable_gradients: bool=False
+            disable_gradients: bool=False,
+            # use_kv_cache: bool=False,
         ):
 
         with torch.set_grad_enabled(not disable_gradients):    
@@ -234,19 +235,23 @@ class WorldModel(Base):
                     action_dist = actor(z[:, -1, :].detach(), deterministic=False)
                     entropies.append(action_dist.entropy()[:, None])
 
+                kv_cache = None
                 for i in range(num_timesteps):
-                    new_z, new_r, new_d = self \
-                        .dynamic_model.rstep(z=z, a=a, r=r, d=d)
+                    z, r, d, kv_cache = self \
+                        .dynamic_model.rstep(
+                            z=z, a=a, r=r, d=d,
+                            kv_cache=kv_cache
+                        )
                     if with_entropies:
                         action_dist = actor(
-                            new_z[:, -1, :].detach(),
+                            z[:, -1, :].detach(),
                             deterministic=False
                         )
                         action = action_dist.rsample()
                         entropies.append(action_dist.entropy()[:, None])
                     else:
                         action = actor(
-                            new_z[:, -1, :].detach(),
+                            z[:, -1, :].detach(),
                             deterministic=True
                         )
                     if self.environment_action_bound is not None:
@@ -255,8 +260,8 @@ class WorldModel(Base):
                             min=-self.environment_action_bound,
                             max=self.environment_action_bound
                         )
-                    new_a = torch.cat((a, action[:, None, :]), dim=1)
-                    z, a, r, d = new_z, new_a, new_r, new_d
+                    a = torch.cat((a, action[:, None, :]), dim=1)
+                    # z, a, r, d = z, a, r, d
                 to_return = [z, a, r, d]
                 if with_entropies:
                     # Stack the entropies along time dimension
