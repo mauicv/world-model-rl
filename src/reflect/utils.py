@@ -6,6 +6,7 @@ import math
 import torch.nn.functional as F
 import torch.distributions as D
 import csv
+import numpy as np
 
 
 class AdamOptim:
@@ -53,12 +54,14 @@ def recon_loss_fn(x, y):
     if len(x.shape) == 4:
         x, y = x.permute(0, 2, 3, 1), y.permute(0, 2, 3, 1)
         y_dist = D.Independent(D.Normal(y, torch.ones_like(y)), 3)
+        norm_factor = np.prod(x.shape[1:])
     elif len(x.shape) == 2:
         y_dist = D.Independent(D.Normal(y, torch.ones_like(y)), 1)
+        norm_factor = x.shape[-1]
     else:
         raise ValueError(f"Expected input shape to be 2 or 4, got {len(x.shape)}")
     ts_loss = - y_dist.log_prob(x)
-    return ts_loss.mean(), ts_loss.detach()
+    return ts_loss.mean() / norm_factor, ts_loss.detach() / norm_factor
 
 
 def reg_loss_fn(z_logits, temperature=1):
@@ -92,8 +95,8 @@ def cross_entropy_loss_fn(z, z_hat, training_mask=None):
         b = b
     cross_entropy = (
         a * b
-    ).sum(-1)
-    return - cross_entropy.sum(), - cross_entropy.detach().sum(-1)
+    ).sum((-1, -2))
+    return - cross_entropy.mean(), - cross_entropy.detach()
 
 
 def reward_loss_fn(r, r_pred):
