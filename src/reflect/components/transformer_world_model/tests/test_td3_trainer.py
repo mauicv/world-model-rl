@@ -1,7 +1,7 @@
 import gymnasium as gym
-from reflect.components.trainers.value.value_trainer import ValueGradTrainer
-from reflect.components.models.actor import Actor
-from reflect.components.trainers.value.critic import ValueCritic
+from reflect.components.trainers.td3.td3_trainer import TD3Trainer
+from reflect.components.trainers.td3.actor import TD3Actor
+from reflect.components.trainers.td3.critic import TD3Critic
 from reflect.components.transformer_world_model.tests.conftest import make_dynamic_model
 from reflect.data.loader import EnvDataLoader, GymRenderImgProcessing
 from reflect.components.transformer_world_model import WorldModel
@@ -34,40 +34,52 @@ def test_update(encoder, decoder, actor):
 
     dl.perform_rollout()
 
-    actor = Actor(
+    actor = TD3Actor(
         input_dim=32*32,
         output_dim=real_env.action_space.shape[0],
-        bound=real_env.action_space.high,
+        # bound=real_env.action_space.high,
     )
-    critic = ValueCritic(
+    critic_1 = TD3Critic(
         state_dim=32*32,
+        action_dim=real_env.action_space.shape[0],
     )
-    trainer = ValueGradTrainer(
+    critic_2 = TD3Critic(
+        state_dim=32*32,
+        action_dim=real_env.action_space.shape[0],
+    )
+    trainer = TD3Trainer(
         actor=actor,
-        critic=critic,
+        critics=[critic_1, critic_2],
+        actor_lr=1e-5,
+        critic_lr=1e-5,
+        grad_clip=0.5,
+        actor_update_frequency=2,
+        tau=5e-3,
     )
 
-    _, _, o, a, r, d = dl.sample(batch_size=2)
+    _, _, o, a, r, d = dl.sample(batch_size=4)
     _, (z, a, r, d) = wm.update(o, a, r, d, return_init_states=True)
 
     z, a, r, d = wm.imagine_rollout(
         z=z, a=a, r=r, d=d,
         actor=actor,
         with_observations=False,
-        num_timesteps=16,
+        disable_gradients=True,
+        num_timesteps=16
     )
 
     history = trainer.update(
         state_samples=z,
         reward_samples=r,
-        done_samples=d
+        done_samples=d,
+        action_samples=a
     )
     history_dict = asdict(history)
     for key in  [
             'actor_grad_norm',
-            'value_grad_norm',
-            'value_loss',
-            'actor_loss'
+            'value_grad_norms',
+            'value_losses',
+            'actor_loss',
         ]:
         assert key in history_dict
 
@@ -91,42 +103,82 @@ def test_update_state(state_encoder, state_decoder, actor):
         use_imgs_as_states=False,
     )
 
-    dl.perform_rollout()
-
-    actor = Actor(
+    actor = TD3Actor(
         input_dim=32*32,
         output_dim=real_env.action_space.shape[0],
-        bound=real_env.action_space.high,
+        noise_std=0.2,
     )
-    critic = ValueCritic(
+    critic_1 = TD3Critic(
         state_dim=32*32,
+        action_dim=real_env.action_space.shape[0],
     )
-    trainer = ValueGradTrainer(
+    critic_2 = TD3Critic(
+        state_dim=32*32,
+        action_dim=real_env.action_space.shape[0],
+    )
+    trainer = TD3Trainer(
         actor=actor,
-        critic=critic,
+        critics=[critic_1, critic_2],
+        actor_lr=1e-5,
+        critic_lr=1e-5,
+        grad_clip=0.5,
+        actor_update_frequency=2,
+        tau=5e-3,
+        alpha=2.5,
+        num_actor_updates=5,
     )
 
-    _, _, o, a, r, d = dl.sample(batch_size=2)
+    dl.perform_rollout()
+    _, _, o, a, r, d = dl.sample(batch_size=4)
     _, (z, a, r, d) = wm.update(o, a, r, d, return_init_states=True)
 
-    z, a, r, d = wm.imagine_rollout(
+    z, a, r, d, _ = wm.imagine_rollout(
         z=z, a=a, r=r, d=d,
         actor=actor,
         with_observations=False,
+        disable_gradients=True,
+        with_entropies=True,
         num_timesteps=16,
     )
 
     history = trainer.update(
         state_samples=z,
         reward_samples=r,
-        done_samples=d
+        done_samples=d,
+        action_samples=a
     )
     history_dict = asdict(history)
     for key in  [
             'actor_grad_norm',
-            'value_grad_norm',
-            'value_loss',
+            'value_grad_norms',
+            'value_losses',
             'actor_loss'
         ]:
         assert key in history_dict
 
+
+def test_save_load(tmp_path):
+    actor = TD3Actor(
+        input_dim=32*32,
+        output_dim=8,
+        # bound=1.0,
+    )
+    critic_1 = TD3Critic(
+        state_dim=32*32,
+        action_dim=8,
+    )
+    critic_2 = TD3Critic(
+        state_dim=32*32,
+        action_dim=8,
+    )
+    trainer = TD3Trainer(
+        actor=actor,
+        critics=[critic_1, critic_2],
+        actor_lr=1e-5,
+        critic_lr=1e-5,
+        grad_clip=0.5,
+        actor_update_frequency=2,
+        tau=5e-3,
+    )
+    trainer.save(tmp_path)
+    trainer.load(tmp_path)

@@ -1,6 +1,8 @@
 import gymnasium as gym
-from reflect.components.trainers.value.value_trainer import ValueGradTrainer
-from reflect.components.models.actor import Actor
+from reflect.components.trainers.ppo.ppo_trainer import PPOTrainer
+from reflect.components.trainers.ppo.actor import PPOActor
+from reflect.components.trainers.ppo.critic import PPOCritic
+
 from reflect.components.trainers.value.critic import ValueCritic
 from reflect.components.transformer_world_model.tests.conftest import make_dynamic_model
 from reflect.data.loader import EnvDataLoader, GymRenderImgProcessing
@@ -34,40 +36,54 @@ def test_update(encoder, decoder, actor):
 
     dl.perform_rollout()
 
-    actor = Actor(
+    actor = PPOActor(
         input_dim=32*32,
         output_dim=real_env.action_space.shape[0],
-        bound=real_env.action_space.high,
+        num_layers=3,
     )
-    critic = ValueCritic(
-        state_dim=32*32,
+    critic = PPOCritic(
+        input_dim=32*32,
+        num_layers=3,
     )
-    trainer = ValueGradTrainer(
+    trainer = PPOTrainer(
         actor=actor,
         critic=critic,
+        actor_lr=1e-5,
+        critic_lr=1e-5,
+        num_minibatch=8,
+        clip_ratio=0.1,
+        target_kl=0.1,
+        eta=0.01,
+        grad_clip=0.5,
+        update_epochs=2,
     )
 
-    _, _, o, a, r, d = dl.sample(batch_size=2)
+    _, _, o, a, r, d = dl.sample(batch_size=4)
     _, (z, a, r, d) = wm.update(o, a, r, d, return_init_states=True)
 
     z, a, r, d = wm.imagine_rollout(
         z=z, a=a, r=r, d=d,
         actor=actor,
         with_observations=False,
+        disable_gradients=True,
         num_timesteps=16,
     )
 
     history = trainer.update(
         state_samples=z,
         reward_samples=r,
-        done_samples=d
+        done_samples=d,
+        action_samples=a
     )
     history_dict = asdict(history)
     for key in  [
             'actor_grad_norm',
             'value_grad_norm',
             'value_loss',
-            'actor_loss'
+            'actor_loss',
+            'entropy_loss',
+            'clipfrac',
+            'approxkl'
         ]:
         assert key in history_dict
 
@@ -91,42 +107,80 @@ def test_update_state(state_encoder, state_decoder, actor):
         use_imgs_as_states=False,
     )
 
-    dl.perform_rollout()
-
-    actor = Actor(
+    actor = PPOActor(
         input_dim=32*32,
         output_dim=real_env.action_space.shape[0],
-        bound=real_env.action_space.high,
+        num_layers=3,
     )
-    critic = ValueCritic(
-        state_dim=32*32,
+    critic = PPOCritic(
+        input_dim=32*32,
+        num_layers=3,
     )
-    trainer = ValueGradTrainer(
+    trainer = PPOTrainer(
         actor=actor,
         critic=critic,
+        actor_lr=1e-5,
+        critic_lr=1e-5,
+        num_minibatch=8,
+        clip_ratio=0.1,
+        target_kl=0.1,
+        eta=0.01,
+        grad_clip=0.5,
+        update_epochs=2,
     )
 
-    _, _, o, a, r, d = dl.sample(batch_size=2)
+    dl.perform_rollout()
+    _, _, o, a, r, d = dl.sample(batch_size=4)
     _, (z, a, r, d) = wm.update(o, a, r, d, return_init_states=True)
 
     z, a, r, d = wm.imagine_rollout(
         z=z, a=a, r=r, d=d,
         actor=actor,
         with_observations=False,
+        disable_gradients=True,
         num_timesteps=16,
     )
 
     history = trainer.update(
         state_samples=z,
         reward_samples=r,
-        done_samples=d
+        done_samples=d,
+        action_samples=a
     )
     history_dict = asdict(history)
     for key in  [
             'actor_grad_norm',
             'value_grad_norm',
             'value_loss',
-            'actor_loss'
+            'actor_loss',
+            'entropy_loss',
+            'clipfrac',
+            'approxkl'
         ]:
         assert key in history_dict
 
+
+def test_save_load(tmp_path):
+    actor = PPOActor(
+        input_dim=32*32,
+        output_dim=8,
+        num_layers=3,
+    )
+    critic = PPOCritic(
+        input_dim=32*32,
+        num_layers=3,
+    )
+    trainer = PPOTrainer(
+        actor=actor,
+        critic=critic,
+        actor_lr=1e-5,
+        critic_lr=1e-5,
+        num_minibatch=8,
+        clip_ratio=0.1,
+        target_kl=0.1,
+        eta=0.01,
+        grad_clip=0.5,
+        update_epochs=2,
+    )
+    trainer.save(tmp_path)
+    trainer.load(tmp_path)

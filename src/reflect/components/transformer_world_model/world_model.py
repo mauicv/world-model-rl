@@ -65,6 +65,7 @@ class WorldModel(Base):
             num_cat: int=32,
             num_latent: int=32,
             params: Optional[WorldModelTrainingParams] = None,
+            environment_action_bound: float = 1.0,
         ):
         super().__init__()
         if params is None:
@@ -75,6 +76,7 @@ class WorldModel(Base):
         self.dynamic_model = dynamic_model
         self.num_cat = num_cat
         self.num_latent = num_latent
+        self.environment_action_bound = environment_action_bound
         observation_parameters = chain(encoder.parameters(), decoder.parameters())
         self.observation_model_opt = AdamOptim(
             observation_parameters,
@@ -225,58 +227,76 @@ class WorldModel(Base):
             with_entropies: bool=False,
             with_uncertainties: bool=False,
             apply_uncertainty_reward_penalty: bool=False,
+            disable_gradients: bool=False,
         ):
-        
-        with FreezeParameters([self.dynamic_model, self.decoder]):
-            if with_uncertainties:
-                assert self.dynamic_model.head.is_ensemble, "Uncertainties are only supported for ensemble models"
-                r_u = [torch.zeros_like(r[:, -1, :])]
-                z_u = [torch.zeros_like(r[:, -1, :])]
 
-            if with_entropies:
-                entropies = []  # Use a list to collect entropies
-                # Calculate entropy for initial state
-                action_dist = actor(z[:, -1, :].detach(), deterministic=False)
-                entropies.append(action_dist.entropy()[:, None])
-
-            for i in range(num_timesteps):
-                (new_z, new_z_u), (new_r, new_r_u), new_d = self \
-                    .dynamic_model.rstep(z=z, a=a, r=r, d=d)
+        with torch.set_grad_enabled(not disable_gradients):    
+            with FreezeParameters([self.dynamic_model, self.decoder]):
                 if with_uncertainties:
-                    z_u.append(new_z_u)
-                    r_u.append(new_r_u)
+                    assert self.dynamic_model.head.is_ensemble, "Uncertainties are only supported for ensemble models"
+                    r_u = [torch.zeros_like(r[:, -1, :])]
+                    z_u = [torch.zeros_like(r[:, -1, :])]
                 if with_entropies:
-                    action_dist = actor(
-                        new_z[:, -1, :].detach(),
-                        deterministic=False
-                    )
-                    action = action_dist.rsample()
+                    entropies = []  # Use a list to collect entropies
+                    # Calculate entropy for initial state
+                    action_dist = actor(z[:, -1, :].detach(), deterministic=False)
                     entropies.append(action_dist.entropy()[:, None])
-                else:
-                    action = actor(
-                        new_z[:, -1, :].detach(),
-                        deterministic=True
-                    )
-                new_a = torch.cat((a, action[:, None, :]), dim=1)
-                z, a, r, d = new_z, new_a, new_r, new_d
-            to_return = [z, a, r, d]
-            if with_entropies:
-                # Stack the entropies along time dimension
-                entropy = torch.stack(entropies, dim=1)  # [batch, time, 1]
-                to_return.append(entropy)
-            if with_observations:
-                b, t, *_ = z.shape
-                o = self.decode(z.reshape(b*t, -1))
-                o = o.reshape(b, t, *o.shape[1:])
-                to_return.append(o)
-            if with_uncertainties:
-                z_u = torch.stack(z_u, dim=1)
-                r_u = torch.stack(r_u, dim=1)
-                to_return.append(z_u)
-                to_return.append(r_u)
-                if apply_uncertainty_reward_penalty:
-                    r = r \
-                        - self.params.uncertainty_reward_penalty_b_r * r_u \
-                        - self.params.uncertainty_reward_penalty_b_s * z_u.mean(dim=-1, keepdim=True)
-                    to_return[2] = r
-            return to_return
+                kv_cache = None
+                for i in range(num_timesteps):
+                    if with_uncertainties:
+                        (z, z_u_i), (r, r_u_i), d, kv_cache = self \
+                            .dynamic_model.rstep(
+                                z=z, a=a, r=r, d=d,
+                                kv_cache=kv_cache
+                            )
+                        z_u.append(z_u_i)
+                        r_u.append(r_u_i)
+                    else:
+                        (z, z_u_i), (r, r_u_i), d, kv_cache = self \
+                            .dynamic_model.rstep(
+                                z=z, a=a, r=r, d=d,
+                                kv_cache=kv_cache
+                            )
+
+                    if with_entropies:
+                        action_dist = actor(
+                            z[:, -1, :].detach(),
+                            deterministic=False
+                        )
+                        action = action_dist.rsample()
+                        entropies.append(action_dist.entropy()[:, None])
+                    else:
+                        action = actor(
+                            z[:, -1, :].detach(),
+                            deterministic=True
+                        )
+
+                    if self.environment_action_bound is not None:
+                        action = torch.clamp(
+                            action,
+                            min=-self.environment_action_bound,
+                            max=self.environment_action_bound
+                        )
+                    a = torch.cat((a, action[:, None, :]), dim=1)
+
+                to_return = [z, a, r, d]
+                if with_entropies:
+                    # Stack the entropies along time dimension
+                    entropy = torch.stack(entropies, dim=1)  # [batch, time, 1]
+                    to_return.append(entropy)
+                if with_observations:
+                    b, t, *_ = z.shape
+                    o = self.decode(z.reshape(b*t, -1))
+                    o = o.reshape(b, t, *o.shape[1:])
+                    to_return.append(o)
+                if with_uncertainties:
+                    z_u = torch.stack(z_u, dim=1)
+                    r_u = torch.stack(r_u, dim=1)
+                    to_return.append(z_u)
+                    to_return.append(r_u)
+                    if apply_uncertainty_reward_penalty:
+                        r = r \
+                            - self.params.uncertainty_reward_penalty_b_r * r_u \
+                            - self.params.uncertainty_reward_penalty_b_s * z_u.mean(dim=-1, keepdim=True)
+                        to_return[2] = r
+                return to_return

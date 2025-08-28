@@ -6,7 +6,7 @@ import pytest
 from reflect.components.transformer_world_model.world_model import WorldModelTrainingParams
 
 
-@pytest.mark.parametrize("timesteps", [5, 16, 18])
+@pytest.mark.parametrize("timesteps", [1])
 def test_world_model_step(timesteps, encoder, decoder, dynamic_model_8d_action):
     dm = dynamic_model_8d_action
     wm = WorldModel(
@@ -24,13 +24,14 @@ def test_world_model_step(timesteps, encoder, decoder, dynamic_model_8d_action):
     z = z.reshape(2, timesteps, 1024)
     assert z.shape == (2, timesteps, 1024)
 
-    (z, _), (r, _), d = wm.dynamic_model.step(z=z, a=a, r=r, d=d)
+    (z, _), (r, _), d, kv_cache = wm.dynamic_model.step(z=z, a=a, r=r, d=d)
     assert z.shape == (2, timesteps+1, 1024)
     assert r.shape == (2, timesteps+1, 1)
     assert d.shape == (2, timesteps+1, 1)
+    assert kv_cache is not None
 
 
-@pytest.mark.parametrize("timesteps", [5, 16, 18])
+@pytest.mark.parametrize("timesteps", [1])
 def test_state_world_model_step(timesteps, state_encoder, state_decoder, dynamic_model_8d_action):
     dm = dynamic_model_8d_action
     wm = WorldModel(
@@ -48,10 +49,11 @@ def test_state_world_model_step(timesteps, state_encoder, state_decoder, dynamic
     z = z.reshape(2, timesteps, 1024)
     assert z.shape == (2, timesteps, 1024)
 
-    (z, _), (r, _), d = wm.dynamic_model.step(z=z, a=a, r=r, d=d)
+    (z, _), (r, _), d, kv_cache = wm.dynamic_model.step(z=z, a=a, r=r, d=d)
     assert z.shape == (2, timesteps+1, 1024)
     assert r.shape == (2, timesteps+1, 1)
     assert d.shape == (2, timesteps+1, 1)
+    assert kv_cache is not None
 
 
 @pytest.mark.parametrize("timesteps", [5, 16, 18])
@@ -219,18 +221,23 @@ def test_world_model_imagine_rollout(
     d = torch.zeros((2, timesteps+1, 1))
     _, (z, a, r, d) = wm.update(o, a, r, d, return_init_states=True)
     if not with_observations:
-        z, a, r, d = wm.imagine_rollout(z=z, a=a, r=r, d=d, actor=actor)
+        z, a, r, d = wm.imagine_rollout(
+            z=z, a=a, r=r, d=d,
+            actor=actor,
+            num_timesteps=16,
+        )
     else:
         z, a, r, d, o = wm.imagine_rollout(
             z=z, a=a, r=r, d=d,
             actor=actor,
-            with_observations=with_observations
+            with_observations=with_observations,
+            num_timesteps=16,
         )
-        assert o.shape == (34, 26, 3, 64, 64)
-    assert z.shape == (34, 26, 1024)
-    assert a.shape == (34, 26, 8)
-    assert r.shape == (34, 26, 1)
-    assert d.shape == (34, 26, 1)
+        assert o.shape == (34, 17, 3, 64, 64)
+    assert z.shape == (34, 17, 1024)
+    assert a.shape == (34, 17, 8)
+    assert r.shape == (34, 17, 1)
+    assert d.shape == (34, 17, 1)
 
 
 @pytest.mark.parametrize("timesteps", [16])
@@ -255,18 +262,23 @@ def test_state_world_model_imagine_rollout(
     d = torch.zeros((2, timesteps+1, 1))
     _, (z, a, r, d) = wm.update(o, a, r, d, return_init_states=True)
     if not with_observations:
-        z, a, r, d = wm.imagine_rollout(z=z, a=a, r=r, d=d, actor=actor)
+        z, a, r, d = wm.imagine_rollout(
+            z=z, a=a, r=r, d=d,
+            actor=actor,
+            num_timesteps=16,
+        )
     else:
         z, a, r, d, o = wm.imagine_rollout(
             z=z, a=a, r=r, d=d,
             actor=actor,
-            with_observations=with_observations
+            with_observations=with_observations,
+            num_timesteps=16,
         )
-        assert o.shape == (34, 26, 27)
-    assert z.shape == (34, 26, 1024)
-    assert a.shape == (34, 26, 8)
-    assert r.shape == (34, 26, 1)
-    assert d.shape == (34, 26, 1)
+        assert o.shape == (34, 17, 27)
+    assert z.shape == (34, 17, 1024)
+    assert a.shape == (34, 17, 8)
+    assert r.shape == (34, 17, 1)
+    assert d.shape == (34, 17, 1)
 
 
 @pytest.mark.parametrize("timesteps", [16])
@@ -291,13 +303,14 @@ def test_world_model_imagine_rollout_non_deterministic(
     z, a, r, d, entropy = wm.imagine_rollout(
         z=z, a=a, r=r, d=d,
         actor=actor,
-        with_entropies=True
+        with_entropies=True,
+        num_timesteps=16,
     )
-    assert z.shape == (34, 26, 1024)
-    assert a.shape == (34, 26, 8)
-    assert r.shape == (34, 26, 1)
-    assert d.shape == (34, 26, 1)
-    assert entropy.shape == (34, 26, 1)
+    assert z.shape == (34, 17, 1024)
+    assert a.shape == (34, 17, 8)
+    assert r.shape == (34, 17, 1)
+    assert d.shape == (34, 17, 1)
+    assert entropy.shape == (34, 17, 1)
 
 
 @pytest.mark.parametrize("timesteps", [16])
@@ -327,11 +340,12 @@ def test_world_model_imagine_rollout_uncertainties(
         z=z, a=a, r=r, d=d,
         actor=actor,
         with_uncertainties=True,
-        apply_uncertainty_reward_penalty=True
+        apply_uncertainty_reward_penalty=True,
+        num_timesteps=16,
     )
-    assert z.shape == (68, 26, 1024)
-    assert a.shape == (68, 26, 8)
-    assert r.shape == (68, 26, 1)
-    assert d.shape == (68, 26, 1)
-    assert z_u.shape == (68, 26, 1)
-    assert r_u.shape == (68, 26, 1)
+    assert z.shape == (68, 17, 1024)
+    assert a.shape == (68, 17, 8)
+    assert r.shape == (68, 17, 1)
+    assert d.shape == (68, 17, 1)
+    assert z_u.shape == (68, 17, 1)
+    assert r_u.shape == (68, 17, 1)

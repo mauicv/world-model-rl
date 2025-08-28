@@ -1,4 +1,4 @@
-from pytfex.transformer.gpt import GPT
+from pytfex.transformer.gpt import GPT, KVCache
 from pytfex.transformer.layer import TransformerLayer
 from pytfex.transformer.mlp import MLP
 from pytfex.transformer.attention import RelativeAttention
@@ -7,7 +7,6 @@ from reflect.components.transformer_world_model.embedder import StackEmbedder, C
 from pytfex.transformer.gpt import GPT
 import torch
 from typing import Literal, Optional
-
 
 
 def get_causal_mask(l):
@@ -43,7 +42,8 @@ class PytfexTransformer(torch.nn.Module):
         self.num_cat = num_cat
         self.latent_dim = latent_dim
         head_cls, embedder_cls, ts_adjuster, hdn_adj = head_embedder_class_map[embedding_type]
-        num_ts = self.num_ts * ts_adjuster
+        self.ts_adjuster = ts_adjuster
+        num_ts = self.num_ts * self.ts_adjuster
         internal_hdn_dim = hdn_adj * hdn_dim
         self.mask = get_causal_mask(num_ts)
 
@@ -51,6 +51,7 @@ class PytfexTransformer(torch.nn.Module):
             dropout=dropout,
             hidden_dim=hdn_dim,
             num_heads=num_heads,
+            blk_size=num_ts,
             embedder=embedder_cls(
                 z_dim=latent_dim*num_cat,
                 a_size=action_size,
@@ -88,12 +89,24 @@ class PytfexTransformer(torch.nn.Module):
             a: torch.Tensor,
             r: torch.Tensor,
             d: torch.Tensor,
+            kv_cache: Optional[KVCache]=None,
         ):
         h = self.dynamic_model((
             z[:, -self.num_ts:],
             a[:, -self.num_ts:],
             r[:, -self.num_ts:]
         ))
+        _, l, _ = z.shape
+        inputs = (
+            z[:, -1:],
+            a[:, -1:],
+            r[:, -1:],
+        )
+        h, kv_cache = self.dynamic_model(
+            inputs,
+            use_kv_cache=True,
+            kv_cache=kv_cache,
+        )
 
         (z_dist, new_z_u), (new_r, new_r_u), new_d = \
             self.head(h, train=False)
@@ -106,7 +119,8 @@ class PytfexTransformer(torch.nn.Module):
         new_d = new_d[:, -1].reshape(-1, 1, 1)
         d = torch.cat([d, new_d], dim=1)
 
-        return (z_dist, z_u), (r, r_u), d
+        return (z_dist, z_u), (r, r_u), d, kv_cache
+
 
     def step(
             self,
@@ -114,12 +128,13 @@ class PytfexTransformer(torch.nn.Module):
             a: torch.Tensor,
             r: torch.Tensor,
             d: torch.Tensor,
+            kv_cache: Optional[KVCache]=None,
         ):
-        (z_dist, new_z_u), (new_r, new_r_u), new_d = self._step(z, a, r, d)
+        (z_dist, new_z_u), (new_r, new_r_u), new_d, kv_cache = self._step(z, a, r, d, kv_cache)
         new_z = z_dist.sample()
         new_z = new_z[:, -1].reshape(-1, 1, self.num_cat * self.latent_dim)
         new_z = torch.cat([z, new_z], dim=1)
-        return (new_z, new_z_u), (new_r, new_r_u), new_d
+        return (new_z, new_z_u), (new_r, new_r_u), new_d, kv_cache
 
     def rstep(
             self,
@@ -127,18 +142,20 @@ class PytfexTransformer(torch.nn.Module):
             a: torch.Tensor,
             r: torch.Tensor,
             d: torch.Tensor,
+            kv_cache: Optional[KVCache]=None,
         ):
-        (z_dist, new_z_u), (new_r, new_r_u), new_d = self._step(z, a, r, d)
+        (z_dist, new_z_u), (new_r, new_r_u), new_d, kv_cache = self._step(z, a, r, d, kv_cache)
         new_z = z_dist.rsample()
         new_z = new_z[:, -1].reshape(-1, 1, self.num_cat * self.latent_dim)
         new_z = torch.cat([z, new_z], dim=1)
-        return (new_z, new_z_u), (new_r, new_r_u), new_d
+        return (new_z, new_z_u), (new_r, new_r_u), new_d, kv_cache
 
     def forward(self, z, a, r):
         self.mask = self.mask.to(z.device)
         h = self.dynamic_model(
             (z, a, r),
-            mask=self.mask
+            mask=self.mask,
+            use_kv_cache=False
         )
         (z_dist, _), (r, _), d = self.head(h, train=True)
         return z_dist, r, d

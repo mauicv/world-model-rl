@@ -16,13 +16,10 @@ class Actor(torch.nn.Module):
         super().__init__()
         self.input_dim = input_dim
         self.output_dim = output_dim
-        self.count = 0
-        self.action = None
         self.action_scale = action_scale
         self.bound = torch.tensor(bound, dtype=torch.float32)
         self.num_layers=num_layers
         self.hidden_dim=hidden_dim
-
         layers = []
         layers.extend([
             torch.nn.Linear(
