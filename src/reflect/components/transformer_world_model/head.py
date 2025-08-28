@@ -79,7 +79,12 @@ class EnsembleMLP(torch.nn.Module):
 
         mu = y.quantile(self.pessimism, dim=0)
 
-        var = y.detach().std(dim=0)
+        # TODO: We want the gradient so perhaps we should use the gradient 
+        # of the quantile here? In essence the reward will end up being 
+        # r = r_preds.mean() + b_1 * r_preds.std() + b_2 * s_preds.std().
+        # Maximizing this will push the reward up but also push the agent
+        # to sample areas with high uncertainty.
+        var = y.std(dim=0)
         return mu, var
 
 
