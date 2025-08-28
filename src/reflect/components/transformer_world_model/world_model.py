@@ -257,7 +257,6 @@ class WorldModel(Base):
                                 z=z, a=a, r=r, d=d,
                                 kv_cache=kv_cache
                             )
-
                     if with_entropies:
                         action_dist = actor(
                             z[:, -1, :].detach(),
@@ -270,7 +269,6 @@ class WorldModel(Base):
                             z[:, -1, :].detach(),
                             deterministic=True
                         )
-
                     if self.environment_action_bound is not None:
                         action = torch.clamp(
                             action,
@@ -281,8 +279,7 @@ class WorldModel(Base):
 
                 to_return = [z, a, r, d]
                 if with_entropies:
-                    # Stack the entropies along time dimension
-                    entropy = torch.stack(entropies, dim=1)  # [batch, time, 1]
+                    entropy = torch.stack(entropies, dim=1)
                     to_return.append(entropy)
                 if with_observations:
                     b, t, *_ = z.shape
