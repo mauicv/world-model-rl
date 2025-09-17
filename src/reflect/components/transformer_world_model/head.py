@@ -39,7 +39,7 @@ class EnsembleMLP(torch.nn.Module):
             dropout: float=0.0,
             sample_iterations: int=2,
             seed: int=0,
-            pessimism: float=0.1
+            pessimism: float=0.5
         ):
         super(EnsembleMLP, self).__init__()
         self.ensemble_size = ensemble_size
@@ -125,7 +125,7 @@ class BaseHead(torch.nn.Module):
                 1,
                 ensemble_size,
                 dropout=dropout,
-                pessimism=0.25
+                pessimism=0.5
             )
             self.is_ensemble = True
         self.done_output_activation = torch.nn.Sigmoid()

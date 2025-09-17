@@ -327,8 +327,8 @@ def test_world_model_imagine_rollout_uncertainties(
         decoder=state_decoder,
         dynamic_model=dm,
         params=WorldModelTrainingParams(
-            uncertainty_reward_penalty_b_r=1.0,
-            uncertainty_reward_penalty_b_s=1.0,
+            uncertainty_reward_penalty_b_r=-1.0,
+            uncertainty_reward_penalty_b_s=-1.0,
         )
     )
     o = torch.zeros((4, timesteps+1, 27))
