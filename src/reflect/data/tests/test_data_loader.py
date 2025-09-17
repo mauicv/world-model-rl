@@ -1,4 +1,5 @@
 from reflect.data.loader import EnvDataLoader
+from reflect.data.saver import DataSaver
 from reflect.components.transformer_world_model.world_model_actor import EncoderActor
 from reflect.components.models import ConvEncoder
 from reflect.components.models import Actor
@@ -208,3 +209,22 @@ def test_data_loader_weight_perturbation(env_name):
     assert r.shape == (3, 10, 1)
     assert d.shape == (3, 10, 1)
     data_loader.close()
+
+
+def test_data_saver(tmp_path):
+    data_loader = EnvDataLoader(
+        num_time_steps=18 + 1,
+        state_shape=(3, 64, 64),
+        use_imgs_as_states=True,
+    )
+    for _ in range(4):
+        data_loader.perform_rollout()
+    data_loader.close()
+
+    saver = DataSaver(
+        path=tmp_path / "data_loader.pkl"
+    )
+    saver.save(data_loader)
+
+    data_loader = saver.load()
+    assert data_loader.rollout_ind == 4

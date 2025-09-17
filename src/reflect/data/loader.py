@@ -161,6 +161,14 @@ class EnvDataLoader:
         if noise_generator is None:
             self.noise_generator = NoNoise(dim=self.action_dim)
 
+    def __getstate__(self):
+        return {
+            k: v for k, v in self.__dict__.items() if k != 'env'
+        }
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+
     def step(self, action):
         state, reward, done, *_ \
             = self.env.step(action.cpu().numpy())
