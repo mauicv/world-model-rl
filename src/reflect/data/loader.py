@@ -163,7 +163,7 @@ class EnvDataLoader:
 
     def __getstate__(self):
         return {
-            k: v for k, v in self.__dict__.items() if k != 'env' or k != 'policy'
+            k: v for k, v in self.__dict__.items() if k != 'env' and k != 'policy'
         }
 
     def __setstate__(self, state):
