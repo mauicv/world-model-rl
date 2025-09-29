@@ -33,7 +33,9 @@ class PytfexTransformer(torch.nn.Module):
             action_size: int=6,
             num_layers: int=12,
             hdn_dim: int=512,
-            embedding_type: Literal['stack', 'add', 'concat']='stack'
+            embedding_type: Literal['stack', 'add', 'concat']='stack',
+            ensemble_size: int=1,
+            reward_dropout: float=0.0,
         ):
         super().__init__()
         self.num_ts = num_ts
@@ -55,11 +57,7 @@ class PytfexTransformer(torch.nn.Module):
                 a_size=action_size,
                 hidden_dim=hdn_dim
             ),
-            head=head_cls(
-                latent_dim=latent_dim,
-                num_cat=num_cat,
-                hidden_dim=hdn_dim
-            ),
+            head=None,
             layers=[
                 TransformerLayer(
                     hidden_dim=internal_hdn_dim,
@@ -77,6 +75,14 @@ class PytfexTransformer(torch.nn.Module):
             ]
         )
 
+        self.head = head_cls(
+            latent_dim=latent_dim,
+            num_cat=num_cat,
+            hidden_dim=hdn_dim,
+            ensemble_size=ensemble_size,
+            dropout=reward_dropout
+        )
+
     def _step(
             self,
             z: torch.Tensor,
@@ -85,17 +91,27 @@ class PytfexTransformer(torch.nn.Module):
             d: torch.Tensor,
             kv_cache: Optional[KVCache]=None,
         ):
+        h = self.dynamic_model((
+            z[:, -self.num_ts:],
+            a[:, -self.num_ts:],
+            r[:, -self.num_ts:]
+        ))
         _, l, _ = z.shape
         inputs = (
             z[:, -1:],
             a[:, -1:],
             r[:, -1:],
         )
-        (z_dist, new_r, new_d), kv_cache = self.dynamic_model(
+        h, kv_cache = self.dynamic_model(
             inputs,
             use_kv_cache=True,
             kv_cache=kv_cache,
         )
+
+        (z_dist, new_z_u), (new_r, new_r_u), new_d = \
+            self.head(h, train=False)
+        z_u = new_z_u[:, -1] if new_z_u is not None else None
+        r_u = new_r_u[:, -1] if new_r_u is not None else None
 
         new_r = new_r[:, -1].reshape(-1, 1, 1)
         r = torch.cat([r, new_r], dim=1)
@@ -103,7 +119,8 @@ class PytfexTransformer(torch.nn.Module):
         new_d = new_d[:, -1].reshape(-1, 1, 1)
         d = torch.cat([d, new_d], dim=1)
 
-        return z_dist, r, d, kv_cache
+        return (z_dist, z_u), (r, r_u), d, kv_cache
+
 
     def step(
             self,
@@ -113,11 +130,11 @@ class PytfexTransformer(torch.nn.Module):
             d: torch.Tensor,
             kv_cache: Optional[KVCache]=None,
         ):
-        z_dist, new_r, new_d, kv_cache = self._step(z, a, r, d, kv_cache)
+        (z_dist, new_z_u), (new_r, new_r_u), new_d, kv_cache = self._step(z, a, r, d, kv_cache)
         new_z = z_dist.sample()
         new_z = new_z[:, -1].reshape(-1, 1, self.num_cat * self.latent_dim)
         new_z = torch.cat([z, new_z], dim=1)
-        return new_z, new_r, new_d, kv_cache
+        return (new_z, new_z_u), (new_r, new_r_u), new_d, kv_cache
 
     def rstep(
             self,
@@ -127,16 +144,18 @@ class PytfexTransformer(torch.nn.Module):
             d: torch.Tensor,
             kv_cache: Optional[KVCache]=None,
         ):
-        z_dist, new_r, new_d, kv_cache = self._step(z, a, r, d, kv_cache)
+        (z_dist, new_z_u), (new_r, new_r_u), new_d, kv_cache = self._step(z, a, r, d, kv_cache)
         new_z = z_dist.rsample()
         new_z = new_z[:, -1].reshape(-1, 1, self.num_cat * self.latent_dim)
         new_z = torch.cat([z, new_z], dim=1)
-        return new_z, new_r, new_d, kv_cache
+        return (new_z, new_z_u), (new_r, new_r_u), new_d, kv_cache
 
     def forward(self, z, a, r):
         self.mask = self.mask.to(z.device)
-        return self.dynamic_model(
+        h = self.dynamic_model(
             (z, a, r),
             mask=self.mask,
             use_kv_cache=False
         )
+        (z_dist, _), (r, _), d = self.head(h, train=True)
+        return z_dist, r, d

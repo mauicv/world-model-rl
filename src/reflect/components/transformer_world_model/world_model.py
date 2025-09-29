@@ -29,6 +29,8 @@ class WorldModelTrainingParams:
     consistency_coeff: float = 0.0
     reward_coeff: float = 10.0
     done_coeff: float = 1.0
+    uncertainty_reward_penalty_b_r: float = 1.0
+    uncertainty_reward_penalty_b_s: float = 1.0
 
 
 @dataclass
@@ -223,25 +225,38 @@ class WorldModel(Base):
             num_timesteps: int=25,
             with_observations: bool=False,
             with_entropies: bool=False,
+            with_uncertainties: bool=False,
+            apply_uncertainty_reward_penalty: bool=False,
             disable_gradients: bool=False,
-            # use_kv_cache: bool=False,
         ):
 
         with torch.set_grad_enabled(not disable_gradients):    
             with FreezeParameters([self.dynamic_model, self.decoder]):
+                if with_uncertainties:
+                    assert self.dynamic_model.head.is_ensemble, "Uncertainties are only supported for ensemble models"
+                    r_u = [torch.zeros_like(r[:, -1, :])]
+                    z_u = [torch.zeros_like(r[:, -1, :])]
                 if with_entropies:
                     entropies = []  # Use a list to collect entropies
                     # Calculate entropy for initial state
                     action_dist = actor(z[:, -1, :].detach(), deterministic=False)
                     entropies.append(action_dist.entropy()[:, None])
-
                 kv_cache = None
                 for i in range(num_timesteps):
-                    z, r, d, kv_cache = self \
-                        .dynamic_model.rstep(
-                            z=z, a=a, r=r, d=d,
-                            kv_cache=kv_cache
-                        )
+                    if with_uncertainties:
+                        (z, z_u_i), (r, r_u_i), d, kv_cache = self \
+                            .dynamic_model.rstep(
+                                z=z, a=a, r=r, d=d,
+                                kv_cache=kv_cache
+                            )
+                        z_u.append(z_u_i)
+                        r_u.append(r_u_i)
+                    else:
+                        (z, z_u_i), (r, r_u_i), d, kv_cache = self \
+                            .dynamic_model.rstep(
+                                z=z, a=a, r=r, d=d,
+                                kv_cache=kv_cache
+                            )
                     if with_entropies:
                         action_dist = actor(
                             z[:, -1, :].detach(),
@@ -261,15 +276,24 @@ class WorldModel(Base):
                             max=self.environment_action_bound
                         )
                     a = torch.cat((a, action[:, None, :]), dim=1)
-                    # z, a, r, d = z, a, r, d
+
                 to_return = [z, a, r, d]
                 if with_entropies:
-                    # Stack the entropies along time dimension
-                    entropy = torch.stack(entropies, dim=1)  # [batch, time, 1]
+                    entropy = torch.stack(entropies, dim=1)
                     to_return.append(entropy)
                 if with_observations:
                     b, t, *_ = z.shape
                     o = self.decode(z.reshape(b*t, -1))
                     o = o.reshape(b, t, *o.shape[1:])
                     to_return.append(o)
+                if with_uncertainties:
+                    z_u = torch.stack(z_u, dim=1)
+                    r_u = torch.stack(r_u, dim=1)
+                    to_return.append(z_u)
+                    to_return.append(r_u)
+                    if apply_uncertainty_reward_penalty:
+                        r = r \
+                            - self.params.uncertainty_reward_penalty_b_r * r_u \
+                            - self.params.uncertainty_reward_penalty_b_s * z_u.mean(dim=-1, keepdim=True)
+                        to_return[2] = r
                 return to_return
