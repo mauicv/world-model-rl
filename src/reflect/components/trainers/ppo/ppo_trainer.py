@@ -3,6 +3,7 @@ from dataclasses import dataclass
 import torch
 from typing import Optional
 import numpy as np
+import torch.nn.functional as F
 
 @dataclass
 class PPOTrainerLosses:
@@ -30,7 +31,6 @@ class PPOTrainer:
             target_kl: float=0.2,
             num_minibatch: int=16,
             update_epochs: int=3,
-            value_clip: float=0.1
         ):
         self.gamma = gamma
         self.lam = lam
@@ -40,7 +40,6 @@ class PPOTrainer:
         self.clip_ratio = clip_ratio
         self.target_kl = target_kl
         self.update_epochs = update_epochs
-        self.value_clip = value_clip
         
         self.actor = actor
         self.actor_lr = actor_lr
@@ -131,8 +130,7 @@ class PPOTrainer:
                     .log_prob(action_minibatch) \
                     .sum(-1)
                 diff = action_log_probs_minibatch - old_action_log_probs_minibatch
-                diff_clamped = torch.clamp(diff, min=-20, max=20)
-                ratio = torch.exp(diff_clamped)
+                ratio = torch.exp(diff)
 
                 with torch.no_grad():
                     clipfrac = ((1 - ratio).abs() > self.clip_ratio).float().mean()
@@ -152,16 +150,7 @@ class PPOTrainer:
                 self.actor_optim.update_parameters()
 
                 values_minibatch = self.critic(state_minibatch).view(-1)
-                assert values_minibatch.shape == returns[sample_inds].shape
-                value_loss_unclipped = (values_minibatch - returns[sample_inds])**2
-                v_clipped = returns[sample_inds] + torch.clamp(
-                    values_minibatch - returns[sample_inds],
-                    -self.value_clip,
-                    self.value_clip,
-                )
-                value_loss_clipped = (v_clipped - returns[sample_inds]) ** 2
-                value_loss_max = torch.max(value_loss_unclipped, value_loss_clipped)
-                value_loss = 0.5 * value_loss_max.mean()
+                value_loss = F.mse_loss(returns[sample_inds], values_minibatch)
                 value_gn = self.critic_optim.backward(value_loss)
                 self.critic_optim.update_parameters()
 
