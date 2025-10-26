@@ -128,10 +128,10 @@ class PPOTrainer:
                 advantage_minibatch = advantages[sample_inds]
 
                 action_dist = self.actor(state_minibatch)
-                entropy_loss = action_dist.entropy().mean()
+                entropy_loss = action_dist.entropy().sum(-1).mean()
                 action_log_probs_minibatch = action_dist \
                     .log_prob(action_minibatch) \
-                    .sum(-1)
+                    .sum(-1) 
                 diff = action_log_probs_minibatch - old_action_log_probs_minibatch
                 ratio = torch.exp(diff)
 
