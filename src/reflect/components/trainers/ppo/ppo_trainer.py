@@ -27,6 +27,7 @@ class PPOTrainer:
             gamma: float=0.99,
             lam: float=0.95,
             eta: float=0.001,
+            vf_coef: float=0.5, 
             clip_ratio: float=0.05,
             target_kl: float=0.2,
             num_minibatch: int=16,
@@ -40,7 +41,8 @@ class PPOTrainer:
         self.clip_ratio = clip_ratio
         self.target_kl = target_kl
         self.update_epochs = update_epochs
-        
+        self.vf_coef = vf_coef
+
         self.actor = actor
         self.actor_lr = actor_lr
         self.actor_optim = AdamOptim(
@@ -115,6 +117,7 @@ class PPOTrainer:
         b, *_ = state_samples.shape
         minibatch_size = int(b / self.num_minibatch)
 
+        continue_training = True
         for epoch in range(self.update_epochs):
             inds = torch.randperm(b, device=advantages.device)
             for i in range(0, b, minibatch_size):
@@ -137,7 +140,9 @@ class PPOTrainer:
                     approxkl = ((ratio - 1) - torch.log(ratio)).mean()
                     clipfracs.append(clipfrac.item())
                     approxkls.append(approxkl.item())
-                    if approxkl > self.target_kl:
+                    if self.target_kl is not None and approxkl > self.target_kl:
+                        continue_training = False
+                        print(f"Early stopping due to KL divergence: {approxkl}")
                         break
 
                 advantage_minibatch = (advantage_minibatch - advantage_minibatch.mean()) / (advantage_minibatch.std() + 1e-8)
@@ -150,7 +155,7 @@ class PPOTrainer:
                 self.actor_optim.update_parameters()
 
                 values_minibatch = self.critic(state_minibatch).view(-1)
-                value_loss = F.mse_loss(returns[sample_inds], values_minibatch)
+                value_loss = self.vf_coef * F.mse_loss(returns[sample_inds], values_minibatch)
                 value_gn = self.critic_optim.backward(value_loss)
                 self.critic_optim.update_parameters()
 
@@ -159,7 +164,7 @@ class PPOTrainer:
                 actor_losses.append(actor_loss.item())
                 entropy_losses.append(entropy_loss.item())
                 actor_gns.append(actor_gn.item())
-            if approxkl > self.target_kl:
+            if not continue_training:
                 break
 
         return (
