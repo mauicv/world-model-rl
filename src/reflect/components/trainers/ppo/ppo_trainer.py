@@ -195,7 +195,6 @@ class PPOTrainer:
             rewards=reward_samples,
             dones=done_samples
         )
-        print(advantages.shape, returns.shape, state_samples.shape, action_samples.shape, done_samples.shape)
         actor_loss, actor_gn, entropy_loss, clipfrac, approxkl, value_loss, value_gn, num_epochs = self.actor_update(
             advantages=advantages.detach(),
             returns=returns.detach(),
