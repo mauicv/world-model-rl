@@ -128,17 +128,16 @@ class PPOTrainer:
                 advantage_minibatch = advantages[sample_inds]
 
                 action_dist = self.actor(state_minibatch)
-                # entropy_loss = action_dist.entropy().sum(-1).mean()
                 action_log_probs_minibatch = action_dist \
                     .log_prob(action_minibatch) \
                     .sum(-1) 
-                entropy_loss = action_log_probs_minibatch.mean()
-                diff = action_log_probs_minibatch - old_action_log_probs_minibatch
-                ratio = torch.exp(diff)
+                entropy_loss = action_dist.entropy().mean()
+                log_ratio = action_log_probs_minibatch - old_action_log_probs_minibatch
+                ratio = torch.exp(log_ratio)
 
                 with torch.no_grad():
                     clipfrac = ((1 - ratio).abs() > self.clip_ratio).float().mean()
-                    approxkl = ((ratio - 1) - torch.log(ratio)).mean()
+                    approxkl = ((ratio - 1) - log_ratio)).mean()
                     clipfracs.append(clipfrac.item())
                     approxkls.append(approxkl.item())
                     if self.target_kl is not None and approxkl > self.target_kl:
