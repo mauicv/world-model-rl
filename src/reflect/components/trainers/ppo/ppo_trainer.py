@@ -137,7 +137,7 @@ class PPOTrainer:
 
                 with torch.no_grad():
                     clipfrac = ((1 - ratio).abs() > self.clip_ratio).float().mean()
-                    approxkl = ((ratio - 1) - log_ratio)).mean()
+                    approxkl = ((ratio - 1) - log_ratio).mean()
                     clipfracs.append(clipfrac.item())
                     approxkls.append(approxkl.item())
                     if self.target_kl is not None and approxkl > self.target_kl:
