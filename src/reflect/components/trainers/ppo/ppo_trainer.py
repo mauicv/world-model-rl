@@ -69,7 +69,7 @@ class PPOTrainer:
         ):
         _, l, *_ = rewards.shape
         values = self.critic(states)
-        advantages = torch.zeros_like(rewards) # this and the logic below mean the final advantage is 0? 
+        advantages = torch.zeros_like(rewards) # this and the logic below mean the final advantage is 0 
         last_advantage = 0
         for t in reversed(range(l-1)):
             next_value = values[:, t + 1]
@@ -78,7 +78,10 @@ class PPOTrainer:
             advantages[:, t] = delta + self.gamma * self.lam * nextnonterminal * last_advantage
             last_advantage = advantages[:, t]
         returns = advantages + values
-        return advantages.squeeze(-1), returns.squeeze(-1)
+        # drop the last advantage and return because we don't have the next_done or next_state.
+        advantages = advantages[:, :-1, :].squeeze(-1)
+        returns = returns[:, :-1, :].squeeze(-1)
+        return advantages, returns
 
     def actor_update(
             self,
@@ -192,11 +195,12 @@ class PPOTrainer:
             rewards=reward_samples,
             dones=done_samples
         )
+        print(advantages.shape, returns.shape, state_samples.shape, action_samples.shape, done_samples.shape)
         actor_loss, actor_gn, entropy_loss, clipfrac, approxkl, value_loss, value_gn, num_epochs = self.actor_update(
             advantages=advantages.detach(),
             returns=returns.detach(),
-            state_samples=state_samples.detach(),
-            action_samples=action_samples.detach(),
+            state_samples=state_samples[:, :-1].detach(),
+            action_samples=action_samples[:,:-1].detach(),
             num_minibatch=num_minibatch,
             update_epochs=update_epochs
         )
