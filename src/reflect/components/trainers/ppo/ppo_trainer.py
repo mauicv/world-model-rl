@@ -31,6 +31,7 @@ class PPOTrainer:
             target_kl: float=0.2,
             num_minibatch: int=16,
             update_epochs: int=3,
+            vf_coef: float=0.5,
         ):
         self.gamma = gamma
         self.lam = lam
@@ -40,7 +41,7 @@ class PPOTrainer:
         self.clip_ratio = clip_ratio
         self.target_kl = target_kl
         self.update_epochs = update_epochs
-        
+        self.vf_coef = vf_coef
         self.actor = actor
         self.actor_lr = actor_lr
         self.actor_optim = AdamOptim(
@@ -67,7 +68,7 @@ class PPOTrainer:
         ):
         _, l, *_ = rewards.shape
         values = self.critic(states)
-        advantages = torch.zeros_like(rewards) # this and the logic below mean the final advantage is 0? 
+        advantages = torch.zeros_like(rewards) # this and the logic below mean the final advantage is 0
         last_advantage = 0
         for t in reversed(range(l-1)):
             next_value = values[:, t + 1]
@@ -76,7 +77,10 @@ class PPOTrainer:
             advantages[:, t] = delta + self.gamma * self.lam * nextnonterminal * last_advantage
             last_advantage = advantages[:, t]
         returns = advantages + values
-        return advantages.squeeze(-1), returns.squeeze(-1)
+        # drop the last advantage and return because we don't have the next_done or next_state.
+        advantages = advantages[:, :-1, :].squeeze(-1)
+        returns = returns[:, :-1, :].squeeze(-1)
+        return advantages, returns
 
     def actor_update(
             self,
@@ -125,7 +129,7 @@ class PPOTrainer:
                 advantage_minibatch = advantages[sample_inds]
 
                 action_dist = self.actor(state_minibatch)
-                entropy_loss = action_dist.entropy().mean()
+                entropy_loss = action_dist.entropy().sum(-1).mean()
                 action_log_probs_minibatch = action_dist \
                     .log_prob(action_minibatch) \
                     .sum(-1)
@@ -150,7 +154,7 @@ class PPOTrainer:
                 self.actor_optim.update_parameters()
 
                 values_minibatch = self.critic(state_minibatch).view(-1)
-                value_loss = F.mse_loss(returns[sample_inds], values_minibatch)
+                value_loss = self.vf_coef * F.mse_loss(returns[sample_inds], values_minibatch)
                 value_gn = self.critic_optim.backward(value_loss)
                 self.critic_optim.update_parameters()
 
@@ -190,8 +194,8 @@ class PPOTrainer:
         actor_loss, actor_gn, entropy_loss, clipfrac, approxkl, value_loss, value_gn, num_epochs = self.actor_update(
             advantages=advantages.detach(),
             returns=returns.detach(),
-            state_samples=state_samples.detach(),
-            action_samples=action_samples.detach(),
+            state_samples=state_samples[:, :-1].detach(),
+            action_samples=action_samples[:,:-1].detach(),
             num_minibatch=num_minibatch,
             update_epochs=update_epochs
         )
