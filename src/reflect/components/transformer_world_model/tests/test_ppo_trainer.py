@@ -48,8 +48,7 @@ def test_update(encoder, decoder, actor):
     trainer = PPOTrainer(
         actor=actor,
         critic=critic,
-        actor_lr=1e-5,
-        critic_lr=1e-5,
+        lr=1e-5,
         num_minibatch=8,
         clip_ratio=0.1,
         target_kl=0.1,
@@ -77,11 +76,10 @@ def test_update(encoder, decoder, actor):
     )
     history_dict = asdict(history)
     for key in  [
-            'actor_grad_norm',
-            'value_grad_norm',
-            'value_loss',
             'actor_loss',
+            'value_loss',
             'entropy_loss',
+            'grad_norm',
             'clipfrac',
             'approxkl'
         ]:
@@ -119,8 +117,7 @@ def test_update_state(state_encoder, state_decoder, actor):
     trainer = PPOTrainer(
         actor=actor,
         critic=critic,
-        actor_lr=1e-5,
-        critic_lr=1e-5,
+        lr=1e-5,
         num_minibatch=8,
         clip_ratio=0.1,
         target_kl=0.1,
@@ -149,11 +146,10 @@ def test_update_state(state_encoder, state_decoder, actor):
     )
     history_dict = asdict(history)
     for key in  [
-            'actor_grad_norm',
-            'value_grad_norm',
-            'value_loss',
             'actor_loss',
+            'value_loss',
             'entropy_loss',
+            'grad_norm',
             'clipfrac',
             'approxkl'
         ]:
@@ -173,8 +169,7 @@ def test_save_load(tmp_path):
     trainer = PPOTrainer(
         actor=actor,
         critic=critic,
-        actor_lr=1e-5,
-        critic_lr=1e-5,
+        lr=1e-5,
         num_minibatch=8,
         clip_ratio=0.1,
         target_kl=0.1,

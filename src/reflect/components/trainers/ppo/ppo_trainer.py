@@ -4,13 +4,13 @@ import torch
 from typing import Optional
 import numpy as np
 import torch.nn.functional as F
+from itertools import chain
 
 @dataclass
 class PPOTrainerLosses:
     value_loss: float
-    value_grad_norm: float
     actor_loss: Optional[float]
-    actor_grad_norm: Optional[float]
+    grad_norm: Optional[float]
     entropy_loss: Optional[float]
     clipfrac: Optional[float]
     approxkl: Optional[float]
@@ -21,8 +21,7 @@ class PPOTrainer:
     def __init__(self,
             actor,
             critic,
-            actor_lr: float=1e-4,
-            critic_lr: float=1e-4,
+            lr: float=1e-4,
             grad_clip: float=0.5,
             gamma: float=0.99,
             lam: float=0.95,
@@ -43,22 +42,15 @@ class PPOTrainer:
         self.update_epochs = update_epochs
         self.vf_coef = vf_coef
         self.actor = actor
-        self.actor_lr = actor_lr
-        self.actor_optim = AdamOptim(
-            self.actor.parameters(),
-            lr=self.actor_lr,
+        self.critic = critic
+        self.lr = lr
+        self.optim = AdamOptim(
+            chain(self.actor.parameters(), self.critic.parameters()),
+            lr=self.lr,
             grad_clip=grad_clip,
             eps=1e-5
         )
 
-        self.critic = critic
-        self.critic_lr = critic_lr
-        self.critic_optim = AdamOptim(
-            self.critic.parameters(),
-            lr=self.critic_lr,
-            grad_clip=grad_clip,
-            eps=1e-5
-        )
 
     def compute_gae(
             self,
@@ -103,13 +95,12 @@ class PPOTrainer:
                 .detach() \
                 .sum(-1)
 
+        value_losses = []
         actor_losses = []
         entropy_losses = []
-        actor_gns = []
+        grad_norms = []
         clipfracs = []
         approxkls = []
-        value_losses = []
-        value_gns = []
 
         state_samples = state_samples.reshape(-1, *state_samples.shape[2:])
         action_samples = action_samples.reshape(-1, *action_samples.shape[2:])
@@ -129,7 +120,7 @@ class PPOTrainer:
                 advantage_minibatch = advantages[sample_inds]
 
                 action_dist = self.actor(state_minibatch)
-                entropy_loss = action_dist.entropy().sum(-1).mean()
+                entropy_loss = -action_dist.entropy().sum(-1).mean()
                 action_log_probs_minibatch = action_dist \
                     .log_prob(action_minibatch) \
                     .sum(-1)
@@ -149,31 +140,31 @@ class PPOTrainer:
                 pg_loss_1 = - advantage_minibatch * ratio
                 pg_loss_2 = - advantage_minibatch * torch.clamp(ratio, 1 - self.clip_ratio, 1 + self.clip_ratio)
                 pg_loss = torch.max(pg_loss_1, pg_loss_2).mean()
-                actor_loss = pg_loss - self.eta * entropy_loss
-                actor_gn = self.actor_optim.backward(actor_loss)
-                self.actor_optim.update_parameters()
 
                 values_minibatch = self.critic(state_minibatch).view(-1)
-                value_loss = self.vf_coef * F.mse_loss(returns[sample_inds], values_minibatch)
-                value_gn = self.critic_optim.backward(value_loss)
-                self.critic_optim.update_parameters()
+                value_loss = F.mse_loss(returns[sample_inds], values_minibatch)
+                
+                loss = pg_loss + self.eta * entropy_loss + self.vf_coef * value_loss
+                gn = self.optim.backward(loss)
+                self.optim.update_parameters()
 
                 value_losses.append(value_loss.item())
-                value_gns.append(value_gn.item())
-                actor_losses.append(actor_loss.item())
+                actor_losses.append(pg_loss.item())
                 entropy_losses.append(entropy_loss.item())
-                actor_gns.append(actor_gn.item())
+                grad_norms.append(gn.item())
+                clipfracs.append(clipfrac.item())
+                approxkls.append(approxkl.item())
+
             if approxkl > self.target_kl:
                 break
 
         return (
+            np.mean(value_losses),
             np.mean(actor_losses),
-            np.mean(actor_gns),
             np.mean(entropy_losses),
+            np.mean(grad_norms),
             np.mean(clipfracs),
             np.mean(approxkls),
-            np.mean(value_losses),
-            np.mean(value_gns),
             epoch
         )
 
@@ -191,7 +182,7 @@ class PPOTrainer:
             rewards=reward_samples,
             dones=done_samples
         )
-        actor_loss, actor_gn, entropy_loss, clipfrac, approxkl, value_loss, value_gn, num_epochs = self.actor_update(
+        value_loss, actor_loss, entropy_loss, grad_norm, clipfrac, approxkl, num_epochs = self.actor_update(
             advantages=advantages.detach(),
             returns=returns.detach(),
             state_samples=state_samples[:, :-1].detach(),
@@ -202,10 +193,9 @@ class PPOTrainer:
 
         return PPOTrainerLosses(
             value_loss=value_loss.item(),
-            value_grad_norm=value_gn.item(),
             actor_loss=actor_loss.item() if actor_loss is not None else None,
             entropy_loss=entropy_loss.item() if entropy_loss is not None else None,
-            actor_grad_norm=actor_gn.item() if actor_loss is not None else None,
+            grad_norm=grad_norm.item() if grad_norm is not None else None,
             clipfrac=clipfrac.item() if clipfrac is not None else None,
             approxkl=approxkl.item() if approxkl is not None else None,
             num_epochs=num_epochs
@@ -218,17 +208,14 @@ class PPOTrainer:
     def save(self, path):
         state_dict = {
             'actor': self.actor.state_dict(),
-            'actor_optim': self.actor_optim.optimizer.state_dict(),
             'critic': self.critic.state_dict(),
-            'critic_optim': self.critic_optim.optimizer.state_dict(),
+            'optim': self.optim.optimizer.state_dict(),
         }
         torch.save(state_dict, f'{path}/agent.pth')
 
     def load(self, path):
         checkpoint = torch.load(f'{path}/agent.pth')
         self.actor.load_state_dict(checkpoint['actor'])
-        self.actor_optim.optimizer \
-            .load_state_dict(checkpoint['actor_optim'])
         self.critic.load_state_dict(checkpoint['critic'])
-        self.critic_optim.optimizer \
-            .load_state_dict(checkpoint['critic_optim'])
+        self.optim.optimizer \
+            .load_state_dict(checkpoint['optim'])
