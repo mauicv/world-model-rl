@@ -35,7 +35,6 @@ class PPOTrainer:
         self.gamma = gamma
         self.lam = lam
         self.eta = eta
-        self.gamma_rollout = None
         self.num_minibatch = num_minibatch
         self.clip_ratio = clip_ratio
         self.target_kl = target_kl
@@ -51,7 +50,6 @@ class PPOTrainer:
             eps=1e-5
         )
 
-
     def compute_gae(
             self,
             states,
@@ -60,7 +58,7 @@ class PPOTrainer:
         ):
         _, l, *_ = rewards.shape
         values = self.critic(states)
-        advantages = torch.zeros_like(rewards) # this and the logic below mean the final advantage is 0
+        advantages = torch.zeros_like(rewards)
         last_advantage = 0
         for t in reversed(range(l-1)):
             next_value = values[:, t + 1]
