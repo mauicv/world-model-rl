@@ -84,18 +84,31 @@ class PytfexTransformer(torch.nn.Module):
             r: torch.Tensor,
             d: torch.Tensor,
             kv_cache: Optional[KVCache]=None,
+            use_kv_cache: bool=True,
         ):
         _, l, _ = z.shape
-        inputs = (
-            z[:, -1:],
-            a[:, -1:],
-            r[:, -1:],
-        )
-        (z_dist, new_r, new_d), kv_cache = self.dynamic_model(
-            inputs,
-            use_kv_cache=True,
-            kv_cache=kv_cache,
-        )
+        if use_kv_cache:
+            inputs = (
+                z[:, -1:],
+                a[:, -1:],
+                r[:, -1:],
+            )
+            (z_dist, new_r, new_d), kv_cache = self.dynamic_model(
+                inputs,
+                use_kv_cache=True,
+                kv_cache=kv_cache,
+            )
+        else:
+            inputs = (
+                z[:, -self.num_ts:],
+                a[:, -self.num_ts:],
+                r[:, -self.num_ts:],
+            )
+            (z_dist, new_r, new_d) = self.dynamic_model(
+                inputs,
+                use_kv_cache=False,
+            )
+            kv_cache = None
 
         new_r = new_r[:, -1].reshape(-1, 1, 1)
         r = torch.cat([r, new_r], dim=1)
@@ -112,8 +125,9 @@ class PytfexTransformer(torch.nn.Module):
             r: torch.Tensor,
             d: torch.Tensor,
             kv_cache: Optional[KVCache]=None,
+            use_kv_cache: bool=True,
         ):
-        z_dist, new_r, new_d, kv_cache = self._step(z, a, r, d, kv_cache)
+        z_dist, new_r, new_d, kv_cache = self._step(z, a, r, d, kv_cache, use_kv_cache)
         new_z = z_dist.sample()
         new_z = new_z[:, -1].reshape(-1, 1, self.num_cat * self.latent_dim)
         new_z = torch.cat([z, new_z], dim=1)
@@ -126,8 +140,9 @@ class PytfexTransformer(torch.nn.Module):
             r: torch.Tensor,
             d: torch.Tensor,
             kv_cache: Optional[KVCache]=None,
+            use_kv_cache: bool=True,
         ):
-        z_dist, new_r, new_d, kv_cache = self._step(z, a, r, d, kv_cache)
+        z_dist, new_r, new_d, kv_cache = self._step(z, a, r, d, kv_cache, use_kv_cache)
         new_z = z_dist.rsample()
         new_z = new_z[:, -1].reshape(-1, 1, self.num_cat * self.latent_dim)
         new_z = torch.cat([z, new_z], dim=1)

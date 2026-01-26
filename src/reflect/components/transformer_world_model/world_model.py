@@ -222,9 +222,38 @@ class WorldModel(Base):
             actor: Actor,
             num_timesteps: int=25,
             with_observations: bool=False,
+            use_kv_cache: bool=True,
             with_entropies: bool=False,
             disable_gradients: bool=False,
-            # use_kv_cache: bool=False,
+        ):
+        if use_kv_cache:
+            return self._imagine_rollout_kvcache(
+                z=z, a=a, r=r, d=d,
+                actor=actor,
+                num_timesteps=num_timesteps,
+                with_observations=with_observations,
+                with_entropies=with_entropies,
+                disable_gradients=disable_gradients,
+            )
+        else:
+            return self._imagine_rollout(
+                z=z, a=a, r=r, d=d,
+                actor=actor,
+                num_timesteps=num_timesteps,
+                with_observations=with_observations,
+            )
+
+    def _imagine_rollout_kvcache(
+            self,
+            z: torch.Tensor,
+            a: torch.Tensor,
+            r: torch.Tensor,
+            d: torch.Tensor,
+            actor: Actor,
+            num_timesteps: int=25,
+            with_observations: bool=False,
+            with_entropies: bool=False,
+            disable_gradients: bool=False,
         ):
 
         with torch.set_grad_enabled(not disable_gradients):    
@@ -267,6 +296,46 @@ class WorldModel(Base):
                     # Stack the entropies along time dimension
                     entropy = torch.stack(entropies, dim=1)  # [batch, time, 1]
                     to_return.append(entropy)
+                if with_observations:
+                    b, t, *_ = z.shape
+                    o = self.decode(z.reshape(b*t, -1))
+                    o = o.reshape(b, t, *o.shape[1:])
+                    to_return.append(o)
+                return to_return
+
+    def _imagine_rollout(
+            self,
+            z: torch.Tensor,
+            a: torch.Tensor,
+            r: torch.Tensor,
+            d: torch.Tensor,
+            actor: Actor,
+            num_timesteps: int=25,
+            with_observations: bool=False,
+        ):
+
+        with torch.no_grad():    
+            with FreezeParameters([self.dynamic_model, self.decoder, actor]):
+                for i in range(num_timesteps):
+                    z, r, d, kv_cache = self \
+                        .dynamic_model.step(
+                            z=z, a=a, r=r, d=d,
+                            kv_cache=None,
+                            use_kv_cache=False,
+                        )
+                    action_dist = actor(
+                        z[:, -1, :].detach(),
+                        deterministic=False
+                    )
+                    action = action_dist.sample()
+                    if self.environment_action_bound is not None:
+                        action = torch.clamp(
+                            action,
+                            min=-self.environment_action_bound,
+                            max=self.environment_action_bound
+                        )
+                    a = torch.cat((a, action[:, None, :]), dim=1)
+                to_return = [z, a, r, d]
                 if with_observations:
                     b, t, *_ = z.shape
                     o = self.decode(z.reshape(b*t, -1))
