@@ -1,5 +1,5 @@
 import torch
-from reflect.examples.differentiable_pendulum import DiffPendulumEnv
+from reflect.examples.differential_rl.differentiable_pendulum import DiffPendulumEnv
 
 
 def test_diff_pendulum_env():
