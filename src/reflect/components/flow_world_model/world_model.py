@@ -151,28 +151,29 @@ class WorldModel(Base):
         o, r, d = self.split_x(x)
         return o, r, d
 
-    def get_imagined_rollout(
+    def imagine_rollout(
             self,
             o: torch.Tensor,
             a: torch.Tensor,
             r: torch.Tensor,
             d: torch.Tensor,
             actor: Actor,
-            num_steps: int,
+            num_timesteps: int,
             num_flow_steps: int = 100,
             noise_scale: float = 0.05,
             disable_gradients: bool=False,
         ):
         with torch.set_grad_enabled(not disable_gradients):
-            for _ in range(num_steps):
-                num_pos = self.dynamic_model.num_positions
-                _o, _a, _r, _d = o[:, -num_pos:], a[:, -num_pos:], r[:, -num_pos:], d[:, -num_pos:]
-                _no, _nr, _nd = self.step_dynamics(_o, _a, _r, _d, num_flow_steps=num_flow_steps, noise_scale=noise_scale)
-                action = actor(_no, deterministic=True)
-                a = torch.cat([a, action], dim=1)
-                o = torch.cat([o, _no], dim=1)
-                r = torch.cat([r, _nr], dim=1)
-                d = torch.cat([d, _nd], dim=1)
+            with FreezeParameters([self.dynamic_model]):
+                for _ in range(num_timesteps):
+                    num_pos = self.dynamic_model.num_positions
+                    _o, _a, _r, _d = o[:, -num_pos:], a[:, -num_pos:], r[:, -num_pos:], d[:, -num_pos:]
+                    _no, _nr, _nd = self.step_dynamics(_o, _a, _r, _d, num_flow_steps=num_flow_steps, noise_scale=noise_scale)
+                    action = actor(_no.detach(), deterministic=True)
+                    a = torch.cat([a, action], dim=1)
+                    o = torch.cat([o, _no], dim=1)
+                    r = torch.cat([r, _nr], dim=1)
+                    d = torch.cat([d, _nd], dim=1)
         return o, a, r, d
 
         
