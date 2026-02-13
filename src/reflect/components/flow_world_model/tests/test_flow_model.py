@@ -57,41 +57,28 @@ def test__step_flow(
     assert not torch.allclose(x_next, x)
 
 
-# @pytest.mark.parametrize("mask", [None, torch.tensor([0, 0, 1])])
-# def test_sample_generation(
-#         env_data_loader: EnvDataLoader,
-#         world_model: WorldModel,
-#         mask: Optional[torch.Tensor]
-#     ):
-#     for i in range(10):
-#         env_data_loader.perform_rollout()
+def test_step_dynamics(
+        env_data_loader: EnvDataLoader,
+        world_model: WorldModel,
+    ):
+    for i in range(10):
+        env_data_loader.perform_rollout()
 
-#     b_inds, t_inds, o_in, a, r_in, d_in = env_data_loader.sample(
-#         batch_size=3,
-#         num_time_steps=3
-#     )
-#     o_out, r_out, d_out = world_model.sample(
-#         o=o_in,
-#         a=a,
-#         r=r_in,
-#         d=d_in,
-#         mask=mask,
-#     )
-#     assert o_out.shape == (3, 3, 4)
-#     assert r_out.shape == (3, 3, 1)
-#     assert d_out.shape == (3, 3, 1)
-
-#     if mask is not None:
-#         assert not torch.allclose(o_out[:, -1, :], o_in[:, -1, :])
-#         assert not torch.allclose(r_out[:, -1, :], r_in[:, -1, :])
-#         assert not torch.allclose(d_out[:, -1, :], d_in[:, -1, :].to(torch.float32))
-#         assert torch.allclose(o_out[:, 0:2, :], o_in[:, 0:2, :])
-#         assert torch.allclose(r_out[:, 0:2, :], r_in[:, 0:2, :])
-#         assert torch.allclose(d_out[:, 0:2, :], d_in[:, 0:2, :].to(torch.float32))
-#     else:
-#         assert not torch.allclose(o_out, o_in)
-#         assert not torch.allclose(r_out, r_in)
-#         assert not torch.allclose(d_out, d_in.to(torch.float32))
+    b_inds, t_inds, o, a, r, d = env_data_loader.sample(
+        batch_size=3,
+        num_time_steps=3
+    )
+    o, r, d = world_model.step_dynamics(
+        o=o,
+        a=a,
+        r=r,
+        d=d,
+        num_flow_steps=10,
+        noise_scale=0.05,
+    )
+    assert o.shape == (3, 1, 4)
+    assert r.shape == (3, 1, 1)
+    assert d.shape == (3, 1, 1)
 
 
 # def test_imagine_rollout(
