@@ -81,7 +81,7 @@ def world_model(dynamic_model, env):
     action_dim = env.action_space.shape[0]
     return WorldModel(
         dynamic_model=dynamic_model,
-        observation_dim=state_dim-2,
+        observation_dim=state_dim,
         action_dim=action_dim,
         environment_action_bound=env.action_space.high,
     )
