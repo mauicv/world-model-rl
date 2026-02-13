@@ -81,29 +81,31 @@ def test_step_dynamics(
     assert d.shape == (3, 1, 1)
 
 
-# def test_imagine_rollout(
-#         env_data_loader: EnvDataLoader,
-#         world_model: WorldModel,
-#         actor: Actor
-#     ):
-#     for i in range(10):
-#         env_data_loader.perform_rollout()
+def test_imagine_rollout(
+        env_data_loader: EnvDataLoader,
+        world_model: WorldModel,
+        actor: Actor
+    ):
+    for i in range(10):
+        env_data_loader.perform_rollout()
 
-#     b_inds, t_inds, o, a, r, d = env_data_loader.sample(
-#         batch_size=6,
-#         num_time_steps=3
-#     )
+    b_inds, t_inds, o, a, r, d = env_data_loader.sample(
+        batch_size=6,
+        num_time_steps=3
+    )
 
-#     rollout = world_model.imagine_rollout(
-#         o=o,
-#         a=a,
-#         r=r,
-#         d=d,
-#         actor=actor,
-#         num_timesteps=10,
-#     )
+    o, a, r, d = world_model.imagine_rollout(
+        o=o,
+        a=a,
+        r=r,
+        d=d,
+        actor=actor,
+        num_timesteps=10,
+        num_flow_steps=2,
+        noise_scale=0.0,
+    )
 
-#     assert rollout.o.shape == (6, 13, 4)
-#     assert rollout.a.shape == (6, 13, 1)
-#     assert rollout.r.shape == (6, 13, 1)
-#     assert rollout.d.shape == (6, 13, 1)
+    assert o.shape == (6, 13, 4)
+    assert a.shape == (6, 13, 1)
+    assert r.shape == (6, 13, 1)
+    assert d.shape == (6, 13, 1)
