@@ -26,115 +26,36 @@ def test_flow_model_update(
     assert losses
 
 
-# @pytest.mark.parametrize("t_pred_ratio", [0, 0.1])
-# def test_sample_generation_orbit(
-#         env_data_loader: EnvDataLoader,
-#         world_model: WorldModel,
-#         t_pred_ratio: float
-#     ):
-#     for i in range(10):
-#         env_data_loader.perform_rollout()
+@pytest.mark.parametrize("step_type", ["euler"])
+@pytest.mark.parametrize("batch_size", [1, 3])
+def test__step_flow(
+        step_type: str,
+        batch_size: int,
+        env_data_loader: EnvDataLoader,
+        world_model: WorldModel
+    ):
+    for i in range(10):
+        env_data_loader.perform_rollout()
 
-#     b_inds, t_inds, s, a, r, d = env_data_loader.sample(
-#         batch_size=3,
-#         num_time_steps=3
-#     )
-#     x = world_model.cat_states(s, r, d)
-#     orbits, times = world_model._sample_orbit(
-#         x=x,
-#         a=a,
-#         delta=0.25,
-#         step_type='euler',
-#     )
-#     assert orbits.shape == (3, 3, 4, 6)
+    b_inds, t_inds, s, a, r, d = env_data_loader.sample(
+        batch_size=batch_size,
+        num_time_steps=3
+    )
+    x_cond = world_model.get_conditioning(s, a, r, d)
+    x = world_model.get_initial_x(s, r, d)
+    t = torch.zeros(batch_size, 1, 1, device=x.device)
 
-#     subsamples, subtimes = world_model._subsample_orbits(
-#         orbits=orbits,
-#         times=times,
-#         num_samples=2,
-#     )
-#     assert subsamples.shape == (6, 3, 6)
-#     assert subtimes.shape == (6, 3, 1)
+    x_next, t_next = world_model._step_flow(
+        x_cond=x_cond,
+        x=x,
+        t=t,
+        delta=0.25,
+        step_type=step_type,
+    )
+    assert x_next.shape == (batch_size, 1, 6)
+    assert t_next.shape == (batch_size, 1, 1)
+    assert not torch.allclose(x_next, x)
 
-# @pytest.mark.parametrize("step_type", ["euler", "rk2"])
-# def test_step(
-#         step_type: str,
-#         env_data_loader: EnvDataLoader,
-#         world_model: WorldModel
-#     ):
-#     for i in range(10):
-#         env_data_loader.perform_rollout()
-
-#     b_inds, t_inds, s, a, r, d = env_data_loader.sample(
-#         batch_size=3,
-#         num_time_steps=3
-#     )
-#     x = world_model.cat_states(s, r, d)
-#     t = torch.zeros(3, 3, 1, device=x.device)
-
-#     x_next, t_next = world_model._step(
-#         x=x,
-#         a=a,
-#         t=t,
-#         delta=0.25,
-#         step_type=step_type,
-#     )
-#     assert x_next.shape == (3, 3, 6)
-#     assert t_next.shape == (3, 3, 1)
-#     assert not torch.allclose(x_next, x)
-
-
-# @pytest.mark.parametrize("step_type", ["euler", "rk2"])
-# def test_step_mask(
-#         step_type: str,
-#         env_data_loader: EnvDataLoader,
-#         world_model: WorldModel
-#     ):
-#     for i in range(10):
-#         env_data_loader.perform_rollout()
-
-#     b_inds, t_inds, s, a, r, d = env_data_loader.sample(
-#         batch_size=3,
-#         num_time_steps=3
-#     )
-#     x = world_model.cat_states(s, r, d)
-#     t = torch.zeros(3, 3, 1, device=x.device)
-
-#     t = torch.ones(3, 3, 1, device=x.device)
-#     t[:, [-1], :] = 0
-    
-#     x_next, t_next = world_model._step(
-#         x=x,
-#         a=a,
-#         t=t,
-#         delta=0.25,
-#         step_type=step_type,
-#         mask=torch.tensor([0, 0, 1], device=x.device),
-#     )
-#     assert torch.allclose(x_next[:, 0:2, :], x[:, 0:2, :])
-#     assert not torch.allclose(x_next[:, 2:, :], x[:, -1, :])
-#     assert x_next.shape == (3, 3, 6)
-#     assert t_next.shape == (3, 3, 1)
-
-# def test_rectified_update(
-#         env_data_loader: EnvDataLoader,
-#         world_model: WorldModel
-#     ):
-#     for i in range(10):
-#         env_data_loader.perform_rollout()
-
-#     b_inds, t_inds, s, a, r, d = env_data_loader.sample(
-#         batch_size=3,
-#         num_time_steps=3
-#     )
-
-#     losses = world_model.rectified_update(
-#         o=s,
-#         r=r,
-#         d=d,
-#         a=a,
-#         delta=-0.25,
-#     )
 
 # @pytest.mark.parametrize("mask", [None, torch.tensor([0, 0, 1])])
 # def test_sample_generation(

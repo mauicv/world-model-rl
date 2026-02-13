@@ -121,6 +121,7 @@ class WorldModel(Base):
         ):    
         if step_type == 'euler':
             u = self.dynamic_model.forward(x_cond, x, t)
+            u = u.unsqueeze(1)
             x_next = x + u * delta
             return x_next, t + delta
         else:
@@ -162,7 +163,7 @@ class WorldModel(Base):
             noise_scale: float = 0.05,
             disable_gradients: bool=False,
         ):
-        with torch.set_grad_enabled(not disable_gradients):    
+        with torch.set_grad_enabled(not disable_gradients):
             for _ in range(num_steps):
                 num_pos = self.dynamic_model.num_positions
                 _o, _a, _r, _d = o[:, -num_pos:], a[:, -num_pos:], r[:, -num_pos:], d[:, -num_pos:]
