@@ -65,6 +65,7 @@ class WorldModel(Base):
             r: torch.Tensor,
             d: torch.Tensor,
             params: Optional[WorldModelTrainingParams] = None,
+            noise_scale: float = 0.05,
         ):
         if params is None:
             params = self.params
@@ -75,7 +76,7 @@ class WorldModel(Base):
         x_real = torch.cat([o[:, [-1]], r[:, [-1]], d[:, [-1]]], dim=-1)
         x_last = torch.cat([o[:, [-2]], r[:, [-2]], d[:, [-2]]], dim=-1)
         t = torch.rand(b, 1, 1, device=x_real.device)
-        x_sample = torch.randn_like(x_last, device=x_real.device)*0.05 + x_last
+        x_sample = torch.randn_like(x_last, device=x_real.device)*noise_scale + x_last
         x_interp = (1 - t) * x_sample + t * x_real
         v = (x_real - x_sample).reshape(b, do + 2)
         u = self.dynamic_model.forward(x_cond, x_interp, t)
@@ -90,9 +91,9 @@ class WorldModel(Base):
         ).mean()
 
         return WorldModelLosses(
-            flow_loss=loss.item(),
-            grad_norm=grad_norm.item(),
-            rel_err=rel_err.item(),
+            flow_loss=loss.cpu().detach().item(),
+            grad_norm=grad_norm.cpu().detach().item(),
+            rel_err=rel_err.cpu().detach().item(),
         )
 
     def get_conditioning(self, o: torch.Tensor, a: torch.Tensor, r: torch.Tensor, d: torch.Tensor):
