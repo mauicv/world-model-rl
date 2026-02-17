@@ -18,7 +18,7 @@ def time_embedding(t, embed_dim=64, max_freq=1000.0):
     emb = torch.cat([torch.sin(angles), torch.cos(angles)], dim=-1)
     return emb
 
-def make_layer(in_size, out_size, use_layer_norm):
+def make_layer_basic(in_size, out_size, use_layer_norm):
     layers = []
     layers.append(nn.Linear(in_size, out_size))
     if use_layer_norm:
@@ -51,7 +51,7 @@ class DynamicFlowModel(torch.nn.Module):
 
         self.pos_embed = PositionEmbeddingLayer(hidden_dim, num_positions)
         self.time_mlp = nn.Sequential(
-            *make_layer(
+            *make_layer_basic(
                 self.time_embed_dim,
                 self.time_embed_dim,
                 use_layer_norm=self.use_layer_norm
@@ -59,7 +59,7 @@ class DynamicFlowModel(torch.nn.Module):
         )
 
         layers = [
-            *make_layer(
+            *make_layer_basic(
                 self.conditioning_dim + self.output_dim + self.time_embed_dim,
                 self.hidden_dim,
                 use_layer_norm=self.use_layer_norm
@@ -68,7 +68,7 @@ class DynamicFlowModel(torch.nn.Module):
 
         for i in range(depth - 1):
             layers.extend(
-                make_layer(
+                make_layer_basic(
                     self.hidden_dim,
                     self.hidden_dim,
                     use_layer_norm=self.use_layer_norm
@@ -93,8 +93,21 @@ class DynamicFlowModel(torch.nn.Module):
         return u
 
 
+def make_layer_transformer_mlp(in_size, hidden_dim, out_size, use_layer_norm):
+    layers = []
+    layers.append(nn.Linear(in_size, hidden_dim))
+    if use_layer_norm:
+        layers.append(nn.LayerNorm(hidden_dim))
+    layers.append(nn.SiLU()) 
+    layers.append(nn.Linear(hidden_dim, out_size))
+    if use_layer_norm:
+        layers.append(nn.LayerNorm(out_size))
+    layers.append(nn.SiLU()) 
+    return layers
+
+
 class CrossAttentionLayer(torch.nn.Module):
-    def __init__(self, hidden_dim, num_heads, use_layer_norm):
+    def __init__(self, hidden_dim, num_heads, use_layer_norm, dropout=0.01):
         super().__init__()
         self.hidden_dim = hidden_dim
         self.num_heads = num_heads
@@ -110,10 +123,12 @@ class CrossAttentionLayer(torch.nn.Module):
         self.attention = CrossAttention(
             hidden_dim=hidden_dim,
             num_heads=num_heads,
+            dropout=dropout,
         )
         self.mlp = nn.Sequential(
-            *make_layer(
+            *make_layer_transformer_mlp(
                 hidden_dim,
+                4*hidden_dim,
                 hidden_dim,
                 use_layer_norm=use_layer_norm
             )
@@ -136,7 +151,7 @@ class TimeEmbeddingLayer(torch.nn.Module):
         self.hidden_dim = hidden_dim
         self.use_layer_norm = use_layer_norm
         self.time_mlp = nn.Sequential(
-            *make_layer(
+            *make_layer_basic(
                 self.hidden_dim,
                 self.hidden_dim,
                 use_layer_norm=self.use_layer_norm
@@ -177,7 +192,8 @@ class DynamicAttentionalFlowModel(torch.nn.Module):
             hidden_dim,
             num_positions,
             depth,
-            use_layer_norm
+            use_layer_norm,
+            dropout=0.01
         ):
         super().__init__()
         self.input_dim = input_dim
@@ -192,7 +208,7 @@ class DynamicAttentionalFlowModel(torch.nn.Module):
         self.time_dim_proj = TimeEmbeddingLayer(hidden_dim, use_layer_norm)
 
         self.cond_dim_proj = nn.Sequential(
-            *make_layer(
+            *make_layer_basic(
                 self.conditioning_dim,
                 self.hidden_dim,
                 use_layer_norm=self.use_layer_norm
@@ -200,7 +216,7 @@ class DynamicAttentionalFlowModel(torch.nn.Module):
         )
 
         self.x_dim_proj = nn.Sequential(
-            *make_layer(
+            *make_layer_basic(
                 self.input_dim,
                 self.hidden_dim,
                 use_layer_norm=self.use_layer_norm
@@ -213,7 +229,8 @@ class DynamicAttentionalFlowModel(torch.nn.Module):
                 CrossAttentionLayer(
                     hidden_dim=self.hidden_dim,
                     num_heads=num_heads,
-                    use_layer_norm=self.use_layer_norm
+                    use_layer_norm=self.use_layer_norm,
+                    dropout=dropout,
                 )
             )
 
