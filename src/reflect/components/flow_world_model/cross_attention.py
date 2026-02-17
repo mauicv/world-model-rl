@@ -6,7 +6,7 @@ class CrossAttention(torch.nn.Module):
             self,
             hidden_dim: int,
             num_heads: int,
-            dropout: float=0.5,
+            dropout: float=0.01,
         ) -> None:
         super(CrossAttention, self).__init__()
         assert hidden_dim % num_heads == 0, f"num_heads must divide hidden_dim, {hidden_dim=}, {num_heads=}"
@@ -29,6 +29,7 @@ class CrossAttention(torch.nn.Module):
         )
 
         self.head_dim = self.hidden_dim // self.num_heads
+        self.scale = torch.sqrt(torch.tensor(self.head_dim, dtype=torch.float32))
 
     def forward(
             self,
@@ -42,8 +43,7 @@ class CrossAttention(torch.nn.Module):
         k = self.k_proj(x_cond).reshape(b, lc, self.num_heads, self.head_dim).transpose(1, 2)
         v = self.v_proj(x_cond).reshape(b, lc, self.num_heads, self.head_dim).transpose(1, 2)
 
-        hd = torch.tensor(self.head_dim, dtype=torch.float32)
-        a = q @ k.transpose(-2, -1) / torch.sqrt(hd)
+        a = q @ k.transpose(-2, -1) / self.scale
 
         a = torch.softmax(a, dim=-1)
         a = self.attn_dropout(a)
