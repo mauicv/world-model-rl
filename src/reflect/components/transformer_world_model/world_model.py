@@ -314,7 +314,7 @@ class WorldModel(Base):
             with_observations: bool=False,
         ):
 
-        with torch.no_grad():    
+        with torch.no_grad():
             with FreezeParameters([self.dynamic_model, self.decoder, actor]):
                 for i in range(num_timesteps):
                     z, r, d, kv_cache = self \
