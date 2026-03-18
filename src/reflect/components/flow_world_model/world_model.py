@@ -152,6 +152,43 @@ class WorldModel(Base):
         o, r, d = self.split_x(x)
         return o, r, d
 
+    def prediction_error_per_sample(
+            self,
+            o: torch.Tensor,
+            a: torch.Tensor,
+            r: torch.Tensor,
+            d: torch.Tensor,
+            step_type: str = 'euler',
+            num_flow_steps: int = 10,
+            noise_scale: float = 0.05,
+        ):
+        n = self.dynamic_model.num_positions
+        assert o.shape[1] >= n + 1
+        assert a.shape[1] >= n + 1
+        assert r.shape[1] >= n + 1
+        assert d.shape[1] >= n + 1
+
+        o_cond = o[:, -(n + 1):-1]
+        a_cond = a[:, -(n + 1):-1]
+        r_cond = r[:, -(n + 1):-1]
+        d_cond = d[:, -(n + 1):-1]
+
+        with torch.no_grad():
+            o_pred, r_pred, d_pred = self.step_dynamics(
+                o=o_cond,
+                a=a_cond,
+                r=r_cond,
+                d=d_cond,
+                step_type=step_type,
+                num_flow_steps=num_flow_steps,
+                noise_scale=noise_scale,
+            )
+
+        x_pred = torch.cat([o_pred, r_pred, d_pred], dim=-1).squeeze(1)
+        x_target = torch.cat([o[:, [-1]], r[:, [-1]], d[:, [-1]]], dim=-1).squeeze(1)
+        per_sample_error = ((x_pred - x_target) ** 2).mean(dim=1)
+        return per_sample_error
+
     def imagine_rollout(
             self,
             o: torch.Tensor,
