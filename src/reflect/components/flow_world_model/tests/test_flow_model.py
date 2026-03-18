@@ -81,6 +81,29 @@ def test_step_dynamics(
     assert d.shape == (3, 1, 1)
 
 
+def test_prediction_error_per_sample(
+        env_data_loader: EnvDataLoader,
+        world_model: WorldModel,
+    ):
+    for i in range(10):
+        env_data_loader.perform_rollout()
+
+    b_inds, t_inds, o, a, r, d = env_data_loader.sample(
+        batch_size=3,
+        num_time_steps=4
+    )
+    per_sample_error = world_model.prediction_error_per_sample(
+        o=o,
+        a=a,
+        r=r,
+        d=d,
+        num_flow_steps=10,
+        noise_scale=0.05,
+    )
+    assert per_sample_error.shape == (3,)
+    assert torch.isfinite(per_sample_error).all()
+
+
 def test_imagine_rollout(
         env_data_loader: EnvDataLoader,
         world_model: WorldModel,
