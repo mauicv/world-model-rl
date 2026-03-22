@@ -6,3 +6,8 @@ experiments
 
 # temp until refactoring etc...
 training/twmvt.py
+
+
+*.pth
+
+REPORT.md
