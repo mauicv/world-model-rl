@@ -205,9 +205,13 @@ class EnvDataLoader:
         that generated s_t.
         """
         state = self.reset()
-        done = False
-        reward = 0
         run_index = self.rollout_ind % self.num_runs
+
+        # take first step of rollout as it is not a valid step
+        action = self.compute_action(state[None, :])
+        state, reward, done = self.step(action)
+        
+        # start recording rollout after first step
         for index in range(self.rollout_length):
             action = self.compute_action(state[None, :])
             self.state_buffer[run_index, index] = state
