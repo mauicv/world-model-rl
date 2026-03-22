@@ -1,4 +1,7 @@
-from reflect.components.flow_world_model.cross_attention import CrossAttention
+from reflect.components.flow_world_model.cross_attention import (
+    AttnActivation,
+    CrossAttention,
+)
 
 from torch.distributions import Normal
 from torch import nn
@@ -107,7 +110,14 @@ def make_layer_transformer_mlp(in_size, hidden_dim, out_size, use_layer_norm):
 
 
 class CrossAttentionLayer(torch.nn.Module):
-    def __init__(self, hidden_dim, num_heads, use_layer_norm, dropout=0.01):
+    def __init__(
+            self,
+            hidden_dim,
+            num_heads,
+            use_layer_norm,
+            dropout=0.01,
+            attn_activation: AttnActivation = "softmax",
+        ):
         super().__init__()
         self.hidden_dim = hidden_dim
         self.num_heads = num_heads
@@ -124,6 +134,7 @@ class CrossAttentionLayer(torch.nn.Module):
             hidden_dim=hidden_dim,
             num_heads=num_heads,
             dropout=dropout,
+            attn_activation=attn_activation,
         )
         self.mlp = nn.Sequential(
             *make_layer_transformer_mlp(
@@ -193,7 +204,8 @@ class DynamicAttentionalFlowModel(torch.nn.Module):
             num_positions,
             depth,
             use_layer_norm,
-            dropout=0.01
+            dropout=0.01,
+            attn_activation: AttnActivation = "softmax",
         ):
         super().__init__()
         self.input_dim = input_dim
@@ -231,6 +243,7 @@ class DynamicAttentionalFlowModel(torch.nn.Module):
                     num_heads=num_heads,
                     use_layer_norm=self.use_layer_norm,
                     dropout=dropout,
+                    attn_activation=attn_activation,
                 )
             )
 

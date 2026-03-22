@@ -1,4 +1,23 @@
+from typing import Callable, Union
+
 import torch
+
+AttnActivation = Union[str, Callable[[torch.Tensor], torch.Tensor]]
+
+
+def _resolve_attn_activation(
+    attn_activation: AttnActivation,
+) -> Callable[[torch.Tensor], torch.Tensor]:
+    if callable(attn_activation):
+        return attn_activation
+    if attn_activation == "softmax":
+        return lambda x: torch.softmax(x, dim=-1)
+    if attn_activation == "sigmoid":
+        return torch.sigmoid
+    raise ValueError(
+        f"Unknown attn_activation {attn_activation!r}; "
+        "use 'softmax', 'sigmoid', or a callable mapping logits to weights"
+    )
 
 
 class CrossAttention(torch.nn.Module):
@@ -7,6 +26,7 @@ class CrossAttention(torch.nn.Module):
             hidden_dim: int,
             num_heads: int,
             dropout: float=0.01,
+            attn_activation: AttnActivation = "softmax",
         ) -> None:
         super(CrossAttention, self).__init__()
         assert hidden_dim % num_heads == 0, f"num_heads must divide hidden_dim, {hidden_dim=}, {num_heads=}"
@@ -30,6 +50,7 @@ class CrossAttention(torch.nn.Module):
 
         self.head_dim = self.hidden_dim // self.num_heads
         self.scale = torch.sqrt(torch.tensor(self.head_dim, dtype=torch.float32))
+        self._attn_activation = _resolve_attn_activation(attn_activation)
 
     def forward(
             self,
@@ -45,7 +66,7 @@ class CrossAttention(torch.nn.Module):
 
         a = q @ k.transpose(-2, -1) / self.scale
 
-        a = torch.softmax(a, dim=-1)
+        a = self._attn_activation(a)
         a = self.attn_dropout(a)
         output = (a @ v).transpose(1, 2).reshape(b, lq, d)
         output = self.linear(output)
