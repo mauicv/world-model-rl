@@ -226,6 +226,7 @@ class EnvDataLoader:
             if done and index > self.num_time_steps:
                 if index + 1 < self.rollout_length:
                     state, reward, done = self._step_rollout(run_index, index + 1, state, reward, done)
+                    index += 1
                 break
         self.reward_sums[run_index] = self.reward_buffer[run_index].sum()
         self.priorities[run_index] = torch.ones(self.rollout_length)
