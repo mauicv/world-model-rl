@@ -194,6 +194,15 @@ class EnvDataLoader:
     def update_priorities(self, b_inds, t_inds, values):
         self.priorities[b_inds, t_inds] = values
 
+    def _step_rollout(self, run_index, index, state, reward, done):
+        action = self.compute_action(state[None, :])
+        self.state_buffer[run_index, index] = state
+        self.action_buffer[run_index, index] = to_tensor(action)
+        self.reward_buffer[run_index, index] = to_tensor(reward)
+        self.done_buffer[run_index, index] = to_tensor(done)
+        state, reward, done = self.step(action)
+        return state, reward, done
+
     def perform_rollout(self):
         """Performs a rollout of the environment.
 
@@ -213,17 +222,10 @@ class EnvDataLoader:
         
         # start recording rollout after first step
         for index in range(self.rollout_length):
-            action = self.compute_action(state[None, :])
-            self.state_buffer[run_index, index] = state
-            self.action_buffer[run_index, index] = to_tensor(action)
-            # weird issue with pendulum environment always returns 1 reward
-            if hasattr(self.env, 'unwrapped') and \
-                    self.env.unwrapped.spec.id == "InvertedPendulum-v4":
-                reward = -10 if done else 1
-            self.reward_buffer[run_index, index] = to_tensor(reward)
-            self.done_buffer[run_index, index] = to_tensor(done)
-            state, reward, done = self.step(action)
+            state, reward, done = self._step_rollout(run_index, index, state, reward, done)
             if done and index > self.num_time_steps:
+                if index + 1 < self.rollout_length:
+                    state, reward, done = self._step_rollout(run_index, index + 1, state, reward, done)
                 break
         self.reward_sums[run_index] = self.reward_buffer[run_index].sum()
         self.priorities[run_index] = torch.ones(self.rollout_length)
