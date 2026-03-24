@@ -281,7 +281,7 @@ class EnvDataLoader:
             sample_offset=0,
         ):
         assert sample_offset < num_time_steps, f'{sample_offset=}, {num_time_steps=}'
-        end_inds = self.end_index[b_inds] + 1 # +1 to account for the first step of the rollout
+        end_inds = self.end_index[b_inds] + 2 # +2 to account for the first step of the rollout
         t_inds = []
         if self.use_custom_priorities:
             priorities = torch.tensor(self.priorities[b_inds[:, 0]], dtype=torch.float32)
