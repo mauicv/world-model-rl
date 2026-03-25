@@ -11,3 +11,4 @@ training/twmvt.py
 *.pth
 
 REPORT.md
+REPORT-VALGRAD.md
