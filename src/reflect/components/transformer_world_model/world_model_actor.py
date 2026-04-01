@@ -152,7 +152,10 @@ class ObservationActor:
 
     def __call__(self, obs: torch.Tensor) -> torch.Tensor:
         actor_device = _module_device(self.actor)
-        if obs.dim() == 1 or obs.dim() == 3:
+        if obs.dim() == 1:
+            obs = obs.unsqueeze(0)
+        elif obs.dim() == 3 and self.flatten_observation:
+            # Treat CHW tensors as a single observation when flattening.
             obs = obs.unsqueeze(0)
         obs = obs.to(actor_device)
         if self.flatten_observation and obs.dim() >= 4:
