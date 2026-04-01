@@ -364,7 +364,7 @@ def test_state_world_model_imagine_rollout_kvcache_actor_input_space_selection(
         state_decoder,
         dynamic_model_8d_action,
     ):
-    timesteps = 8
+    timesteps = 16
     dm = dynamic_model_8d_action
     wm = WorldModel(
         encoder=state_encoder,
@@ -386,10 +386,10 @@ def test_state_world_model_imagine_rollout_kvcache_actor_input_space_selection(
         use_kv_cache=True,
     )
     assert latent_actor.last_input_dim == 1024
-    assert z_latent.shape == (18, 9, 1024)
-    assert a_latent.shape == (18, 9, 8)
-    assert r_latent.shape == (18, 9, 1)
-    assert d_latent.shape == (18, 9, 1)
+    assert z_latent.shape == (34, 9, 1024)
+    assert a_latent.shape == (34, 9, 8)
+    assert r_latent.shape == (34, 9, 1)
+    assert d_latent.shape == (34, 9, 1)
 
     reconstructed_actor = RecordingActor(input_dim=27)
     z_obs, a_obs, r_obs, d_obs = wm.imagine_rollout(
@@ -400,10 +400,10 @@ def test_state_world_model_imagine_rollout_kvcache_actor_input_space_selection(
         use_kv_cache=True,
     )
     assert reconstructed_actor.last_input_dim == 27
-    assert z_obs.shape == (18, 9, 1024)
-    assert a_obs.shape == (18, 9, 8)
-    assert r_obs.shape == (18, 9, 1)
-    assert d_obs.shape == (18, 9, 1)
+    assert z_obs.shape == (34, 9, 1024)
+    assert a_obs.shape == (34, 9, 8)
+    assert r_obs.shape == (34, 9, 1)
+    assert d_obs.shape == (34, 9, 1)
 
 
 def test_state_world_model_imagine_rollout_no_kvcache_actor_input_space_selection(
@@ -411,7 +411,7 @@ def test_state_world_model_imagine_rollout_no_kvcache_actor_input_space_selectio
         state_decoder,
         dynamic_model_8d_action,
     ):
-    timesteps = 8
+    timesteps = 16
     dm = dynamic_model_8d_action
     wm = WorldModel(
         encoder=state_encoder,
@@ -433,10 +433,10 @@ def test_state_world_model_imagine_rollout_no_kvcache_actor_input_space_selectio
         use_kv_cache=False,
     )
     assert latent_actor.last_input_dim == 1024
-    assert z_latent.shape == (18, 9, 1024)
-    assert a_latent.shape == (18, 9, 8)
-    assert r_latent.shape == (18, 9, 1)
-    assert d_latent.shape == (18, 9, 1)
+    assert z_latent.shape == (34, 9, 1024)
+    assert a_latent.shape == (34, 9, 8)
+    assert r_latent.shape == (34, 9, 1)
+    assert d_latent.shape == (34, 9, 1)
 
     reconstructed_actor = RecordingActor(input_dim=27)
     z_obs, a_obs, r_obs, d_obs = wm.imagine_rollout(
@@ -447,7 +447,7 @@ def test_state_world_model_imagine_rollout_no_kvcache_actor_input_space_selectio
         use_kv_cache=False,
     )
     assert reconstructed_actor.last_input_dim == 27
-    assert z_obs.shape == (18, 9, 1024)
-    assert a_obs.shape == (18, 9, 8)
-    assert r_obs.shape == (18, 9, 1)
-    assert d_obs.shape == (18, 9, 1)
+    assert z_obs.shape == (34, 9, 1024)
+    assert a_obs.shape == (34, 9, 8)
+    assert r_obs.shape == (34, 9, 1)
+    assert d_obs.shape == (34, 9, 1)
