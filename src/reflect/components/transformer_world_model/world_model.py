@@ -246,15 +246,16 @@ class WorldModel(Base):
                 actor_in_latent_space=actor_in_latent_space,
             )
 
-    def _extract_actor_input_from_latent(
+    def _extract_actor_input(
             self,
             z_last: torch.Tensor,
+            o_last: torch.Tensor,
             actor_in_latent_space: bool,
         ) -> torch.Tensor:
         if actor_in_latent_space:
             return z_last.detach()
 
-        o_last = self.decode(z_last).detach()
+        o_last = o_last.detach()
         if o_last.dim() > 2:
             # Default actor is MLP-based and expects vector inputs.
             o_last = o_last.reshape(o_last.shape[0], -1)
@@ -276,17 +277,16 @@ class WorldModel(Base):
 
         with torch.set_grad_enabled(not disable_gradients):    
             with FreezeParameters([self.dynamic_model, self.decoder]):
-                observations = []
-                if with_observations:
-                    b, t, *_ = z.shape
-                    o = self.decode(z.reshape(b*t, -1))
-                    observations.append(o.reshape(b, t, *o.shape[1:]))
+                b, t, *_ = z.shape
+                o = self.decode(z.reshape(b*t, -1))
+                observations = [o.reshape(b, t, *o.shape[1:])]
 
                 if with_entropies:
                     entropies = []  # Use a list to collect entropies
                     # Calculate entropy for initial state
-                    actor_input = self._extract_actor_input_from_latent(
+                    actor_input = self._extract_actor_input(
                         z[:, -1, :],
+                        observations[0][:, -1, ...],
                         actor_in_latent_space=actor_in_latent_space
                     )
                     action_dist = actor(actor_input, deterministic=False)
@@ -299,11 +299,12 @@ class WorldModel(Base):
                             z=z, a=a, r=r, d=d,
                             kv_cache=kv_cache
                         )
-                    if with_observations:
-                        observations.append(self.decode(z[:, -1, :])[:, None, ...])
+                    o_last = self.decode(z[:, -1, :])
+                    observations.append(o_last[:, None, ...])
 
-                    actor_input = self._extract_actor_input_from_latent(
+                    actor_input = self._extract_actor_input(
                         z[:, -1, :],
+                        o_last,
                         actor_in_latent_space=actor_in_latent_space
                     )
                     if with_entropies:
@@ -343,11 +344,9 @@ class WorldModel(Base):
 
         with torch.no_grad():    
             with FreezeParameters([self.dynamic_model, self.decoder, actor]):
-                observations = []
-                if with_observations:
-                    b, t, *_ = z.shape
-                    o = self.decode(z.reshape(b*t, -1))
-                    observations.append(o.reshape(b, t, *o.shape[1:]))
+                b, t, *_ = z.shape
+                o = self.decode(z.reshape(b*t, -1))
+                observations = [o.reshape(b, t, *o.shape[1:])]
 
                 for i in range(num_timesteps):
                     z, r, d, kv_cache = self \
@@ -356,11 +355,12 @@ class WorldModel(Base):
                             kv_cache=None,
                             use_kv_cache=False,
                         )
-                    if with_observations:
-                        observations.append(self.decode(z[:, -1, :])[:, None, ...])
+                    o_last = self.decode(z[:, -1, :])
+                    observations.append(o_last[:, None, ...])
 
-                    actor_input = self._extract_actor_input_from_latent(
+                    actor_input = self._extract_actor_input(
                         z[:, -1, :],
+                        o_last,
                         actor_in_latent_space=actor_in_latent_space
                     )
                     action_dist = actor(
