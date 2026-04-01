@@ -5,6 +5,22 @@ import torch
 import pytest
 
 
+class RecordingActor(torch.nn.Module):
+    def __init__(self, input_dim: int, action_dim: int = 8):
+        super().__init__()
+        self.policy = torch.nn.Linear(input_dim, action_dim)
+        self.last_input_dim = None
+
+    def forward(self, x, deterministic: bool = False):
+        self.last_input_dim = x.shape[-1]
+        mu = torch.tanh(self.policy(x))
+        if deterministic:
+            return mu
+        std = torch.ones_like(mu) * 0.1
+        dist = torch.distributions.normal.Normal(mu, std)
+        return torch.distributions.independent.Independent(dist, 1)
+
+
 @pytest.mark.parametrize("timesteps", [1])
 def test_world_model_step(timesteps, encoder, decoder, dynamic_model_8d_action):
     dm = dynamic_model_8d_action
@@ -341,3 +357,97 @@ def test_world_model_imagine_rollout_no_kvcache(
     assert a.shape == (34, 25, 8)
     assert r.shape == (34, 25, 1)
     assert d.shape == (34, 25, 1)
+
+
+def test_state_world_model_imagine_rollout_kvcache_actor_input_space_selection(
+        state_encoder,
+        state_decoder,
+        dynamic_model_8d_action,
+    ):
+    timesteps = 8
+    dm = dynamic_model_8d_action
+    wm = WorldModel(
+        encoder=state_encoder,
+        decoder=state_decoder,
+        dynamic_model=dm,
+    )
+    o = torch.zeros((2, timesteps + 1, 27))
+    a = torch.zeros((2, timesteps + 1, 8))
+    r = torch.zeros((2, timesteps + 1, 1))
+    d = torch.zeros((2, timesteps + 1, 1))
+    _, (z, a, r, d) = wm.update(o, a, r, d, return_init_states=True)
+
+    latent_actor = RecordingActor(input_dim=1024)
+    z_latent, a_latent, r_latent, d_latent = wm.imagine_rollout(
+        z=z, a=a, r=r, d=d,
+        actor=latent_actor,
+        actor_in_latent_space=True,
+        num_timesteps=8,
+        use_kv_cache=True,
+    )
+    assert latent_actor.last_input_dim == 1024
+    assert z_latent.shape == (18, 9, 1024)
+    assert a_latent.shape == (18, 9, 8)
+    assert r_latent.shape == (18, 9, 1)
+    assert d_latent.shape == (18, 9, 1)
+
+    reconstructed_actor = RecordingActor(input_dim=27)
+    z_obs, a_obs, r_obs, d_obs = wm.imagine_rollout(
+        z=z, a=a, r=r, d=d,
+        actor=reconstructed_actor,
+        actor_in_latent_space=False,
+        num_timesteps=8,
+        use_kv_cache=True,
+    )
+    assert reconstructed_actor.last_input_dim == 27
+    assert z_obs.shape == (18, 9, 1024)
+    assert a_obs.shape == (18, 9, 8)
+    assert r_obs.shape == (18, 9, 1)
+    assert d_obs.shape == (18, 9, 1)
+
+
+def test_state_world_model_imagine_rollout_no_kvcache_actor_input_space_selection(
+        state_encoder,
+        state_decoder,
+        dynamic_model_8d_action,
+    ):
+    timesteps = 8
+    dm = dynamic_model_8d_action
+    wm = WorldModel(
+        encoder=state_encoder,
+        decoder=state_decoder,
+        dynamic_model=dm,
+    )
+    o = torch.zeros((2, timesteps + 1, 27))
+    a = torch.zeros((2, timesteps + 1, 8))
+    r = torch.zeros((2, timesteps + 1, 1))
+    d = torch.zeros((2, timesteps + 1, 1))
+    _, (z, a, r, d) = wm.update(o, a, r, d, return_init_states=True)
+
+    latent_actor = RecordingActor(input_dim=1024)
+    z_latent, a_latent, r_latent, d_latent = wm.imagine_rollout(
+        z=z, a=a, r=r, d=d,
+        actor=latent_actor,
+        actor_in_latent_space=True,
+        num_timesteps=8,
+        use_kv_cache=False,
+    )
+    assert latent_actor.last_input_dim == 1024
+    assert z_latent.shape == (18, 9, 1024)
+    assert a_latent.shape == (18, 9, 8)
+    assert r_latent.shape == (18, 9, 1)
+    assert d_latent.shape == (18, 9, 1)
+
+    reconstructed_actor = RecordingActor(input_dim=27)
+    z_obs, a_obs, r_obs, d_obs = wm.imagine_rollout(
+        z=z, a=a, r=r, d=d,
+        actor=reconstructed_actor,
+        actor_in_latent_space=False,
+        num_timesteps=8,
+        use_kv_cache=False,
+    )
+    assert reconstructed_actor.last_input_dim == 27
+    assert z_obs.shape == (18, 9, 1024)
+    assert a_obs.shape == (18, 9, 8)
+    assert r_obs.shape == (18, 9, 1)
+    assert d_obs.shape == (18, 9, 1)
