@@ -143,6 +143,11 @@ class ValueGradTrainer:
             entropy=None,
             critic_only=False
         ):
+
+        # shift done samples by one to correctly align with reward samples - first step is always not done.
+        done_samples = torch.cat([torch.zeros_like(done_samples[:, [0]]), done_samples[:, :-1]], dim=1)
+        done_samples, _ = (done_samples > 0.5).float().cummax(dim=1)
+
         value_loss, target_values = self.value_loss(
             state_samples=state_samples,
             reward_samples=reward_samples,
