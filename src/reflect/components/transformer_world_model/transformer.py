@@ -67,7 +67,8 @@ class PytfexTransformer(torch.nn.Module):
                         hidden_dim=internal_hdn_dim,
                         num_heads=num_heads,
                         num_positions=num_ts,
-                        dropout=dropout
+                        dropout=dropout,
+                        # activation='sigmoid'
                     ),
                     mlp=MLP(
                         hidden_dim=internal_hdn_dim,

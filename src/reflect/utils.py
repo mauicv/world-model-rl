@@ -94,7 +94,7 @@ def cross_entropy_loss_fn(z, z_hat, training_mask=None):
         a = a * training_mask[:, :, None, None]
         b = b
     cross_entropy = (
-        a * b
+        torch.log_softmax(a, dim=-1) * b
     ).sum((-1, -2))
     return - cross_entropy.mean(), - cross_entropy.detach()
 
