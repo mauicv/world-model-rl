@@ -226,6 +226,7 @@ class WorldModel(Base):
             with_entropies: bool=False,
             disable_gradients: bool=False,
             corrector=None,
+            actor_in_latent_space: bool=True,
         ):
         if use_kv_cache:
             return self._imagine_rollout_kvcache(
@@ -235,6 +236,7 @@ class WorldModel(Base):
                 with_observations=with_observations,
                 with_entropies=with_entropies,
                 disable_gradients=disable_gradients,
+                actor_in_latent_space=actor_in_latent_space,
             )
         else:
             return self._imagine_rollout(
@@ -242,7 +244,23 @@ class WorldModel(Base):
                 actor=actor,
                 num_timesteps=num_timesteps,
                 with_observations=with_observations,
+                actor_in_latent_space=actor_in_latent_space,
             )
+
+    def _extract_actor_input(
+            self,
+            z_last: torch.Tensor,
+            o_last: torch.Tensor,
+            actor_in_latent_space: bool,
+        ) -> torch.Tensor:
+        if actor_in_latent_space:
+            return z_last.detach()
+
+        o_last = o_last.detach()
+        if o_last.dim() > 2:
+            # Default actor is MLP-based and expects vector inputs.
+            o_last = o_last.reshape(o_last.shape[0], -1)
+        return o_last
 
     def _imagine_rollout_kvcache(
             self,
@@ -255,14 +273,24 @@ class WorldModel(Base):
             with_observations: bool=False,
             with_entropies: bool=False,
             disable_gradients: bool=False,
+            actor_in_latent_space: bool=True,
         ):
 
         with torch.set_grad_enabled(not disable_gradients):    
             with FreezeParameters([self.dynamic_model, self.decoder]):
+                b, t, *_ = z.shape
+                o = self.decode(z.reshape(b*t, -1))
+                observations = [o.reshape(b, t, *o.shape[1:])]
+
                 if with_entropies:
                     entropies = []  # Use a list to collect entropies
                     # Calculate entropy for initial state
-                    action_dist = actor(z[:, -1, :].detach(), deterministic=False)
+                    actor_input = self._extract_actor_input(
+                        z[:, -1, :],
+                        observations[0][:, -1, ...],
+                        actor_in_latent_space=actor_in_latent_space
+                    )
+                    action_dist = actor(actor_input, deterministic=False)
                     entropies.append(action_dist.entropy()[:, None])
 
                 kv_cache = None
@@ -272,18 +300,20 @@ class WorldModel(Base):
                             z=z, a=a, r=r, d=d,
                             kv_cache=kv_cache
                         )
+                    o_last = self.decode(z[:, -1, :])
+                    observations.append(o_last[:, None, ...])
+
+                    actor_input = self._extract_actor_input(
+                        z[:, -1, :],
+                        o_last,
+                        actor_in_latent_space=actor_in_latent_space
+                    )
                     if with_entropies:
-                        action_dist = actor(
-                            z[:, -1, :].detach(),
-                            deterministic=False
-                        )
+                        action_dist = actor(actor_input, deterministic=False)
                         action = action_dist.rsample()
                         entropies.append(action_dist.entropy()[:, None])
                     else:
-                        action = actor(
-                            z[:, -1, :].detach(),
-                            deterministic=True
-                        )
+                        action = actor(actor_input, deterministic=True)
                     if self.environment_action_bound is not None:
                         action = torch.clamp(
                             action,
@@ -298,10 +328,7 @@ class WorldModel(Base):
                     entropy = torch.stack(entropies, dim=1)  # [batch, time, 1]
                     to_return.append(entropy)
                 if with_observations:
-                    b, t, *_ = z.shape
-                    o = self.decode(z.reshape(b*t, -1))
-                    o = o.reshape(b, t, *o.shape[1:])
-                    to_return.append(o)
+                    to_return.append(torch.cat(observations, dim=1))
                 return to_return
 
     def _imagine_rollout(
@@ -313,10 +340,15 @@ class WorldModel(Base):
             actor: Actor,
             num_timesteps: int=25,
             with_observations: bool=False,
+            actor_in_latent_space: bool=True,
         ):
 
         with torch.no_grad():
             with FreezeParameters([self.dynamic_model, self.decoder, actor]):
+                b, t, *_ = z.shape
+                o = self.decode(z.reshape(b*t, -1))
+                observations = [o.reshape(b, t, *o.shape[1:])]
+
                 for i in range(num_timesteps):
                     z, r, d, kv_cache = self \
                         .dynamic_model.step(
@@ -324,8 +356,16 @@ class WorldModel(Base):
                             kv_cache=None,
                             use_kv_cache=False,
                         )
+                    o_last = self.decode(z[:, -1, :])
+                    observations.append(o_last[:, None, ...])
+
+                    actor_input = self._extract_actor_input(
+                        z[:, -1, :],
+                        o_last,
+                        actor_in_latent_space=actor_in_latent_space
+                    )
                     action_dist = actor(
-                        z[:, -1, :].detach(),
+                        actor_input,
                         deterministic=False
                     )
                     action = action_dist.sample()
@@ -338,8 +378,5 @@ class WorldModel(Base):
                     a = torch.cat((a, action[:, None, :]), dim=1)
                 to_return = [z, a, r, d]
                 if with_observations:
-                    b, t, *_ = z.shape
-                    o = self.decode(z.reshape(b*t, -1))
-                    o = o.reshape(b, t, *o.shape[1:])
-                    to_return.append(o)
+                    to_return.append(torch.cat(observations, dim=1))
                 return to_return
