@@ -207,8 +207,8 @@ class WorldModel(Base):
             to_return.append(self.flatten_batch_time(z=z, a=a, r=r, d=d))
         if return_decoded_predicted_latents:
             with torch.no_grad():
-                o_pred = self.decode(z_pred.rsample())
-                o_pred = o_pred.reshape(b, t - 1, *o_pred.shape[1:]).detach()
+                z_pred_sample = z_pred.rsample().reshape(b, t - 1, -1)
+                o_pred = self.decode(z_pred_sample).detach()
             to_return.append(o_pred)
         if len(to_return) == 1:
             return to_return[0]

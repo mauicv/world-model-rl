@@ -169,15 +169,17 @@ def test_state_world_model(return_init_states, training_mask, state_encoder, sta
     d = torch.zeros((2, timesteps+1, 1))
 
     if return_init_states:
-        results, (z, a, r, d) = wm.update(
+        results, (z, a, r, d), o_pred = wm.update(
             o, a, r, d,
             training_mask=training_mask,
-            return_init_states=return_init_states
+            return_init_states=return_init_states,
+            return_decoded_predicted_latents=True,
         )
         assert z.shape == (2*(timesteps + 1), 1, 1024)
         assert a.shape == (2*(timesteps + 1), 1, 8)
         assert r.shape == (2*(timesteps + 1), 1, 1)
         assert d.shape == (2*(timesteps + 1), 1, 1)
+        assert o_pred.shape == (2, timesteps, 27)
     else:
         results = wm.update(
             o, a, r, d,
