@@ -66,7 +66,7 @@ class WorldModel(Base):
         b, l, do = o.shape
         n = self.dynamic_model.num_positions
         x_cond = torch.cat(
-            [o[:, -2-n:-1], a[:, -2-n:-1]],
+            [o[:, -1-n:-1], a[:, -1-n:-1]],
             dim=-1
         )
         x_real = o[:, [-1]]
