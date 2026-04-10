@@ -315,7 +315,6 @@ class WorldModel(Base):
                         o_last = self.decode(z[:, -1, :])
 
                     if corrector is not None:
-                        print(obs_buf[:, :t + i].shape, a.shape, o_last[:, None, ...].shape)
                         o_corrected = corrector.correct(
                             o=obs_buf[:, :t + i],
                             a=a,
