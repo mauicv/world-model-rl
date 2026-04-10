@@ -19,7 +19,7 @@ class WorldModelTrainingParams:
 class WorldModelLosses:
     flow_loss: float
     rel_err: float
-    grad_norm: float
+    flow_grad_norm: float
 
 
 class WorldModel(Base):
@@ -91,7 +91,7 @@ class WorldModel(Base):
         return WorldModelLosses(
             flow_loss=flow_loss.cpu().detach().item(),
             rel_err=rel_err.cpu().detach().item(),
-            grad_norm=grad_norm.cpu().detach().item(),
+            flow_grad_norm=grad_norm.cpu().detach().item(),
         )
 
     def get_conditioning(
