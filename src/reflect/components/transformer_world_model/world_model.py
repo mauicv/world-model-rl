@@ -237,6 +237,7 @@ class WorldModel(Base):
                 with_entropies=with_entropies,
                 disable_gradients=disable_gradients,
                 actor_in_latent_space=actor_in_latent_space,
+                corrector=corrector,
             )
         else:
             return self._imagine_rollout(
@@ -274,20 +275,30 @@ class WorldModel(Base):
             with_entropies: bool=False,
             disable_gradients: bool=False,
             actor_in_latent_space: bool=True,
+            corrector=None,
         ):
+        freeze_list = [self.dynamic_model, self.decoder]
+        if corrector is not None:
+            freeze_list.append(corrector.dynamic_model)
 
-        with torch.set_grad_enabled(not disable_gradients):    
-            with FreezeParameters([self.dynamic_model, self.decoder]):
+        with torch.set_grad_enabled(not disable_gradients):
+            with FreezeParameters(freeze_list):
                 b, t, *_ = z.shape
-                o = self.decode(z.reshape(b*t, -1))
-                observations = [o.reshape(b, t, *o.shape[1:])]
+                with torch.no_grad():
+                    o_init = self.decode(z.reshape(b*t, -1))
+                    o_init = o_init.reshape(b, t, *o_init.shape[1:])
+
+                obs_buf = torch.zeros(
+                    b, t + num_timesteps, *o_init.shape[2:],
+                    device=z.device, dtype=o_init.dtype
+                )
+                obs_buf[:, :t] = o_init.detach()
 
                 if with_entropies:
-                    entropies = []  # Use a list to collect entropies
-                    # Calculate entropy for initial state
+                    entropies = []
                     actor_input = self._extract_actor_input(
                         z[:, -1, :],
-                        observations[0][:, -1, ...],
+                        o_init[:, -1, ...],
                         actor_in_latent_space=actor_in_latent_space
                     )
                     action_dist = actor(actor_input, deterministic=False)
@@ -300,8 +311,19 @@ class WorldModel(Base):
                             z=z, a=a, r=r, d=d,
                             kv_cache=kv_cache
                         )
-                    o_last = self.decode(z[:, -1, :])
-                    observations.append(o_last[:, None, ...])
+                    with torch.no_grad():
+                        o_last = self.decode(z[:, -1, :])
+
+                    if corrector is not None:
+                        print(obs_buf[:, :t + i].shape, a.shape, o_last[:, None, ...].shape)
+                        o_corrected = corrector.correct(
+                            o=obs_buf[:, :t + i],
+                            a=a,
+                            o_decoded=o_last[:, None, ...],
+                        )  # [b, 1, obs_dim]
+                        o_last = o_corrected[:, 0, ...]
+
+                    obs_buf[:, t + i] = o_last.detach()
 
                     actor_input = self._extract_actor_input(
                         z[:, -1, :],
@@ -321,14 +343,13 @@ class WorldModel(Base):
                             max=self.environment_action_bound
                         )
                     a = torch.cat((a, action[:, None, :]), dim=1)
-                    # z, a, r, d = z, a, r, d
+
                 to_return = [z, a, r, d]
                 if with_entropies:
-                    # Stack the entropies along time dimension
                     entropy = torch.stack(entropies, dim=1)  # [batch, time, 1]
                     to_return.append(entropy)
                 if with_observations:
-                    to_return.append(torch.cat(observations, dim=1))
+                    to_return.append(obs_buf)
                 return to_return
 
     def _imagine_rollout(

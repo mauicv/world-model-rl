@@ -170,11 +170,15 @@ class WorldModel(Base):
             corrected observation [b, 1, obs_dim]
         """
         n = self.dynamic_model.num_positions
-        context_o = torch.cat([o, o_decoded], dim=1)[:, -n:]
-        context_a = a[:, -n:]
+        o_ctx = o[:, -n:]
+        a_ctx = a[:, -n:]
+        if o_ctx.shape[1] < n:
+            pad = n - o_ctx.shape[1]
+            o_ctx = torch.cat([o_ctx[:, [0]].expand(-1, pad, -1), o_ctx], dim=1)
+            a_ctx = torch.cat([a_ctx[:, [0]].expand(-1, pad, -1), a_ctx], dim=1)
         return self.step_dynamics(
-            o=context_o,
-            a=context_a,
+            o=o_ctx,
+            a=a_ctx,
             x_source=o_decoded,
             **kwargs,
         )
