@@ -112,6 +112,7 @@ class WorldModel(Base):
             training_mask: Optional[torch.Tensor] = None,
             params: Optional[WorldModelTrainingParams] = None,
             return_init_states: bool=False,
+            return_decoded_predicted_latents: bool=False,
             no_update: bool=False,
         ):
         if params is None:
@@ -201,9 +202,17 @@ class WorldModel(Base):
             dynamic_loss_per_timestep=dynamic_loss_per_timestep.detach().cpu(),
             reward_loss_per_timestep=reward_loss_per_timestep.detach().cpu(),
         )
+        to_return = [losses]
         if return_init_states:
-            return losses, self.flatten_batch_time(z=z, a=a, r=r, d=d)
-        return losses
+            to_return.append(self.flatten_batch_time(z=z, a=a, r=r, d=d))
+        if return_decoded_predicted_latents:
+            with torch.no_grad():
+                o_pred = self.decode(z_pred.rsample())
+                o_pred = o_pred.reshape(b, t - 1, *o_pred.shape[1:]).detach()
+            to_return.append(o_pred)
+        if len(to_return) == 1:
+            return to_return[0]
+        return tuple(to_return)
 
     def flatten_batch_time(self, z, a, r, d):
         b, t, *_ = z.shape
