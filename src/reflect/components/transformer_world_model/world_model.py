@@ -225,6 +225,7 @@ class WorldModel(Base):
             use_kv_cache: bool=True,
             with_entropies: bool=False,
             disable_gradients: bool=False,
+            corrector=None,
         ):
         if use_kv_cache:
             return self._imagine_rollout_kvcache(

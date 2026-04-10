@@ -19,11 +19,11 @@ def test_dynamic_flow_model(
         num_time_steps=4
     )
 
-    x_cond = torch.cat([s[:, :3], a[:, :3], r[:, :3], d[:, :3]], dim=-1)
+    x_cond = torch.cat([s[:, :3], a[:, :3]], dim=-1)
     x = torch.randn(s.shape[0], 1, dynamic_model.output_dim)
     t = torch.rand(3, 1, 1)
     u = dynamic_model.forward(x_cond, x, t)
-    assert u.shape == (3, 6)
+    assert u.shape == (3, dynamic_model.output_dim)
 
 
 def test_dynamic_attentional_flow_model(
@@ -37,8 +37,8 @@ def test_dynamic_attentional_flow_model(
         batch_size=3,
         num_time_steps=4
     )
-    x_cond = torch.cat([s[:, :3], a[:, :3], r[:, :3], d[:, :3]], dim=-1)
+    x_cond = torch.cat([s[:, :3], a[:, :3]], dim=-1)
     x = torch.randn(s.shape[0], 1, dynamic_attentional_model.output_dim)
     t = torch.rand(3, 1, 1)
     u = dynamic_attentional_model.forward(x_cond, x, t)
-    assert u.shape == (3, 6)
+    assert u.shape == (3, dynamic_attentional_model.output_dim)

@@ -1,9 +1,7 @@
 from reflect.data.loader import EnvDataLoader
 from reflect.components.flow_world_model.world_model import WorldModel
-from reflect.components.models.actor import Actor
 import torch
 import pytest
-from typing import Optional
 
 
 def test_flow_model_update(
@@ -17,12 +15,23 @@ def test_flow_model_update(
         batch_size=3,
         num_time_steps=4
     )
-    losses = world_model.update(
-        o=o,
-        r=r,
-        d=d,
-        a=a,
+    losses = world_model.update(o=o, a=a)
+    assert losses
+
+
+def test_flow_model_update_with_x_source(
+        env_data_loader: EnvDataLoader,
+        world_model: WorldModel,
+    ):
+    for i in range(10):
+        env_data_loader.perform_rollout()
+
+    b_inds, t_inds, o, a, r, d = env_data_loader.sample(
+        batch_size=3,
+        num_time_steps=4
     )
+    x_source = o[:, [-2]] + 0.1 * torch.randn_like(o[:, [-2]])
+    losses = world_model.update(o=o, a=a, x_source=x_source)
     assert losses
 
 
@@ -41,8 +50,8 @@ def test__step_flow(
         batch_size=batch_size,
         num_time_steps=3
     )
-    x_cond = world_model.get_conditioning(s, a, r, d)
-    x = world_model.get_initial_x(s, r, d)
+    x_cond = world_model.get_conditioning(s, a)
+    x = world_model.get_initial_x(s)
     t = torch.zeros(batch_size, 1, 1, device=x.device)
 
     x_next, t_next = world_model._step_flow(
@@ -52,7 +61,7 @@ def test__step_flow(
         delta=0.25,
         step_type=step_type,
     )
-    assert x_next.shape == (batch_size, 1, 6)
+    assert x_next.shape == (batch_size, 1, world_model.observation_dim)
     assert t_next.shape == (batch_size, 1, 1)
     assert not torch.allclose(x_next, x)
 
@@ -68,20 +77,11 @@ def test_step_dynamics(
         batch_size=3,
         num_time_steps=3
     )
-    o, r, d = world_model.step_dynamics(
-        o=o,
-        a=a,
-        r=r,
-        d=d,
-        num_flow_steps=10,
-        noise_scale=0.05,
-    )
-    assert o.shape == (3, 1, 4)
-    assert r.shape == (3, 1, 1)
-    assert d.shape == (3, 1, 1)
+    o_pred = world_model.step_dynamics(o=o, a=a, num_flow_steps=10)
+    assert o_pred.shape == (3, 1, world_model.observation_dim)
 
 
-def test_prediction_error_per_sample(
+def test_correct(
         env_data_loader: EnvDataLoader,
         world_model: WorldModel,
     ):
@@ -90,45 +90,8 @@ def test_prediction_error_per_sample(
 
     b_inds, t_inds, o, a, r, d = env_data_loader.sample(
         batch_size=3,
-        num_time_steps=4
+        num_time_steps=5
     )
-    per_sample_error = world_model.prediction_error_per_sample(
-        o=o,
-        a=a,
-        r=r,
-        d=d,
-        num_flow_steps=10,
-        noise_scale=0.05,
-    )
-    assert per_sample_error.shape == (3,)
-    assert torch.isfinite(per_sample_error).all()
-
-
-def test_imagine_rollout(
-        env_data_loader: EnvDataLoader,
-        world_model: WorldModel,
-        actor: Actor
-    ):
-    for i in range(10):
-        env_data_loader.perform_rollout()
-
-    b_inds, t_inds, o, a, r, d = env_data_loader.sample(
-        batch_size=6,
-        num_time_steps=3
-    )
-
-    o, a, r, d = world_model.imagine_rollout(
-        o=o,
-        a=a,
-        r=r,
-        d=d,
-        actor=actor,
-        num_timesteps=10,
-        num_flow_steps=2,
-        noise_scale=0.0,
-    )
-
-    assert o.shape == (6, 13, 4)
-    assert a.shape == (6, 13, 1)
-    assert r.shape == (6, 13, 1)
-    assert d.shape == (6, 13, 1)
+    o_decoded = o[:, [-1]] + 0.1 * torch.randn_like(o[:, [-1]])
+    o_corrected = world_model.correct(o=o[:, :-1], a=a[:, :-1], o_decoded=o_decoded)
+    assert o_corrected.shape == (3, 1, world_model.observation_dim)

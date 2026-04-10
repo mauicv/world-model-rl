@@ -49,9 +49,9 @@ def dynamic_model(env):
     state_dim = env.observation_space.shape[0]
     action_dim = env.action_space.shape[0]
     return DynamicFlowModel(
-        input_dim=state_dim + 2,
-        conditioning_dim=3*(state_dim + action_dim + 2),
-        output_dim=state_dim + 2,
+        input_dim=state_dim,
+        conditioning_dim=3*(state_dim + action_dim),
+        output_dim=state_dim,
         time_embed_dim=16,
         hidden_dim=128,
         depth=4,
@@ -64,9 +64,9 @@ def dynamic_attentional_model(env):
     state_dim = env.observation_space.shape[0]
     action_dim = env.action_space.shape[0]
     return DynamicAttentionalFlowModel(
-        input_dim=state_dim + 2,
-        conditioning_dim=state_dim+action_dim + 2,
-        output_dim=state_dim + 2,
+        input_dim=state_dim,
+        conditioning_dim=state_dim + action_dim,
+        output_dim=state_dim,
         hidden_dim=128,
         num_heads=2,
         num_positions=3,
