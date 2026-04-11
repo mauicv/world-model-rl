@@ -99,6 +99,52 @@ def cross_entropy_loss_fn(z, z_hat, training_mask=None):
     return - cross_entropy.mean(), - cross_entropy.detach()
 
 
+def make_windows(x: torch.Tensor, window_size: int) -> torch.Tensor:
+    """Reshape (b, l, ...) into sliding windows (b * num_windows, window_size, ...).
+    num_windows = l - window_size + 1, step=1, so every possible window is included.
+    """
+    b, l, *dims = x.shape
+    ndim = len(dims)
+    windows = x.unfold(dimension=1, size=window_size, step=1)
+    # unfold output: (b, num_windows, *dims, window_size)
+    # permute to:    (b, num_windows, window_size, *dims)
+    if ndim > 0:
+        perm = [0, 1, ndim + 2] + list(range(2, ndim + 2))
+        windows = windows.permute(*perm).contiguous()
+    num_windows = windows.shape[1]
+    return windows.reshape(b * num_windows, window_size, *dims)
+
+
+def make_flow_windows(
+        o: torch.Tensor,
+        a: torch.Tensor,
+        o_pred: torch.Tensor,
+        num_positions: int,
+) -> tuple:
+    """Create aligned sliding-window batches for flow model training.
+
+    window_size = num_positions + 2  (n context steps + x_0 + x_real)
+
+    For a window of o ending at index j:
+      x_real   = o[j]        (last element of window)
+      x_0      = o[j-1]      (second to last)
+      x_source = o_pred[j-1] (transformer prediction for o[j], since o_pred[i] predicts o[i+1])
+
+    Returns:
+        o_windows:  (b * num_windows, window_size, obs_dim)
+        a_windows:  (b * num_windows, window_size, a_dim)
+        x_source:   (b * num_windows, 1, obs_dim)
+    """
+    w = num_positions + 2
+    b, l = o.shape[:2]
+    num_windows = l - w + 1
+    o_windows = make_windows(o, w)
+    a_windows = make_windows(a, w)
+    # o_pred[:, w-2:] has shape (b, num_windows, obs_dim)
+    x_source = o_pred[:, w - 2:].reshape(b * num_windows, *o.shape[2:]).unsqueeze(1)
+    return o_windows, a_windows, x_source
+
+
 def reward_loss_fn(r, r_pred):
     r_pred_dist = D.Independent(D.Normal(r_pred, torch.ones_like(r_pred)), 1)
     ts_loss = - r_pred_dist.log_prob(r)
