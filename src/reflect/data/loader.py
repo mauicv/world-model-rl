@@ -234,6 +234,32 @@ class EnvDataLoader:
         self.end_index[run_index] = index
         self.rollout_ind += 1
 
+    def add_rollout_manual(self, states, actions, rewards, dones):
+        """Add a rollout to the buffer manually.
+
+        Args:
+            states: torch.Tensor, shape (l, *state_shape)
+            actions: torch.Tensor, shape (l, action_dim)
+            rewards: torch.Tensor, shape (l,)
+            dones: torch.Tensor, shape (l,)
+        """
+        l, *_ = states.shape
+        assert l == actions.shape[0] == rewards.shape[0] == dones.shape[0]
+        assert states.shape[1:] == self.state_buffer.shape[2:], f'{states.shape[1:]=} != {self.state_buffer.shape[2:]=}'
+        assert actions.shape[1:] == self.action_buffer.shape[2:], f'{actions.shape[1:]=} != {self.action_buffer.shape[2:]=}'
+
+        run_index = self.rollout_ind % self.num_runs
+        end_index = min(l, self.rollout_length - 1)
+        self.state_buffer[run_index, :end_index] = states
+        self.action_buffer[run_index, :end_index] = actions
+        self.reward_buffer[run_index, :end_index] = rewards
+        self.done_buffer[run_index, :end_index] = dones
+        self.reward_sums[run_index] = rewards.sum()
+        self.priorities[run_index, :end_index] = torch.ones(end_index)
+        self.priorities[run_index, end_index:] = 0
+        self.end_index[run_index] = end_index
+        self.rollout_ind += 1
+
     def compute_action(self, observation):
         if self.policy:
             action = self.policy(observation)
