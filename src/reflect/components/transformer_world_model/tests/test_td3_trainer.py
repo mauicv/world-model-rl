@@ -6,7 +6,6 @@ from reflect.components.transformer_world_model.tests.conftest import make_dynam
 from reflect.data.loader import EnvDataLoader, GymRenderImgProcessing
 from reflect.components.transformer_world_model import WorldModel
 from torchvision.transforms import Resize, Compose
-from dataclasses import asdict
 
 
 def test_update(encoder, decoder, actor):
@@ -53,7 +52,6 @@ def test_update(encoder, decoder, actor):
         actor_lr=1e-5,
         critic_lr=1e-5,
         grad_clip=0.5,
-        actor_update_frequency=2,
         tau=5e-3,
     )
 
@@ -68,20 +66,10 @@ def test_update(encoder, decoder, actor):
         num_timesteps=16
     )
 
-    history = trainer.update(
-        state_samples=z,
-        reward_samples=r,
-        done_samples=d,
-        action_samples=a
-    )
-    history_dict = asdict(history)
-    for key in  [
-            'actor_grad_norm',
-            'value_grad_norms',
-            'value_losses',
-            'actor_loss',
-        ]:
-        assert key in history_dict
+    critic_losses = trainer.update_critics(z, r, d, a)
+    actor_losses = trainer.update_actor(z)
+    assert critic_losses.value_losses is not None
+    assert actor_losses.actor_loss is not None
 
 
 def test_update_state(state_encoder, state_decoder, actor):
@@ -122,10 +110,7 @@ def test_update_state(state_encoder, state_decoder, actor):
         actor_lr=1e-5,
         critic_lr=1e-5,
         grad_clip=0.5,
-        actor_update_frequency=2,
         tau=5e-3,
-        alpha=2.5,
-        num_actor_updates=5,
     )
 
     dl.perform_rollout()
@@ -141,20 +126,8 @@ def test_update_state(state_encoder, state_decoder, actor):
         num_timesteps=16,
     )
 
-    history = trainer.update(
-        state_samples=z,
-        reward_samples=r,
-        done_samples=d,
-        action_samples=a
-    )
-    history_dict = asdict(history)
-    for key in  [
-            'actor_grad_norm',
-            'value_grad_norms',
-            'value_losses',
-            'actor_loss'
-        ]:
-        assert key in history_dict
+    critic_losses = trainer.update_critics(z, r, d, a)
+    actor_losses = trainer.update_actor(z)
 
 
 def test_save_load(tmp_path):
@@ -177,7 +150,6 @@ def test_save_load(tmp_path):
         actor_lr=1e-5,
         critic_lr=1e-5,
         grad_clip=0.5,
-        actor_update_frequency=2,
         tau=5e-3,
     )
     trainer.save(tmp_path)
