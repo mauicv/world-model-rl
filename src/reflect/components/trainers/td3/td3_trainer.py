@@ -29,6 +29,8 @@ class TD3Trainer:
             action_reg_clip: float=0.5,
             n_steps: int=1,
         ):
+        if len(critics) < 2:
+            raise ValueError("TD3Trainer requires at least 2 critics.")
         self.tau = tau
         self.gamma = gamma
         self.n_steps = n_steps
@@ -113,8 +115,9 @@ class TD3Trainer:
             next_state_actions = self.target_actor(next_states)
             perturbed_actions = self.perturb_actions(next_state_actions).clamp(-1, 1)
 
+        sampled_indices = self._sample_critics(k=2)
         b_targets = []
-        for i in range(self.num_critics):
+        for i in sampled_indices:
             targets = self.compute_TD_target(
                 next_states,
                 n_step_rewards,
@@ -150,9 +153,17 @@ class TD3Trainer:
             states=state_samples.reshape(-1, state_samples.shape[-1])
         )
 
+    def _sample_critics(self, k=2):
+        indices = torch.randperm(self.num_critics)[:k].tolist()
+        return indices
+
     def _update_actor(self, states):
+        sampled_indices = self._sample_critics(k=2)
         actions = self.actor(states)
-        actor_loss = -self.critics[0](states, actions).mean()
+        q_values = torch.stack(
+            [self.critics[i](states, actions) for i in sampled_indices], dim=0
+        ).mean(0)
+        actor_loss = -q_values.mean()
         actor_gn = self.actor_optim.backward(actor_loss)
         self.actor_optim.update_parameters()
         self._update_target_network(self.target_actor, self.actor)
