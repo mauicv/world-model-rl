@@ -120,6 +120,7 @@ class WorldModel(Base):
             training_mask = torch.ones(o.shape[:2]).to(o.device)
         b, t, *_  = o.shape
 
+        # TODO: can simplifier by not flattening batch and time for z and z_logits...
         z, z_logits = self.encode(o)
         z = z.reshape(b, t, -1)
         r_o = self.decode(z)

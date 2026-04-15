@@ -27,9 +27,11 @@ class TD3Trainer:
             tau: float=5e-3,
             action_reg_sig: float=0.2,
             action_reg_clip: float=0.5,
+            n_steps: int=1,
         ):
         self.tau = tau
         self.gamma = gamma
+        self.n_steps = n_steps
         self.action_reg_sig = action_reg_sig
         self.action_reg_clip = action_reg_clip
         self.num_critics = len(critics)
@@ -61,36 +63,52 @@ class TD3Trainer:
     def compute_TD_target(
             self,
             next_states,
-            rewards,
-            dones,
+            n_step_rewards,
+            not_done_mask,
             perturbed_actions,
-            target_critic
+            target_critic,
+            gamma_n,
         ):
         with torch.no_grad():
             next_state_action_values = target_critic(
                 next_states,
                 perturbed_actions
             ).squeeze(-1)
-            targets = rewards + self.gamma * (1 - dones) * next_state_action_values
+            targets = n_step_rewards + gamma_n * not_done_mask * next_state_action_values
         return targets.detach()
 
     def update_critics(self, state_samples, reward_samples, done_samples, action_samples):
         return self._update_critics(
-            current_states=state_samples[:, :-1],
-            next_states=state_samples[:, 1:],
-            current_actions=action_samples[:, :-1],
-            rewards=reward_samples[:, :-1].squeeze(-1),
-            dones=done_samples[:, :-1].squeeze(-1),
+            state_samples=state_samples,
+            reward_samples=reward_samples.squeeze(-1),
+            done_samples=done_samples.squeeze(-1),
+            action_samples=action_samples,
         )
 
     def _update_critics(
             self,
-            current_states,
-            next_states,
-            current_actions,
-            rewards,
-            dones
+            state_samples,
+            reward_samples,
+            done_samples,
+            action_samples,
         ):
+        n = self.n_steps
+        b, T_plus_1, _ = state_samples.shape
+        T = T_plus_1 - 1
+        num_valid = T - n + 1  # valid starting positions for n-step targets
+
+        # Accumulate n-step discounted rewards with done masking
+        n_step_rewards = torch.zeros(b, num_valid, device=state_samples.device)
+        not_done_mask = torch.ones(b, num_valid, device=state_samples.device)
+        for k in range(n):
+            n_step_rewards += (self.gamma ** k) * not_done_mask * reward_samples[:, k:k + num_valid]
+            not_done_mask = not_done_mask * (1 - done_samples[:, k:k + num_valid])
+
+        current_states = state_samples[:, :num_valid]
+        next_states = state_samples[:, n:n + num_valid]
+        current_actions = action_samples[:, :num_valid]
+        gamma_n = self.gamma ** n
+
         with torch.no_grad():
             next_state_actions = self.target_actor(next_states)
             perturbed_actions = self.perturb_actions(next_state_actions).clamp(-1, 1)
@@ -99,10 +117,11 @@ class TD3Trainer:
         for i in range(self.num_critics):
             targets = self.compute_TD_target(
                 next_states,
-                rewards,
-                dones,
+                n_step_rewards,
+                not_done_mask,
                 perturbed_actions,
-                self.target_critics[i]
+                self.target_critics[i],
+                gamma_n,
             )
             b_targets.append(targets.view(-1, 1))
 
