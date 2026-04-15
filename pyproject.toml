@@ -21,5 +21,6 @@ dependencies = [
     "click",
     "matplotlib",
     "gymnasium[mujoco]",
+    "vector-quantize-pytorch"
 ]
 dynamic = ["version"]
