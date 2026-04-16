@@ -42,6 +42,7 @@ class LatentWorldModel(Base):
             ema_tau: float = 0.005,
             environment_action_bound: float = 1.0,
             use_delta: bool = False,
+            learning_rate: float = 3e-4,
         ):
         super().__init__()
         if params is None:
@@ -57,8 +58,8 @@ class LatentWorldModel(Base):
         optim_param = chain(encoder.parameters(), self.dynamic_model.parameters())
         self.optim = AdamOptim(
             optim_param,
-            lr=0.0001,
-            eps=1e-5,
+            lr=learning_rate,
+            # eps=1e-5,
             grad_clip=100
         )
 
@@ -74,7 +75,7 @@ class LatentWorldModel(Base):
                 self.ema_encoder.parameters(),
                 self.encoder.parameters()
             ):
-                ema_param.data = self.ema_tau * ema_param.data + (1 - self.ema_tau) * param.data
+                ema_param.data = self.ema_tau * param.data + (1 - self.ema_tau) * ema_param.data
 
     def encode(self, state):
         return self.encoder(state)
