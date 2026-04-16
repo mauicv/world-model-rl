@@ -12,13 +12,13 @@ class TD3Critic(torch.nn.Module):
         layers = [
             torch.nn.Linear(state_dim + action_dim, hidden_dim),
             torch.nn.LayerNorm(hidden_dim),
-            torch.nn.ELU(),
+            torch.nn.Mish(),
         ]
         for _ in range(num_layers - 1):
             layers.extend([
                 torch.nn.Linear(hidden_dim, hidden_dim),
                 torch.nn.LayerNorm(hidden_dim),
-                torch.nn.ELU(),
+                torch.nn.Mish(),
             ])
         output_layer = torch.nn.Linear(hidden_dim, 1)
         torch.nn.init.uniform_(

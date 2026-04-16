@@ -8,13 +8,13 @@ class MLPEncoder(nn.Module):
         layers = [
             nn.Linear(input_dim, hidden_dim),
             nn.LayerNorm(hidden_dim),
-            nn.ELU(),
+            nn.Mish(),
         ]
         for _ in range(num_layers - 1):
             layers.extend([
                 nn.Linear(hidden_dim, hidden_dim),
                 nn.LayerNorm(hidden_dim),
-                nn.ELU(),
+                nn.Mish(),
             ])
         layers.append(nn.Linear(hidden_dim, output_dim))
         self.layers = nn.Sequential(*layers)

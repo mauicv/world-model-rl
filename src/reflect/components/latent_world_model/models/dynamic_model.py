@@ -14,13 +14,13 @@ class MLPDynamicModel(nn.Module):
         trunk_layers = [
             nn.Linear(latent_dim + action_dim, hidden_dim),
             nn.LayerNorm(hidden_dim),
-            nn.ELU(),
+            nn.Mish(),
         ]
         for _ in range(num_layers - 1):
             trunk_layers.extend([
                 nn.Linear(hidden_dim, hidden_dim),
                 nn.LayerNorm(hidden_dim),
-                nn.ELU(),
+                nn.Mish(),
             ])
         self.trunk = nn.Sequential(*trunk_layers)
         self.z_head = nn.Linear(hidden_dim, latent_dim)

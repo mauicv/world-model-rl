@@ -66,6 +66,23 @@ def test_imagine_rollout(encoder, dynamic_model, actor, env_data_loader):
     assert torch.all(d_traj[:, -1] == 0)
 
 
+def test_update_use_delta(encoder, dynamic_model, env_data_loader):
+    wm = LatentWorldModel(
+        encoder=encoder,
+        dynamic_model=dynamic_model,
+        use_delta=True,
+    )
+    env_data_loader.perform_rollout()
+    _, _, o, a, r, d = env_data_loader.sample(batch_size=4)
+
+    losses = wm.update(o, a, r, d)
+
+    assert isinstance(losses, LatentWorldModelLosses)
+    assert torch.isfinite(torch.tensor(losses.consistency_loss))
+    assert torch.isfinite(torch.tensor(losses.reward_loss))
+    assert torch.isfinite(torch.tensor(losses.done_loss))
+
+
 def test_ema_encoder_updates(encoder, dynamic_model, env_data_loader):
     wm = LatentWorldModel(
         encoder=encoder,

@@ -41,6 +41,7 @@ class LatentWorldModel(Base):
             params: Optional[LatentWorldModelTrainingParams] = None,
             ema_tau: float = 0.005,
             environment_action_bound: float = 1.0,
+            use_delta: bool = False,
         ):
         super().__init__()
         if params is None:
@@ -52,6 +53,7 @@ class LatentWorldModel(Base):
         self.ema_tau = ema_tau
         self.dynamic_model = dynamic_model
         self.environment_action_bound = environment_action_bound
+        self.use_delta = use_delta
         optim_param = chain(encoder.parameters(), self.dynamic_model.parameters())
         self.optim = AdamOptim(
             optim_param,
@@ -59,6 +61,12 @@ class LatentWorldModel(Base):
             eps=1e-5,
             grad_clip=100
         )
+
+    def _step(self, z: torch.Tensor, a: torch.Tensor):
+        z_out, r, d = self.dynamic_model(z, a)
+        if self.use_delta:
+            z_out = z + z_out
+        return z_out, r, d
 
     def _update_ema_encoder(self):
         with torch.no_grad():
@@ -104,7 +112,7 @@ class LatentWorldModel(Base):
         predicted_rs = []
         predicted_ds = []
         for h in range(t - 1):
-            z, r_pred, d_pred = self.dynamic_model(z, a[:, h])
+            z, r_pred, d_pred = self._step(z, a[:, h])
             predicted_zs.append(z)
             predicted_rs.append(r_pred)
             predicted_ds.append(d_pred)
@@ -191,7 +199,7 @@ class LatentWorldModel(Base):
                             -self.environment_action_bound,
                             self.environment_action_bound,
                         )
-                    z_next, r, d = self.dynamic_model(z_current, a)
+                    z_next, r, d = self._step(z_current, a)
                     actions.append(a)
                     rewards.append(r)
                     dones.append(d)
