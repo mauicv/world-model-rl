@@ -25,6 +25,8 @@ class LatentWorldModelLosses:
     reward_loss: float
     done_loss: float
     grad_norm: float
+    effective_rank: float
+    mean_latent_std: float
 
 
 class LatentWorldModel(Base):
@@ -62,6 +64,16 @@ class LatentWorldModel(Base):
             # eps=1e-5,
             grad_clip=100
         )
+
+    def _latent_collapse_metrics(self, z: torch.Tensor):
+        # z: (b, t, latent_dim) or (b, latent_dim)
+        z_flat = z.reshape(-1, z.shape[-1]).detach()
+        mean_latent_std = z_flat.std(dim=0).mean()
+        z_centered = z_flat - z_flat.mean(dim=0)
+        _, S, _ = torch.linalg.svd(z_centered, full_matrices=False)
+        p = S / (S.sum() + 1e-8)
+        effective_rank = torch.exp(-(p * torch.log(p + 1e-8)).sum())
+        return effective_rank.item(), mean_latent_std.item()
 
     def _step(self, z: torch.Tensor, a: torch.Tensor):
         z_out, r, d = self.dynamic_model(z, a)
@@ -156,11 +168,14 @@ class LatentWorldModel(Base):
 
         self._update_ema_encoder()
 
+        effective_rank, mean_latent_std = self._latent_collapse_metrics(predicted_zs)
         losses = LatentWorldModelLosses(
             consistency_loss=consistency_loss.item(),
             reward_loss=reward_loss.item(),
             done_loss=done_loss.item(),
             grad_norm=grad_norm.item(),
+            effective_rank=effective_rank,
+            mean_latent_std=mean_latent_std,
         )
 
         if return_init_states:
