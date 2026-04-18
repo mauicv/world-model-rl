@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 
+from reflect.components.latent_world_model.models.mlp import MLP
 
 class MLPDynamicModel(nn.Module):
     def __init__(
@@ -11,23 +12,32 @@ class MLPDynamicModel(nn.Module):
             hidden_dim: int = 512,
         ):
         super().__init__()
-        trunk_layers = [
-            nn.Linear(latent_dim + action_dim, hidden_dim),
-            nn.LayerNorm(hidden_dim),
-            nn.Mish(),
-        ]
-        for _ in range(num_layers - 1):
-            trunk_layers.extend([
-                nn.Linear(hidden_dim, hidden_dim),
-                nn.LayerNorm(hidden_dim),
-                nn.Mish(),
-            ])
-        self.trunk = nn.Sequential(*trunk_layers)
-        self.z_head = nn.Linear(hidden_dim, latent_dim)
-        self.reward_head = nn.Linear(hidden_dim, 1)
-        self.done_head = nn.Linear(hidden_dim, 1)
+
+        self._reward_model = MLP(
+            input_dim=latent_dim + action_dim,
+            output_dim=1,
+            num_layers=num_layers,
+            hidden_dim=hidden_dim,
+        )
+
+        self._done_model = MLP(
+            input_dim=latent_dim + action_dim,
+            output_dim=1,
+            num_layers=num_layers,
+            hidden_dim=hidden_dim,
+        )
+
+        self._z_model = MLP(
+            input_dim=latent_dim + action_dim,
+            output_dim=latent_dim,
+            num_layers=num_layers,
+            hidden_dim=hidden_dim,
+        )
 
     def forward(self, z: torch.Tensor, a: torch.Tensor):
         x = torch.cat([z, a], dim=-1)
-        x = self.trunk(x)
-        return self.z_head(x), self.reward_head(x), torch.sigmoid(self.done_head(x))
+        z_out = self._z_model(x)
+        reward_out = self._reward_model(x)
+        done_out = torch.sigmoid(self._done_model(x))
+        return z_out, reward_out, done_out
+
