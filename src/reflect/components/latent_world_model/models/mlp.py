@@ -21,7 +21,7 @@ class MLP(nn.Module):
             hidden_dim: int = 512,
             activation: nn.Module = nn.Mish,
             output_activation: nn.Module = nn.Identity,
-            layernorm: bool = True,
+            layernorm: bool = False,
             orthogonal_init: bool = True,
         ):
         super().__init__()
