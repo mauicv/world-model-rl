@@ -18,6 +18,7 @@ class MLPDynamicModel(nn.Module):
             output_dim=1,
             num_layers=num_layers,
             hidden_dim=hidden_dim,
+            activation=nn.ELU,
         )
 
         self._done_model = MLP(
@@ -25,6 +26,7 @@ class MLPDynamicModel(nn.Module):
             output_dim=1,
             num_layers=num_layers,
             hidden_dim=hidden_dim,
+            activation=nn.ELU,
         )
 
         self._z_model = MLP(
@@ -32,6 +34,7 @@ class MLPDynamicModel(nn.Module):
             output_dim=latent_dim,
             num_layers=num_layers,
             hidden_dim=hidden_dim,
+            activation=nn.ELU,
         )
 
     def forward(self, z: torch.Tensor, a: torch.Tensor):

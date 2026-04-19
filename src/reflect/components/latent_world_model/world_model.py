@@ -62,7 +62,7 @@ class LatentWorldModel(Base):
             optim_param,
             lr=learning_rate,
             # eps=1e-5,
-            grad_clip=100
+            grad_clip=10
         )
 
     def _latent_collapse_metrics(self, z: torch.Tensor):
@@ -150,14 +150,14 @@ class LatentWorldModel(Base):
         reward_loss = (F.mse_loss(predicted_rs, r[:, 1:], reduction='none').squeeze(-1) * weights).mean()
 
         # Done BCE loss
-        done_loss = (
-            F.binary_cross_entropy(predicted_ds, d[:, 1:].float(), reduction='none').squeeze(-1) * weights
-        ).mean()
+        # done_loss = (
+        #     F.binary_cross_entropy(predicted_ds, d[:, 1:].float(), reduction='none').squeeze(-1) * weights
+        # ).mean()
 
         loss = (
             params.consistency_coeff * consistency_loss
             + params.reward_coeff * reward_loss
-            + params.done_coeff * done_loss
+            # + params.done_coeff * done_loss
         )
 
         grad_norm = self.optim.backward(loss)
@@ -172,7 +172,8 @@ class LatentWorldModel(Base):
         losses = LatentWorldModelLosses(
             consistency_loss=consistency_loss.item(),
             reward_loss=reward_loss.item(),
-            done_loss=done_loss.item(),
+            done_loss=0,
+            # done_loss=done_loss.item(),
             grad_norm=grad_norm.item(),
             effective_rank=effective_rank,
             mean_latent_std=mean_latent_std,
