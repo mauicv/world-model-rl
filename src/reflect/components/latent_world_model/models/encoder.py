@@ -11,7 +11,7 @@ class MLPEncoder(nn.Module):
             output_dim=output_dim,
             num_layers=num_layers,
             hidden_dim=hidden_dim,
-            activation=nn.Mish,
+            activation=nn.ELU,
             output_activation=nn.Identity,
         )
 

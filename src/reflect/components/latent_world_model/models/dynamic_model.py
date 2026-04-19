@@ -8,7 +8,7 @@ class MLPDynamicModel(nn.Module):
             self,
             latent_dim: int,
             action_dim: int,
-            num_layers: int = 3,
+            num_layers: int = 2,
             hidden_dim: int = 512,
         ):
         super().__init__()

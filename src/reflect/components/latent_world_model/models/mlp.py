@@ -17,7 +17,7 @@ class MLP(nn.Module):
             self,
             input_dim: int,
             output_dim: int,
-            num_layers: int = 3,
+            num_layers: int = 2,
             hidden_dim: int = 512,
             activation: nn.Module = nn.Mish,
             output_activation: nn.Module = nn.Identity,
