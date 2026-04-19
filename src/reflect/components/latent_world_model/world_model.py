@@ -142,23 +142,23 @@ class LatentWorldModel(Base):
             device=predicted_zs.device,
         )  # (t-1,)
 
-        # Cosine similarity loss between predicted and EMA target latents
-        cosine_sim = F.cosine_similarity(predicted_zs, target_z, dim=-1)  # (b, t-1)
-        consistency_loss = ((1 - cosine_sim) * weights).mean()
+        # Cosine distance: 2 - 2*(x_norm · y_norm), range [0, 4] — matches TCRL h.cosine exactly
+        pred_norm = F.normalize(predicted_zs, dim=-1, p=2)
+        target_norm = F.normalize(target_z, dim=-1, p=2)
+        cosine_dist = 2 - 2 * (pred_norm * target_norm).sum(dim=-1)  # (b, t-1)
+        # Sum over time (weighted), mean over batch — matches TCRL accumulation pattern
+        consistency_loss = (cosine_dist * weights).sum(dim=1).mean()
 
-        # Reward MSE loss
-        reward_loss = (F.mse_loss(predicted_rs, r[:, 1:], reduction='none').squeeze(-1) * weights).mean()
-
-        # Done BCE loss
-        # done_loss = (
-        #     F.binary_cross_entropy(predicted_ds, d[:, 1:].float(), reduction='none').squeeze(-1) * weights
-        # ).mean()
+        # Reward MSE loss — same structure: sum over time, mean over batch
+        reward_loss = (F.mse_loss(predicted_rs, r[:, 1:], reduction='none').squeeze(-1) * weights).sum(dim=1).mean()
 
         loss = (
-            params.consistency_coeff * consistency_loss
-            + params.reward_coeff * reward_loss
-            # + params.done_coeff * done_loss
+            params.consistency_coeff * consistency_loss.clamp(max=1e4)
+            + params.reward_coeff * reward_loss.clamp(max=1e4)
         )
+        # Scale gradients by 1/horizon — matches TCRL's register_hook convention
+        horizon = t - 1
+        loss.register_hook(lambda grad: grad * (1 / horizon))
 
         grad_norm = self.optim.backward(loss)
         if no_update:
