@@ -62,7 +62,8 @@ class LatentWorldModel(Base):
             optim_param,
             lr=learning_rate,
             # eps=1e-5,
-            grad_clip=10
+            grad_clip=10,
+            weight_decay=1e-6
         )
 
     def _latent_collapse_metrics(self, z: torch.Tensor):
