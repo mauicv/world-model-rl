@@ -160,6 +160,9 @@ class TD3Trainer:
     def _update_actor(self, states):
         sampled_indices = self._sample_critics(k=2)
         actions = self.actor(states)
+        # TODO: double check this
+        actions = self.perturb_actions(actions)
+
         q_values = torch.stack(
             [self.critics[i](states, actions) for i in sampled_indices], dim=0
         ).mean(0)
