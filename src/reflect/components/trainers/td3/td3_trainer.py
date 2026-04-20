@@ -28,6 +28,7 @@ class TD3Trainer:
             action_reg_sig: float=0.2,
             action_reg_clip: float=0.5,
             n_steps: int=1,
+            perturb_actions_in_actor_update: bool=False,
         ):
         if len(critics) < 2:
             raise ValueError("TD3Trainer requires at least 2 critics.")
@@ -38,6 +39,7 @@ class TD3Trainer:
         self.action_reg_clip = action_reg_clip
         self.num_critics = len(critics)
         self.actor = actor
+        self.perturb_actions_in_actor_update = perturb_actions_in_actor_update
 
         actor_optim = AdamOptim(
             self.actor.parameters(),
@@ -160,8 +162,8 @@ class TD3Trainer:
     def _update_actor(self, states):
         sampled_indices = self._sample_critics(k=2)
         actions = self.actor(states)
-        # TODO: double check this
-        actions = self.perturb_actions(actions)
+        if self.perturb_actions_in_actor_update:
+            actions = self.perturb_actions(actions).clamp(-1, 1)
 
         q_values = torch.stack(
             [self.critics[i](states, actions) for i in sampled_indices], dim=0

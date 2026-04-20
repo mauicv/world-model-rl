@@ -17,6 +17,7 @@ class LatentWorldModelTrainingParams:
     reward_coeff: float = 1.0
     done_coeff: float = 1.0
     rollout_discount: float = 0.5
+    use_done: bool = True
 
 
 @dataclass
@@ -129,11 +130,12 @@ class LatentWorldModel(Base):
             z, r_pred, d_pred = self._step(z, a[:, h])
             predicted_zs.append(z)
             predicted_rs.append(r_pred)
-            predicted_ds.append(d_pred)
+            if d_pred is not None:
+                predicted_ds.append(d_pred)
 
         predicted_zs = torch.stack(predicted_zs, dim=1)  # (b, t-1, latent_dim)
         predicted_rs = torch.stack(predicted_rs, dim=1)  # (b, t-1, 1)
-        predicted_ds = torch.stack(predicted_ds, dim=1)  # (b, t-1, 1)
+        predicted_ds = torch.stack(predicted_ds, dim=1) if predicted_ds else None  # (b, t-1, 1)
 
         # Discount weights: [γ^0, γ^1, ..., γ^(t-2)] — earlier steps weighted more
         discount = params.rollout_discount
@@ -153,9 +155,17 @@ class LatentWorldModel(Base):
         # Reward MSE loss — same structure: sum over time, mean over batch
         reward_loss = (F.mse_loss(predicted_rs, r[:, 1:], reduction='none').squeeze(-1) * weights).sum(dim=1).mean()
 
+        done_loss = torch.tensor(0.0)
+        if params.use_done and predicted_ds is not None:
+            done_loss = (
+                F.binary_cross_entropy(predicted_ds, d[:, 1:].float(), reduction='none')
+                .squeeze(-1) * weights
+            ).sum(dim=1).mean()
+
         loss = (
             params.consistency_coeff * consistency_loss.clamp(max=1e4)
             + params.reward_coeff * reward_loss.clamp(max=1e4)
+            + params.done_coeff * done_loss.clamp(max=1e4)
         )
         # Scale gradients by 1/horizon — matches TCRL's register_hook convention
         horizon = t - 1
@@ -173,8 +183,7 @@ class LatentWorldModel(Base):
         losses = LatentWorldModelLosses(
             consistency_loss=consistency_loss.item(),
             reward_loss=reward_loss.item(),
-            done_loss=0,
-            # done_loss=done_loss.item(),
+            done_loss=done_loss.item(),
             grad_norm=grad_norm.item(),
             effective_rank=effective_rank,
             mean_latent_std=mean_latent_std,
