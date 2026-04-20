@@ -17,7 +17,6 @@ class LatentWorldModelTrainingParams:
     reward_coeff: float = 1.0
     done_coeff: float = 1.0
     rollout_discount: float = 0.5
-    use_done: bool = True
 
 
 @dataclass
@@ -156,7 +155,7 @@ class LatentWorldModel(Base):
         reward_loss = (F.mse_loss(predicted_rs, r[:, 1:], reduction='none').squeeze(-1) * weights).sum(dim=1).mean()
 
         done_loss = torch.tensor(0.0)
-        if params.use_done and predicted_ds is not None:
+        if predicted_ds is not None:
             done_loss = (
                 F.binary_cross_entropy(predicted_ds, d[:, 1:].float(), reduction='none')
                 .squeeze(-1) * weights
