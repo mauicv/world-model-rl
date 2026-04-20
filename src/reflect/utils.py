@@ -10,11 +10,11 @@ import numpy as np
 
 
 class AdamOptim:
-    def __init__(self, parameters, lr, betas=(0.9, 0.999), eps=1e-8, grad_clip=torch.inf):
+    def __init__(self, parameters, lr, betas=(0.9, 0.999), eps=1e-8, grad_clip=torch.inf, weight_decay=0):
         self.parameters = list(parameters)
         self.grad_clip = grad_clip
         self.lr = lr
-        self.optimizer = Adam(self.parameters, lr=lr, betas=betas, eps=eps)
+        self.optimizer = Adam(self.parameters, lr=lr, betas=betas, eps=eps, weight_decay=weight_decay)
 
     def backward(self, loss, retain_graph=False):
         self.optimizer.zero_grad()

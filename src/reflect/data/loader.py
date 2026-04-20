@@ -95,7 +95,7 @@ class EnvDataLoader:
         self.seed = seed
         self.noise_size = noise_size
         self.use_imgs_as_states = use_imgs_as_states
-        _ = self.env.reset()
+        _ = self.env.reset(seed=seed)
         self.action_dim = self.env.action_space.shape[0]
         self.weight_perturbation_size = weight_perturbation_size
         self.bounds = (
@@ -178,8 +178,8 @@ class EnvDataLoader:
         state = self.processing.preprocess(state)
         return state, reward, done
 
-    def reset(self):
-        state, *_ = self.env.reset(seed=self.seed)
+    def reset(self, seed=None):
+        state, *_ = self.env.reset(seed=seed)
         if self.policy is not None:
             self.policy.reset()
             self.policy.perturb_actor(
@@ -203,7 +203,7 @@ class EnvDataLoader:
         state, reward, done = self.step(action)
         return state, reward, done
 
-    def perform_rollout(self):
+    def perform_rollout(self, seed=None):
         """Performs a rollout of the environment.
 
         Iterate rollouts and store the images, actions, rewards, and done
@@ -213,7 +213,7 @@ class EnvDataLoader:
         the time step. So a_t is the action taken at time step t not the action
         that generated s_t.
         """
-        state = self.reset()
+        state = self.reset(seed=seed)
         run_index = self.rollout_ind % self.num_runs
 
         # take first step of rollout as it is not a valid step
