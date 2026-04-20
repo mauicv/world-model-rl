@@ -24,6 +24,17 @@ def encoder(env_bipedal_walker):
     )
 
 @pytest.fixture
+def discrete_encoder(env_bipedal_walker):
+    input_dim = env_bipedal_walker.observation_space.shape[0]
+    return MLPEncoder(
+        input_dim=input_dim,
+        output_dim=512,
+        num_layers=3,
+        hidden_dim=512,
+        output_activation=torch.nn.Tanh,
+    )
+
+@pytest.fixture
 def dynamic_model(env_bipedal_walker):
     action_dim = env_bipedal_walker.action_space.shape[0]
     return MLPDynamicModel(
@@ -31,6 +42,17 @@ def dynamic_model(env_bipedal_walker):
         action_dim=action_dim,
         num_layers=3,
         hidden_dim=512,
+    )
+
+@pytest.fixture
+def discrete_dynamic_model(env_bipedal_walker):
+    action_dim = env_bipedal_walker.action_space.shape[0]
+    return MLPDynamicModel(
+        latent_dim=LATENT_DIM,
+        action_dim=action_dim,
+        num_layers=3,
+        hidden_dim=512,
+        output_dim=256*64,
     )
 
 @pytest.fixture
