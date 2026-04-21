@@ -124,7 +124,7 @@ class DiscreteLatentWorldModel(Base):
 
         # Encode first observation as rollout starting point
         enc = self.encoder(o[:, 0])
-        assert torch.all(enc < 1) and torch.all(enc > -1), "Encoder output must be between -1 and 1"
+        assert torch.all(enc <= 1) and torch.all(enc >= -1), "Encoder output must be between -1 and 1"
         z = self.fsq(enc)['codes']  # (b, latent_dim)
 
         # EMA targets for all subsequent observations
