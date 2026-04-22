@@ -1,6 +1,6 @@
 # World Model RL
 
-World model Reinforcement Learning is a branch of RL that trains or uses models of the environment in order to solve the reinforcement learning task.
+World model Reinforcement Learning is a branch of RL that trains or uses models of the environment in order to solve the reinforcement learning task. This codebase contains implementations of some world model RL algorithms with a focus on continuous control.
 
 ![Imagined rollout for the Transformer based world model agent](/assets/tssm-imagined-rollout.gif)
 ![Real rollout for the Transformer based world model agent](/assets/tssm-real-rollout.gif)
