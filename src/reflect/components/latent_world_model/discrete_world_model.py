@@ -113,6 +113,7 @@ class DiscreteLatentWorldModel(Base):
             d: torch.Tensor,
             return_init_states: bool = False,
             no_update: bool = False,
+            tau: float = 1.0,
         ):
         """
         o: (b, t, *s_dim)
@@ -139,7 +140,7 @@ class DiscreteLatentWorldModel(Base):
         predicted_rs = []
         predicted_ds = []
         for h in range(t - 1):
-            logits, z, r_pred, d_pred = self._step(z, a[:, h])
+            logits, z, r_pred, d_pred = self._step(z, a[:, h], tau=tau, hard=True)
             predicted_logits.append(logits)
             predicted_zs.append(z)
             predicted_rs.append(r_pred)
