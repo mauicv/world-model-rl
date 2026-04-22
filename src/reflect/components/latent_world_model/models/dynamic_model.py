@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from typing import Optional
 
 from reflect.components.latent_world_model.models.mlp import MLP
 
@@ -11,8 +12,10 @@ class MLPDynamicModel(nn.Module):
             num_layers: int = 2,
             hidden_dim: int = 512,
             predict_done: bool = True,
+            output_dim: Optional[int] = None,
         ):
         super().__init__()
+        z_output_dim = output_dim if output_dim is not None else latent_dim
 
         self._reward_model = MLP(
             input_dim=latent_dim + action_dim,
@@ -32,7 +35,7 @@ class MLPDynamicModel(nn.Module):
 
         self._z_model = MLP(
             input_dim=latent_dim + action_dim,
-            output_dim=latent_dim,
+            output_dim=z_output_dim,
             num_layers=num_layers,
             hidden_dim=hidden_dim,
             activation=nn.ELU,
