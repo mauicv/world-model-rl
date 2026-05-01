@@ -162,7 +162,8 @@ class ReconWorldModel(Base):
 
         # Gated reconstruction loss — gradient flows through z_for_recon into encoder
         recon_obs = self.decoder(z_for_recon)                                        # (b, t-1, obs_dim)
-        recon_loss_per = F.mse_loss(recon_obs, o[:, 1:], reduction='none').mean(dim=-1)  # (b, t-1)
+        # flatten all obs dims so this works for both state (b,t-1,d) and pixel (b,t-1,C,H,W)
+        recon_loss_per = F.mse_loss(recon_obs, o[:, 1:], reduction='none').flatten(2).mean(-1)  # (b, t-1)
         recon_loss = (recon_gate * recon_loss_per * weights).sum(dim=1).mean()
 
         loss = (

@@ -1,9 +1,12 @@
 import torch
+import pytest
 from reflect.components.recon_world_model.world_model import (
     ReconWorldModel,
     ReconWorldModelLosses,
     ReconWorldModelTrainingParams,
 )
+from reflect.components.recon_world_model.models import ConvEncoder, ConvDecoder
+from reflect.components.latent_world_model.models import MLPDynamicModel
 from reflect.components.recon_world_model.tests.conftest import LATENT_DIM
 
 
@@ -144,3 +147,69 @@ def test_encoder_receives_reconstruction_gradient(encoder, decoder, dynamic_mode
 
     encoder_grads = [p.grad for p in wm.encoder.parameters() if p.grad is not None]
     assert len(encoder_grads) > 0, "encoder should have received gradients"
+
+
+# --- ConvEncoder / ConvDecoder unit tests ---
+
+IMAGE_SHAPE = (3, 64, 64)
+LATENT_DIM = 512
+BATCH, TIME = 4, 10
+
+
+@pytest.fixture
+def conv_encoder():
+    return ConvEncoder(input_shape=IMAGE_SHAPE, latent_dim=LATENT_DIM)
+
+
+@pytest.fixture
+def conv_decoder():
+    return ConvDecoder(latent_dim=LATENT_DIM, output_shape=IMAGE_SHAPE)
+
+
+@pytest.fixture
+def conv_dynamic_model():
+    return MLPDynamicModel(latent_dim=LATENT_DIM, action_dim=4, num_layers=3, hidden_dim=512)
+
+
+def test_conv_encoder_batch(conv_encoder):
+    x = torch.randn(BATCH, *IMAGE_SHAPE)
+    z = conv_encoder(x)
+    assert z.shape == (BATCH, LATENT_DIM)
+
+
+def test_conv_encoder_batch_time(conv_encoder):
+    x = torch.randn(BATCH, TIME, *IMAGE_SHAPE)
+    z = conv_encoder(x)
+    assert z.shape == (BATCH, TIME, LATENT_DIM)
+
+
+def test_conv_decoder_batch(conv_decoder):
+    z = torch.randn(BATCH, LATENT_DIM)
+    x = conv_decoder(z)
+    assert x.shape == (BATCH, *IMAGE_SHAPE)
+
+
+def test_conv_decoder_batch_time(conv_decoder):
+    z = torch.randn(BATCH, TIME, LATENT_DIM)
+    x = conv_decoder(z)
+    assert x.shape == (BATCH, TIME, *IMAGE_SHAPE)
+
+
+def test_recon_world_model_pixel_update(conv_encoder, conv_decoder, conv_dynamic_model):
+    """End-to-end update with pixel observations."""
+    wm = ReconWorldModel(
+        encoder=conv_encoder,
+        decoder=conv_decoder,
+        dynamic_model=conv_dynamic_model,
+    )
+    o = torch.randn(BATCH, TIME, *IMAGE_SHAPE)
+    a = torch.randn(BATCH, TIME, 4)
+    r = torch.randn(BATCH, TIME, 1)
+    d = torch.zeros(BATCH, TIME, 1)
+
+    losses = wm.update(o, a, r, d)
+
+    assert isinstance(losses, ReconWorldModelLosses)
+    assert torch.isfinite(torch.tensor(losses.consistency_loss))
+    assert torch.isfinite(torch.tensor(losses.recon_loss))
+    assert 0.0 <= losses.recon_gate_mean <= 1.0
