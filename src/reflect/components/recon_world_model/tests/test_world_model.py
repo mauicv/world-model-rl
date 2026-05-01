@@ -111,6 +111,22 @@ def test_imagine_rollout(encoder, decoder, dynamic_model, actor, env_data_loader
     assert torch.all(d_traj[:, -1] == 0)
 
 
+def test_gate_disabled(encoder, decoder, dynamic_model, env_data_loader):
+    """With use_recon_gate=False, recon_gate_mean should always be 1.0."""
+    wm = ReconWorldModel(
+        encoder=encoder,
+        decoder=decoder,
+        dynamic_model=dynamic_model,
+        params=ReconWorldModelTrainingParams(use_recon_gate=False),
+    )
+    env_data_loader.perform_rollout()
+    _, _, o, a, r, d = env_data_loader.sample(batch_size=4)
+
+    losses = wm.update(o, a, r, d)
+
+    assert losses.recon_gate_mean == 1.0
+
+
 def test_encoder_receives_reconstruction_gradient(encoder, decoder, dynamic_model, env_data_loader):
     """Encoder parameters should receive gradient from reconstruction path."""
     wm = ReconWorldModel(

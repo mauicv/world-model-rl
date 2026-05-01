@@ -17,6 +17,7 @@ class ReconWorldModelTrainingParams:
     done_coeff: float = 1.0
     recon_coeff: float = 1.0
     recon_threshold: float = 0.5
+    use_recon_gate: bool = True
     rollout_discount: float = 0.5
 
 
@@ -152,8 +153,12 @@ class ReconWorldModel(Base):
                 .squeeze(-1) * weights
             ).sum(dim=1).mean()
 
-        # Soft gate: 1 when cosine_dist=0 (perfect prediction), 0 at threshold
-        recon_gate = F.relu(params.recon_threshold - cosine_dist) / params.recon_threshold  # (b, t-1)
+        # Soft gate: 1 when cosine_dist=0 (perfect prediction), 0 at threshold.
+        # Disabled: gate is uniformly 1 so reconstruction always fires.
+        if params.use_recon_gate:
+            recon_gate = F.relu(params.recon_threshold - cosine_dist) / params.recon_threshold  # (b, t-1)
+        else:
+            recon_gate = torch.ones_like(cosine_dist)
 
         # Gated reconstruction loss — gradient flows through z_for_recon into encoder
         recon_obs = self.decoder(z_for_recon)                                        # (b, t-1, obs_dim)
