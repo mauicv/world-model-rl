@@ -28,8 +28,12 @@ class ConvEncoder(nn.Module):
             nn.Conv2d(depth*2, depth*4, 4, stride=2), nn.ELU(),
             nn.Conv2d(depth*4, depth*8, 4, stride=2), nn.ELU(),
         )
-        # LazyLinear infers in_features on first forward pass
-        self.fc = nn.LazyLinear(latent_dim)
+        # Compute flat conv output size with a dummy pass so we can use a regular
+        # Linear rather than LazyLinear — necessary for deepcopy (used by
+        # LatentWorldModel's EMA encoder) to produce an identical copy.
+        with torch.no_grad():
+            flat_size = self.conv(torch.zeros(1, *input_shape)).flatten(1).shape[1]
+        self.fc = nn.Linear(flat_size, latent_dim)
 
     def _encode(self, x: torch.Tensor) -> torch.Tensor:
         return self.fc(self.conv(x).flatten(1))
