@@ -350,3 +350,19 @@ class EnvDataLoader:
             self.reward_buffer[b_inds, t_inds].unsqueeze(-1).detach(),
             self.done_buffer[b_inds, t_inds].unsqueeze(-1).detach(),
         )
+
+    def sample_pairs(
+        self,
+        batch_size: int,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Sample consecutive state pairs (s_i, s_{i+1}) from the buffer.
+
+        Returns:
+            Tuple of (s_i, s_next), each of shape (batch_size, *state_shape).
+        """
+        max_index = min(self.rollout_ind, self.num_runs)
+        b_inds = torch.randint(0, max_index, (batch_size,))
+        t_inds = torch.randint(0, self.rollout_length - 1, (batch_size,))
+        s_i = self.state_buffer[b_inds, t_inds].detach()
+        s_next = self.state_buffer[b_inds, t_inds + 1].detach()
+        return s_i, s_next
