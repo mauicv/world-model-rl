@@ -2,11 +2,10 @@ venv
 world_model_rl.egg-info
 __pycache__
 .DS_Store
-experiments
+results
 
 # temp until refactoring etc...
 training/twmvt.py
-
 
 *.pth
 
