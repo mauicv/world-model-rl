@@ -4,61 +4,9 @@ See also: https://colab.research.google.com/drive/10-QQlnSFZeWBC7JCm0mPraGBPLVU2
 """
 
 import gymnasium as gym
-from reflect.data.noise import NoNoise
-from torchvision.transforms import Resize, Compose
+from reflect.data.noise import NormalNoise
 import torch
-import numpy as np
-
-
-def to_tensor(t):
-    if isinstance(t, torch.Tensor):
-        return t
-    if isinstance(t, np.ndarray):
-        return torch.tensor(t.copy(), dtype=torch.float32)
-    return torch.tensor(t, dtype=torch.float32)
-
-
-class Processing:
-    def __init__(self, transforms):
-        self.transforms = transforms
-
-    def preprocess(self, x):
-        raise NotImplementedError
-
-    def postprocess(self, x):
-        raise NotImplementedError
-
-
-class GymRenderImgProcessing(Processing):
-    def __init__(
-            self,
-            transforms=None
-        ):
-        if transforms is None:
-            transforms = Compose([Resize((64, 64))])
-        self.transforms = transforms
-
-    def preprocess(self, x):
-        x = x.permute(2, 0, 1)
-        x = self.transforms(x)
-        x = x / 256 - 0.5
-        return x
-
-    def postprocess(self, x):
-        x = x.permute(1, 2, 0)
-        x = (x + 0.5) * 256
-        return x
-
-
-class GymStateProcessing(Processing):
-    def __init__(self, transforms=None):
-        self.transforms = transforms
-
-    def preprocess(self, x):
-        return x
-
-    def postprocess(self, x):
-        return x
+from reflect.data.processing import GymRenderImgProcessing, GymStateProcessing, to_tensor
 
 
 class EnvDataLoader:
@@ -77,7 +25,6 @@ class EnvDataLoader:
             ),
             noise_generator=None,
             seed=None,
-            noise_size=0.05,
             weight_perturbation_size=0.01,
             use_imgs_as_states=True,
             priority_sampling_temperature=None,
@@ -93,7 +40,6 @@ class EnvDataLoader:
         self.processing = processing
         self.env = env
         self.seed = seed
-        self.noise_size = noise_size
         self.use_imgs_as_states = use_imgs_as_states
         _ = self.env.reset(seed=seed)
         self.action_dim = self.env.action_space.shape[0]
@@ -159,7 +105,12 @@ class EnvDataLoader:
         self.current_index = 0
 
         if noise_generator is None:
-            self.noise_generator = NoNoise(dim=self.action_dim)
+            self.noise_generator = NormalNoise(
+                dim=self.action_dim,
+                sigma=0.2,
+                dt=1e-2,
+                repeat=1
+            )
 
     def __getstate__(self):
         return {
@@ -237,7 +188,8 @@ class EnvDataLoader:
     def compute_action(self, observation):
         if self.policy:
             action = self.policy(observation)
-            action = action + torch.normal(torch.zeros_like(action), self.noise_size)
+            noise = self.noise_generator()
+            action = action + noise
             # action = action.squeeze(0)
             action = action.squeeze()
         else:

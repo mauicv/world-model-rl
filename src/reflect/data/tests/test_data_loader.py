@@ -187,7 +187,6 @@ def test_data_loader_weight_perturbation(env_name):
         state_shape=(3, 64, 64),
         use_imgs_as_states=True,
         env=env,
-        noise_size=0.0,
         weight_perturbation_size=weight_perturbation_size,
         policy=policy
     )
