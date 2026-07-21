@@ -138,6 +138,8 @@ class EnvDataLoader:
             )
         if self.use_imgs_as_states:
             state = self.env.render()
+        if self.noise_generator is not None:
+            self.noise_generator.reset()
         state = to_tensor(state)
         state = self.processing.preprocess(state)
         return state
