@@ -314,7 +314,14 @@ class EnvDataLoader:
         """
         max_index = min(self.rollout_ind, self.num_runs)
         b_inds = torch.randint(0, max_index, (batch_size,))
-        t_inds = torch.randint(0, self.rollout_length - 1, (batch_size,))
+        # bound t_inds by each rollout's end so we never sample the pair
+        # (s_i, s_{i+1}) from outside the finished rollout. end_index stores the
+        # last recorded index; +2 accounts for the first step of the rollout and
+        # -2 leaves room for the consecutive pair (matches _sample_step_indices).
+        end_inds = self.end_index[b_inds] + 2
+        t_inds = torch.cat([
+            torch.randint(0, end_ind - 2, (1,)) for end_ind in end_inds
+        ])
         s_i = self.state_buffer[b_inds, t_inds].detach()
         s_next = self.state_buffer[b_inds, t_inds + 1].detach()
         return s_i, s_next
