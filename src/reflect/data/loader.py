@@ -189,7 +189,7 @@ class EnvDataLoader:
         if self.policy:
             action = self.policy(observation)
             noise = self.noise_generator()
-            action = action + noise
+            action = action + noise.to(observation.device)
             # action = action.squeeze(0)
             action = action.squeeze()
         else:
