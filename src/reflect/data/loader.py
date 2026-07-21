@@ -91,6 +91,15 @@ class EnvDataLoader:
             dtype=torch.int
         )
 
+        # Last *real* frame of each rollout (the terminal frame for terminated
+        # episodes). end_index additionally covers the absorbing padding
+        # appended after termination; use term_index wherever padded frames
+        # must be excluded (e.g. sample_pairs).
+        self.term_index = torch.zeros(
+            self.num_runs,
+            dtype=torch.int
+        )
+
         self.reward_sums = torch.zeros(
             self.num_runs,
             dtype=torch.float32
@@ -156,6 +165,31 @@ class EnvDataLoader:
         state, reward, done = self.step(action)
         return state, reward, done
 
+    def _pad_absorbing_frames(self, run_index, index):
+        """Append absorbing frames after the terminal frame at `index`: the
+        terminal state repeated, with zero action, zero reward and done=1.
+
+        Without padding, sampled windows can only reach the terminal frame as
+        their final element, so the terminal reward and done flag never land on
+        the positions an n-step TD trainer actually uses — the critic never
+        observes episode termination. With padding, windows containing the
+        terminal transition become sampleable, and positions that land on the
+        padding itself learn Q ~= 0, the correct value of a terminated episode.
+
+        Only call this for terminated episodes: time-limit truncations must
+        keep bootstrapping and are not padded.
+
+        Returns the index of the last padded frame.
+        """
+        terminal_state = self.state_buffer[run_index, index].clone()
+        pad_end = min(index + self.num_time_steps, self.rollout_length - 1)
+        for idx in range(index + 1, pad_end + 1):
+            self.state_buffer[run_index, idx] = terminal_state
+            self.action_buffer[run_index, idx] = 0.0
+            self.reward_buffer[run_index, idx] = 0.0
+            self.done_buffer[run_index, idx] = 1
+        return pad_end
+
     def perform_rollout(self, seed=None):
         """Performs a rollout of the environment.
 
@@ -181,6 +215,13 @@ class EnvDataLoader:
                     state, reward, done = self._step_rollout(run_index, index + 1, state, reward, done)
                     index += 1
                 break
+        self.term_index[run_index] = index
+        # Pad terminated episodes with absorbing frames so windows containing
+        # the terminal transition are sampleable (see _pad_absorbing_frames).
+        # done_buffer[index] is only 1 when the terminal frame was recorded, so
+        # full-length (time-limit) rollouts are left unpadded.
+        if bool(self.done_buffer[run_index, index] == 1):
+            index = self._pad_absorbing_frames(run_index, index)
         self.reward_sums[run_index] = self.reward_buffer[run_index].sum()
         self.priorities[run_index] = torch.ones(self.rollout_length)
         self.priorities[run_index, index-self.num_time_steps:] = 0
@@ -316,13 +357,14 @@ class EnvDataLoader:
         """
         max_index = min(self.rollout_ind, self.num_runs)
         b_inds = torch.randint(0, max_index, (batch_size,))
-        # bound t_inds by each rollout's end so we never sample the pair
-        # (s_i, s_{i+1}) from outside the finished rollout. end_index stores the
-        # last recorded index; +2 accounts for the first step of the rollout and
-        # -2 leaves room for the consecutive pair (matches _sample_step_indices).
-        end_inds = self.end_index[b_inds] + 2
+        # bound t_inds by each rollout's last *real* frame so we never sample
+        # the pair (s_i, s_{i+1}) from outside the finished rollout or from the
+        # absorbing padding appended after termination. t < term_index keeps
+        # the pair (term-1, term) — the transition into the terminal state —
+        # sampleable, while (term, term+1) padding pairs are excluded.
+        term_inds = self.term_index[b_inds]
         t_inds = torch.cat([
-            torch.randint(0, end_ind - 2, (1,)) for end_ind in end_inds
+            torch.randint(0, term_ind, (1,)) for term_ind in term_inds
         ])
         s_i = self.state_buffer[b_inds, t_inds].detach()
         s_next = self.state_buffer[b_inds, t_inds + 1].detach()
