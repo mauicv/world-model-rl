@@ -189,7 +189,7 @@ class EnvDataLoader:
         if self.policy:
             action = self.policy(observation)
             noise = self.noise_generator()
-            action = action + torch.tensor(noise, device=observation.device)
+            action = action + torch.tensor(noise, device=action.device)
             # action = action.squeeze(0)
             action = action.squeeze()
         else:
