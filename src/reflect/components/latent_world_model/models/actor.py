@@ -13,6 +13,7 @@ class MLPActor(nn.Module):
             num_layers=2,
             hidden_dim=hidden_dim,
             output_activation=nn.Tanh,
+            layernorm=True,
         )
         self.output_layer = torch.nn.Sequential(
             nn.Linear(hidden_dim, action_dim),
