@@ -42,7 +42,7 @@ class NormalNoise:
             dim,
             sigma=0.2,
             dt=1e-2,
-            repeat=2):
+            repeat=1):
         self.dim = dim
         self.sigma = sigma
         self.dt = dt
@@ -61,4 +61,31 @@ class NormalNoise:
         self.count = 0
         self.current_action = self.sigma * np.sqrt(self.dt) * \
             np.random.normal(loc=0, scale=1, size=(self.dim,))
+        return self.current_action
+
+
+class OUNoise:
+    def __init__(
+            self,
+            dim,
+            mu=0.0,
+            theta=0.15,
+            sigma=0.2,
+            dt=1e-2):
+        self.dim = dim
+        self.mu = mu
+        self.theta = theta
+        self.sigma = sigma
+        self.dt = dt
+        self.reset()
+
+    def __call__(self):
+        self.current_action = self.current_action \
+            + self.theta * (self.mu - self.current_action) * self.dt \
+            + self.sigma * np.sqrt(self.dt) \
+            * np.random.normal(loc=0, scale=1, size=(self.dim,))
+        return self.current_action
+
+    def reset(self):
+        self.current_action = np.ones(self.dim) * self.mu
         return self.current_action

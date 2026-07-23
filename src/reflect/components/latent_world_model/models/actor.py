@@ -13,13 +13,15 @@ class MLPActor(nn.Module):
             num_layers=2,
             hidden_dim=hidden_dim,
             output_activation=nn.Tanh,
+            layernorm=True,
         )
         self.output_layer = torch.nn.Sequential(
             nn.Linear(hidden_dim, action_dim),
-            nn.LayerNorm(action_dim),
             nn.Tanh(),
         )
         self.apply(orthogonal_init_fn)
+        nn.init.uniform_(self.output_layer[0].weight, -1e-3, 1e-3)
+        nn.init.constant_(self.output_layer[0].bias, 0.0)
 
     def forward(self, z: torch.Tensor, deterministic: bool = True) -> torch.Tensor:
         return self.output_layer(self.mlp(z))

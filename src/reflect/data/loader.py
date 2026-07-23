@@ -4,61 +4,9 @@ See also: https://colab.research.google.com/drive/10-QQlnSFZeWBC7JCm0mPraGBPLVU2
 """
 
 import gymnasium as gym
-from reflect.data.noise import NoNoise
-from torchvision.transforms import Resize, Compose
+from reflect.data.noise import NormalNoise
 import torch
-import numpy as np
-
-
-def to_tensor(t):
-    if isinstance(t, torch.Tensor):
-        return t
-    if isinstance(t, np.ndarray):
-        return torch.tensor(t.copy(), dtype=torch.float32)
-    return torch.tensor(t, dtype=torch.float32)
-
-
-class Processing:
-    def __init__(self, transforms):
-        self.transforms = transforms
-
-    def preprocess(self, x):
-        raise NotImplementedError
-
-    def postprocess(self, x):
-        raise NotImplementedError
-
-
-class GymRenderImgProcessing(Processing):
-    def __init__(
-            self,
-            transforms=None
-        ):
-        if transforms is None:
-            transforms = Compose([Resize((64, 64))])
-        self.transforms = transforms
-
-    def preprocess(self, x):
-        x = x.permute(2, 0, 1)
-        x = self.transforms(x)
-        x = x / 256 - 0.5
-        return x
-
-    def postprocess(self, x):
-        x = x.permute(1, 2, 0)
-        x = (x + 0.5) * 256
-        return x
-
-
-class GymStateProcessing(Processing):
-    def __init__(self, transforms=None):
-        self.transforms = transforms
-
-    def preprocess(self, x):
-        return x
-
-    def postprocess(self, x):
-        return x
+from reflect.data.processing import GymRenderImgProcessing, GymStateProcessing, to_tensor
 
 
 class EnvDataLoader:
@@ -77,7 +25,6 @@ class EnvDataLoader:
             ),
             noise_generator=None,
             seed=None,
-            noise_size=0.05,
             weight_perturbation_size=0.01,
             use_imgs_as_states=True,
             priority_sampling_temperature=None,
@@ -93,7 +40,6 @@ class EnvDataLoader:
         self.processing = processing
         self.env = env
         self.seed = seed
-        self.noise_size = noise_size
         self.use_imgs_as_states = use_imgs_as_states
         _ = self.env.reset(seed=seed)
         self.action_dim = self.env.action_space.shape[0]
@@ -145,6 +91,15 @@ class EnvDataLoader:
             dtype=torch.int
         )
 
+        # Last *real* frame of each rollout (the terminal frame for terminated
+        # episodes). end_index additionally covers the absorbing padding
+        # appended after termination; use term_index wherever padded frames
+        # must be excluded (e.g. sample_pairs).
+        self.term_index = torch.zeros(
+            self.num_runs,
+            dtype=torch.int
+        )
+
         self.reward_sums = torch.zeros(
             self.num_runs,
             dtype=torch.float32
@@ -159,7 +114,12 @@ class EnvDataLoader:
         self.current_index = 0
 
         if noise_generator is None:
-            self.noise_generator = NoNoise(dim=self.action_dim)
+            self.noise_generator = NormalNoise(
+                dim=self.action_dim,
+                sigma=0.2,
+                dt=1e-2,
+                repeat=1
+            )
 
     def __getstate__(self):
         return {
@@ -187,6 +147,8 @@ class EnvDataLoader:
             )
         if self.use_imgs_as_states:
             state = self.env.render()
+        if self.noise_generator is not None:
+            self.noise_generator.reset()
         state = to_tensor(state)
         state = self.processing.preprocess(state)
         return state
@@ -202,6 +164,31 @@ class EnvDataLoader:
         self.done_buffer[run_index, index] = to_tensor(done)
         state, reward, done = self.step(action)
         return state, reward, done
+
+    def _pad_absorbing_frames(self, run_index, index):
+        """Append absorbing frames after the terminal frame at `index`: the
+        terminal state repeated, with zero action, zero reward and done=1.
+
+        Without padding, sampled windows can only reach the terminal frame as
+        their final element, so the terminal reward and done flag never land on
+        the positions an n-step TD trainer actually uses — the critic never
+        observes episode termination. With padding, windows containing the
+        terminal transition become sampleable, and positions that land on the
+        padding itself learn Q ~= 0, the correct value of a terminated episode.
+
+        Only call this for terminated episodes: time-limit truncations must
+        keep bootstrapping and are not padded.
+
+        Returns the index of the last padded frame.
+        """
+        terminal_state = self.state_buffer[run_index, index].clone()
+        pad_end = min(index + self.num_time_steps, self.rollout_length - 1)
+        for idx in range(index + 1, pad_end + 1):
+            self.state_buffer[run_index, idx] = terminal_state
+            self.action_buffer[run_index, idx] = 0.0
+            self.reward_buffer[run_index, idx] = 0.0
+            self.done_buffer[run_index, idx] = 1
+        return pad_end
 
     def perform_rollout(self, seed=None):
         """Performs a rollout of the environment.
@@ -228,6 +215,13 @@ class EnvDataLoader:
                     state, reward, done = self._step_rollout(run_index, index + 1, state, reward, done)
                     index += 1
                 break
+        self.term_index[run_index] = index
+        # Pad terminated episodes with absorbing frames so windows containing
+        # the terminal transition are sampleable (see _pad_absorbing_frames).
+        # done_buffer[index] is only 1 when the terminal frame was recorded, so
+        # full-length (time-limit) rollouts are left unpadded.
+        if bool(self.done_buffer[run_index, index] == 1):
+            index = self._pad_absorbing_frames(run_index, index)
         self.reward_sums[run_index] = self.reward_buffer[run_index].sum()
         self.priorities[run_index] = torch.ones(self.rollout_length)
         self.priorities[run_index, index-self.num_time_steps:] = 0
@@ -237,7 +231,8 @@ class EnvDataLoader:
     def compute_action(self, observation):
         if self.policy:
             action = self.policy(observation)
-            action = action + torch.normal(torch.zeros_like(action), self.noise_size)
+            noise = self.noise_generator()
+            action = action + torch.tensor(noise, device=action.device)
             # action = action.squeeze(0)
             action = action.squeeze()
         else:
@@ -362,7 +357,15 @@ class EnvDataLoader:
         """
         max_index = min(self.rollout_ind, self.num_runs)
         b_inds = torch.randint(0, max_index, (batch_size,))
-        t_inds = torch.randint(0, self.rollout_length - 1, (batch_size,))
+        # bound t_inds by each rollout's last *real* frame so we never sample
+        # the pair (s_i, s_{i+1}) from outside the finished rollout or from the
+        # absorbing padding appended after termination. t < term_index keeps
+        # the pair (term-1, term) — the transition into the terminal state —
+        # sampleable, while (term, term+1) padding pairs are excluded.
+        term_inds = self.term_index[b_inds]
+        t_inds = torch.cat([
+            torch.randint(0, term_ind, (1,)) for term_ind in term_inds
+        ])
         s_i = self.state_buffer[b_inds, t_inds].detach()
         s_next = self.state_buffer[b_inds, t_inds + 1].detach()
         return s_i, s_next
