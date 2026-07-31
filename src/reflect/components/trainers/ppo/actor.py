@@ -12,12 +12,16 @@ class PPOActor(torch.nn.Module):
             output_dim,
             num_layers=3,
             hidden_dim=512,
+            log_std_min=-3,
+            log_std_max=0,
         ):
         super().__init__()
         self.input_dim = input_dim
         self.output_dim = output_dim
         self.num_layers = num_layers
         self.hidden_dim = hidden_dim
+        self.log_std_min = log_std_min
+        self.log_std_max = log_std_max
         layers = [
             layer_init(nn.Linear(np.array(input_dim).prod(), hidden_dim)),
             nn.Tanh(),
@@ -39,6 +43,7 @@ class PPOActor(torch.nn.Module):
         if deterministic:
             return action_mean
         action_logstd = self.actor_logstd.expand_as(action_mean)
+        action_logstd = torch.clamp(action_logstd, self.log_std_min, self.log_std_max)
         action_std = torch.exp(action_logstd)
         probs = Normal(action_mean, action_std)
         return probs
