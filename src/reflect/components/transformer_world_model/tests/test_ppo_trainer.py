@@ -69,7 +69,8 @@ def test_update(encoder, decoder, actor):
     )
 
     history = trainer.update(
-        state_samples=z,
+        actor_state_samples=z,
+        critic_state_samples=z,
         reward_samples=r,
         done_samples=d,
         action_samples=a
@@ -139,7 +140,8 @@ def test_update_state(state_encoder, state_decoder, actor):
     )
 
     history = trainer.update(
-        state_samples=z,
+        actor_state_samples=z,
+        critic_state_samples=z,
         reward_samples=r,
         done_samples=d,
         action_samples=a
