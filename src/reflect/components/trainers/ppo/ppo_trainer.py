@@ -52,12 +52,12 @@ class PPOTrainer:
 
     def compute_gae(
             self,
-            states,
+            critic_states,
             rewards,
             dones
         ):
         _, l, *_ = rewards.shape
-        values = self.critic(states)
+        values = self.critic(critic_states)
         advantages = torch.zeros_like(rewards)
         last_advantage = 0
         for t in reversed(range(l-1)):
@@ -76,7 +76,8 @@ class PPOTrainer:
             self,
             advantages,
             returns,
-            state_samples,
+            actor_state_samples,
+            critic_state_samples,
             action_samples,
             num_minibatch: Optional[int]=None,
             update_epochs: Optional[int]=None,
@@ -87,7 +88,7 @@ class PPOTrainer:
             update_epochs = self.update_epochs
 
         with torch.no_grad():
-            old_action_dist = self.actor(state_samples)
+            old_action_dist = self.actor(actor_state_samples)
             old_action_log_probs = old_action_dist \
                 .log_prob(action_samples) \
                 .detach() \
@@ -100,24 +101,26 @@ class PPOTrainer:
         clipfracs = []
         approxkls = []
 
-        state_samples = state_samples.reshape(-1, *state_samples.shape[2:])
+        actor_state_samples = actor_state_samples.reshape(-1, *actor_state_samples.shape[2:])
+        critic_state_samples = critic_state_samples.reshape(-1, *critic_state_samples.shape[2:])
         action_samples = action_samples.reshape(-1, *action_samples.shape[2:])
         advantages = advantages.reshape(-1, *advantages.shape[2:])
         returns = returns.reshape(-1, *returns.shape[2:])
         old_action_log_probs = old_action_log_probs.reshape(-1, *old_action_log_probs.shape[2:])
-        b, *_ = state_samples.shape
+        b, *_ = actor_state_samples.shape
         minibatch_size = int(b / self.num_minibatch)
 
         for epoch in range(self.update_epochs):
             inds = torch.randperm(b, device=advantages.device)
             for i in range(0, b, minibatch_size):
                 sample_inds = inds[i:i+minibatch_size]
-                state_minibatch = state_samples[sample_inds]
+                actor_state_minibatch = actor_state_samples[sample_inds]
+                critic_state_minibatch = critic_state_samples[sample_inds]
                 action_minibatch = action_samples[sample_inds]
                 old_action_log_probs_minibatch = old_action_log_probs[sample_inds]
                 advantage_minibatch = advantages[sample_inds]
 
-                action_dist = self.actor(state_minibatch)
+                action_dist = self.actor(actor_state_minibatch)
                 entropy_loss = -action_dist.entropy().sum(-1).mean()
                 action_log_probs_minibatch = action_dist \
                     .log_prob(action_minibatch) \
@@ -139,7 +142,7 @@ class PPOTrainer:
                 pg_loss_2 = - advantage_minibatch * torch.clamp(ratio, 1 - self.clip_ratio, 1 + self.clip_ratio)
                 pg_loss = torch.max(pg_loss_1, pg_loss_2).mean()
 
-                values_minibatch = self.critic(state_minibatch).view(-1)
+                values_minibatch = self.critic(critic_state_minibatch).view(-1)
                 value_loss = F.mse_loss(returns[sample_inds], values_minibatch)
                 
                 loss = pg_loss + self.eta * entropy_loss + self.vf_coef * value_loss
@@ -168,7 +171,8 @@ class PPOTrainer:
 
     def update(
             self,
-            state_samples,
+            actor_state_samples,
+            critic_state_samples,
             reward_samples,
             done_samples,
             action_samples,
@@ -176,14 +180,15 @@ class PPOTrainer:
             update_epochs: Optional[int]=None,
         ):
         advantages, returns = self.compute_gae(
-            states=state_samples,
+            critic_states=critic_state_samples,
             rewards=reward_samples,
             dones=done_samples
         )
         value_loss, actor_loss, entropy_loss, grad_norm, clipfrac, approxkl, num_epochs = self.actor_update(
             advantages=advantages.detach(),
             returns=returns.detach(),
-            state_samples=state_samples[:, :-1].detach(),
+            actor_state_samples=actor_state_samples[:, :-1].detach(),
+            critic_state_samples=critic_state_samples[:, :-1].detach(),
             action_samples=action_samples[:,:-1].detach(),
             num_minibatch=num_minibatch,
             update_epochs=update_epochs
