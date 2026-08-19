@@ -15,6 +15,7 @@ class PPOTrainerLosses:
     clipfrac: Optional[float]
     approxkl: Optional[float]
     num_epochs: int
+    lr: Optional[float] = None
 
 
 class PPOTrainer:
@@ -31,6 +32,9 @@ class PPOTrainer:
             num_minibatch: int=16,
             update_epochs: int=3,
             vf_coef: float=0.5,
+            adaptive_lr: bool=False,
+            adaptive_lr_min: float=1e-5,
+            adaptive_lr_max: float=1e-2,
         ):
         self.gamma = gamma
         self.lam = lam
@@ -40,6 +44,9 @@ class PPOTrainer:
         self.target_kl = target_kl
         self.update_epochs = update_epochs
         self.vf_coef = vf_coef
+        self.adaptive_lr = adaptive_lr
+        self.adaptive_lr_min = adaptive_lr_min
+        self.adaptive_lr_max = adaptive_lr_max
         self.actor = actor
         self.critic = critic
         self.lr = lr
@@ -133,7 +140,7 @@ class PPOTrainer:
                     approxkl = ((ratio - 1) - torch.log(ratio)).mean()
                     clipfracs.append(clipfrac.item())
                     approxkls.append(approxkl.item())
-                    if approxkl > self.target_kl:
+                    if not self.adaptive_lr and approxkl > self.target_kl:
                         break
 
                 advantage_minibatch = (advantage_minibatch - advantage_minibatch.mean()) / (advantage_minibatch.std() + 1e-8)
@@ -156,7 +163,14 @@ class PPOTrainer:
                 clipfracs.append(clipfrac.item())
                 approxkls.append(approxkl.item())
 
-            if approxkl > self.target_kl:
+            if self.adaptive_lr:
+                if approxkl > 2 * self.target_kl:
+                    self.lr *= 0.5
+                elif approxkl < 0.5 * self.target_kl:
+                    self.lr *= 1.5
+                self.lr = min(max(self.lr, self.adaptive_lr_min), self.adaptive_lr_max)
+                self.optim.update_lr(self.lr)
+            elif approxkl > self.target_kl:
                 break
 
         return (
@@ -166,7 +180,8 @@ class PPOTrainer:
             np.mean(grad_norms),
             np.mean(clipfracs),
             np.mean(approxkls),
-            epoch
+            epoch,
+            self.lr
         )
 
     def update(
@@ -184,7 +199,7 @@ class PPOTrainer:
             rewards=reward_samples,
             dones=done_samples
         )
-        value_loss, actor_loss, entropy_loss, grad_norm, clipfrac, approxkl, num_epochs = self.actor_update(
+        value_loss, actor_loss, entropy_loss, grad_norm, clipfrac, approxkl, num_epochs, lr = self.actor_update(
             advantages=advantages.detach(),
             returns=returns.detach(),
             actor_state_samples=actor_state_samples[:, :-1].detach(),
@@ -201,7 +216,8 @@ class PPOTrainer:
             grad_norm=grad_norm.item() if grad_norm is not None else None,
             clipfrac=clipfrac.item() if clipfrac is not None else None,
             approxkl=approxkl.item() if approxkl is not None else None,
-            num_epochs=num_epochs
+            num_epochs=num_epochs,
+            lr=lr
         )
 
     def to(self, device):
