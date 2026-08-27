@@ -227,3 +227,29 @@ def test_data_saver(tmp_path):
 
     data_loader = saver.load()
     assert data_loader.rollout_ind == 4
+
+def test_data_loader_add_rollout_manual():
+    env = gym.make(
+        "InvertedPendulum-v4",
+        render_mode="rgb_array"
+    )
+    data_loader = EnvDataLoader(
+        num_time_steps=18 + 1,
+        state_shape=(3, 64, 64),
+        use_imgs_as_states=True,
+        env=env,
+    )
+    states = torch.randn(10, 3, 64, 64)
+    actions = torch.randn(10, env.action_space.shape[0])
+    rewards = torch.randn(10)
+    dones = torch.randint(0, 2, (10,))
+    data_loader.add_rollout_manual(states, actions, rewards, dones)
+    assert data_loader.rollout_ind == 1
+    assert data_loader.end_index[0] == 10
+    assert torch.all(data_loader.state_buffer[0, :10] == states)
+    assert torch.all(data_loader.action_buffer[0, :10] == actions)
+    assert torch.all(data_loader.reward_buffer[0, :10] == rewards)
+    assert torch.all(data_loader.done_buffer[0, :10] == dones)
+    assert data_loader.reward_sums[0] == rewards.sum()
+    assert torch.all(data_loader.priorities[0, :10] == 1)
+    assert torch.all(data_loader.priorities[0, 10:] == 0)
